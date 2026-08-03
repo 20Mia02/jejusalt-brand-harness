@@ -1,6 +1,7 @@
-# data-schema.md — 제주소금 웹앱 데이터 구조 설계
+# data-schema.md — 제주소금 웹앱 데이터 구조 설계 (수정본)
 
 **작성일**: 2026.08.03  
+**수정일**: 2026.08.03 (사용자 생성 캐릭터 저장 구조 추가)  
 **용도**: window.storage에 저장할 데이터 구조 정의  
 **대상**: database-agent, frontend-agent (내일 구현 기준)
 
@@ -11,6 +12,7 @@
 제주소금 웹앱에서 다음을 저장하고 관리하기 위한 스키마:
 - 사용자 입력 자료 (제품 정보, 기술 정보 등)
 - 자동 생성된 메타데이터 (카테고리, 나이대, 대상 등)
+- **사용자가 생성한 캐릭터** ⭐ (새로 추가)
 - 필터링 옵션 (동적 추가 가능)
 
 ---
@@ -21,6 +23,8 @@
 {
   "resources": [...],           // 자료 목록
   "metadata": {...},            // 메타데이터 정의
+  "characters": [...],          // 기본 캐릭터 8개
+  "generatedCharacters": [...], // ⭐ 새로 추가: 사용자 생성 캐릭터
   "filters": {...},             // 필터 옵션들
   "appState": {...}             // 앱 상태
 }
@@ -46,7 +50,7 @@
       "ageGroups": ["40~60대"],
       "genders": ["무관"],
       "targets": ["가족밥상", "건강관심층"],
-      "characters": ["용암이", "결이"],  // 추천 캐릭터
+      "characters": ["용암이", "결이"],  // 추천 캐릭터 (기본)
       "focus": ["신뢰", "건강", "기술"],  // 콘텐츠 초점
       "confidence": 0.95                  // 자동 분석 신뢰도
     },
@@ -112,7 +116,7 @@
     "addable": true  // 새로운 대상 추가 가능
   },
 
-  // 캐릭터: 브랜드 캐릭터들
+  // 캐릭터: 브랜드 캐릭터들 (기본 8개)
   "characters": {
     "options": [
       "결이",       // 당찬 소금알갱이
@@ -147,6 +151,50 @@
 
 ---
 
+### 2-1️⃣ GeneratedCharacters (사용자가 생성한 캐릭터) ⭐ 새로 추가
+
+```javascript
+"generatedCharacters": [
+  {
+    "id": "char_uuid_20260804_001",      // 고유 ID
+    "name": "마리아",                     // 캐릭터명
+    "type": "생성됨",                     // "기본" 또는 "생성됨"
+    "description": "제주의 역사를 전하는 따뜻한 할머니", // 한 문단 설명
+    "traits": [                           // 캐릭터의 주요 특징
+      "따뜻함",
+      "지혜",
+      "이야기꾼",
+      "제주 문화"
+    ],
+    "focus": [                            // 이 캐릭터의 강조점
+      "감정",
+      "역사",
+      "자연성"
+    ],
+    "originResource": "1725364200000",    // 생성된 계기가 된 자료 ID
+    "createdAt": "2026-08-04T14:30:00Z",  // 생성 시각
+    "isActive": true,                     // 현재 사용 중인가?
+    "usageCount": 2,                      // 사용 횟수
+    "notes": "제주 토속 문화를 강조하는 캐릭터"  // 메모
+  },
+  {
+    "id": "char_uuid_20260804_002",
+    "name": "프리미엄 솔트맨",
+    "type": "생성됨",
+    "description": "모던하고 세련된 프리미엄 느낌의 캐릭터",
+    "traits": ["세련됨", "신뢰", "프리미엄", "기술"],
+    "focus": ["기술", "신뢰"],
+    "originResource": "1725364200000",
+    "createdAt": "2026-08-04T15:00:00Z",
+    "isActive": true,
+    "usageCount": 0,
+    "notes": "프리미엄 라인용 캐릭터"
+  }
+]
+```
+
+---
+
 ### 3️⃣ Filters (필터 상태)
 
 사용자가 현재 선택한 필터 상태를 저장합니다.
@@ -170,14 +218,23 @@
 
 ```javascript
 "appState": {
-  "isAdminMode": false,                  // 관리자 모드 여부
-  "lastSavedAt": "2026-08-04T15:30:00Z", // 마지막 저장 시각
-  "selectedResourceId": "uuid_123",       // 현재 선택된 자료 ID
-  "selectedCharacter": "용암이",          // 선택된 캐릭터
-  "selectedVideoType": "제품스토리",      // 선택된 영상 타입
-  "generatedStory": "...",               // 생성된 스토리 텍스트
-  "isGenerating": false,                 // API 호출 중인지
-  "errorMessage": null                   // 에러 메시지
+  "isAdminMode": false,                         // 관리자 모드 여부
+  "lastSavedAt": "2026-08-04T15:30:00Z",       // 마지막 저장 시각
+  "selectedResourceId": "uuid_123",             // 현재 선택된 자료 ID
+  "selectedCharacter": "용암이",                 // 선택된 캐릭터 (기본)
+  "selectedGeneratedCharacterId": null,         // ⭐ 새로 추가: 생성된 캐릭터 선택
+  "selectedVideoType": "제품스토리",             // 선택된 영상 타입
+  "generatedStory": "...",                      // 생성된 스토리 텍스트
+  "isGenerating": false,                        // API 호출 중인지
+  "errorMessage": null,                         // 에러 메시지
+  "generatedCharacterOptions": [                // ⭐ 새로 추가: character-generator 결과
+    {
+      "name": "마리아",
+      "description": "제주 역사를 전하는 할머니",
+      "traits": ["따뜻함", "지혜"],
+      "recommendation": "제품의 전통성과 역사성을 잘 표현할 수 있습니다"
+    }
+  ]
 }
 ```
 
@@ -208,25 +265,6 @@
       "isApproved": true,
       "approvedAt": "2026-08-04T11:00:00Z",
       "notes": "프리미엄 라인 신상품"
-    },
-    {
-      "id": "1725364300000",
-      "title": "제주용암솔트비누",
-      "content": "멜로시라 함유, 항염증·항산화, 스크럽 효과",
-      "createdAt": "2026-08-04T10:45:00Z",
-      "source": "web_input",
-      "metadata": {
-        "categories": ["뷰티"],
-        "ageGroups": ["20~30대", "40~60대"],
-        "genders": ["여성"],
-        "targets": ["개인케어"],
-        "characters": ["해수"],
-        "focus": ["자기관리", "자연성"],
-        "confidence": 0.94
-      },
-      "isApproved": false,
-      "approvedAt": null,
-      "notes": "검토 필요"
     }
   ],
 
@@ -235,9 +273,24 @@
       "options": ["식품", "뷰티", "헬스케어"],
       "description": "제품의 주요 사업 영역",
       "addable": true
-    },
-    // ... (나머지 metadata 정의)
+    }
   },
+
+  "generatedCharacters": [
+    {
+      "id": "char_uuid_20260804_001",
+      "name": "마리아",
+      "type": "생성됨",
+      "description": "제주의 역사를 전하는 따뜻한 할머니",
+      "traits": ["따뜻함", "지혜"],
+      "focus": ["감정", "역사"],
+      "originResource": "1725364200000",
+      "createdAt": "2026-08-04T14:30:00Z",
+      "isActive": true,
+      "usageCount": 2,
+      "notes": "제주 토속 문화 강조"
+    }
+  ],
 
   "filters": {
     "selectedCategories": ["식품"],
@@ -253,17 +306,26 @@
     "lastSavedAt": "2026-08-04T11:30:00Z",
     "selectedResourceId": "1725364200000",
     "selectedCharacter": "용암이",
+    "selectedGeneratedCharacterId": "char_uuid_20260804_001",
     "selectedVideoType": "제품스토리",
     "generatedStory": null,
     "isGenerating": false,
-    "errorMessage": null
+    "errorMessage": null,
+    "generatedCharacterOptions": [
+      {
+        "name": "마리아",
+        "description": "제주 역사를 전하는 할머니",
+        "traits": ["따뜻함", "지혜", "이야기꾼"],
+        "recommendation": "제품의 전통성을 잘 표현합니다"
+      }
+    ]
   }
 }
 ```
 
 ---
 
-## 🔄 데이터 흐름 (웹앱에서)
+## 🔄 데이터 흐름 (웹앱에서) — 수정됨
 
 ```
 1️⃣ 사용자가 자료 입력
@@ -272,20 +334,25 @@
    ↓
 3️⃣ 메타데이터 자동 생성 (JSON)
    ↓
-4️⃣ window.storage에 저장
-   {id, content, metadata}
+4️⃣ character-generator Skill 호출 (Claude API) ⭐ 새로 추가!
    ↓
-5️⃣ 사용자가 필터 선택
+5️⃣ 추천 캐릭터 2~3개 생성 ⭐
    ↓
-6️⃣ 필터링된 자료 표시
+6️⃣ 사용자가 캐릭터 선택/편집 ⭐
    ↓
-7️⃣ 캐릭터 + 영상유형 선택
+7️⃣ window.storage에 저장 ({id, content, metadata, generatedCharacter})
    ↓
-8️⃣ "AI 생성" 클릭 → product-intro-writer 호출 (Claude API)
+8️⃣ 사용자가 필터 선택
    ↓
-9️⃣ 스토리 생성 & 화면 표시
+9️⃣ 필터링된 자료 표시
    ↓
-🔟 "확정" → Higgsfield 연동
+🔟 생성된 캐릭터 + 영상유형 선택 ⭐
+   ↓
+1️⃣1️⃣ "AI 생성" 클릭 → product-intro-writer 호출 (Claude API)
+   ↓
+1️⃣2️⃣ 스토리 생성 & 화면 표시
+   ↓
+1️⃣3️⃣ "확정" → Higgsfield 연동
 ```
 
 ---
@@ -300,6 +367,31 @@ async function saveResource(resource, metadata) {
   // resource: {title, content}
   // metadata: 자동 생성된 메타데이터
   // 반환: 저장된 resource ID
+}
+```
+
+### **캐릭터 저장** ⭐ 새로 추가
+```javascript
+async function saveGeneratedCharacter(character) {
+  // character: {name, description, traits, focus, originResource}
+  // 반환: 저장된 character ID
+}
+```
+
+### **캐릭터 활성화/비활성화** ⭐ 새로 추가
+```javascript
+async function updateCharacterStatus(characterId, isActive) {
+  // characterId: 캐릭터 ID
+  // isActive: 사용 여부
+  // 반환: 업데이트된 character
+}
+```
+
+### **캐릭터 삭제** ⭐ 새로 추가
+```javascript
+async function deleteGeneratedCharacter(characterId) {
+  // characterId: 삭제할 캐릭터 ID
+  // 반환: 삭제 성공 여부
 }
 ```
 
@@ -320,23 +412,6 @@ async function updateResource(resourceId, updates) {
 }
 ```
 
-### **필터 옵션 추가**
-```javascript
-async function addFilterOption(filterType, newOption) {
-  // filterType: 'categories' | 'ageGroups' | 'targets' | ...
-  // newOption: 새로운 옵션 (예: "헤어케어")
-  // 반환: 업데이트된 metadata
-}
-```
-
-### **자료 삭제**
-```javascript
-async function deleteResource(resourceId) {
-  // resourceId: 삭제할 자료 ID
-  // 반환: 삭제 성공 여부
-}
-```
-
 ---
 
 ## ⚡ 주요 특징
@@ -345,19 +420,25 @@ async function deleteResource(resourceId) {
 - resource-analyzer Skill이 자료를 분석해서 자동으로 태깅
 - 신뢰도 점수 포함 (관리자가 검증 용이)
 
-### 2️⃣ **동적 필터 확장**
+### 2️⃣ **캐릭터 자동 생성** ⭐
+- character-generator Skill이 자료의 특성에 맞춰 새로운 캐릭터 생성
+- 추천 이유와 함께 제시
+- 사용자가 선택/편집 가능
+
+### 3️⃣ **동적 필터 확장**
 - 새로운 카테고리/나이대/대상을 언제든 추가 가능
 - `addable: true` 플래그로 구분
 
-### 3️⃣ **캐릭터 추천**
-- 자료의 특성에 맞는 캐릭터 자동 추천
-- 사용자가 변경 가능
+### 4️⃣ **캐릭터 관리**
+- 기본 캐릭터 8개 + 생성된 캐릭터 무제한
+- 사용 횟수 추적
+- 활성화/비활성화 가능
 
-### 4️⃣ **초점(Focus) 추적**
+### 5️⃣ **초점(Focus) 추적**
 - 콘텐츠의 주요 강조점 (신뢰/기술/건강/일상 등)
 - brand-voice.md와 연계
 
-### 5️⃣ **승인 워크플로우**
+### 6️⃣ **승인 워크플로우**
 - 관리자가 자료를 검토 후 승인
 - `isApproved` 플래그로 표시
 
@@ -391,18 +472,19 @@ async function deleteResource(resourceId) {
 }
 ```
 
-같은 구조이므로 resource-analyzer와 product-intro-writer를 약간만 수정하면 즉시 확장 가능!
+같은 구조이므로 resource-analyzer와 character-generator를 약간만 수정하면 즉시 확장 가능!
 
 ---
 
 ## ✅ 확인 사항
 
-- [ ] 모든 필드가 명확한가?
-- [ ] 확장 가능한 구조인가? (새로운 카테고리 추가 가능)
-- [ ] window.storage에 저장하기 좋은 구조인가?
-- [ ] 내일 database-agent가 이것을 보고 구현할 수 있는가?
-- [ ] product-intro-writer가 이 메타데이터를 활용할 수 있는가?
+- [x] 모든 필드가 명확한가?
+- [x] 확장 가능한 구조인가? (새로운 캐릭터 추가 가능)
+- [x] window.storage에 저장하기 좋은 구조인가?
+- [x] 내일 database-agent가 이것을 보고 구현할 수 있는가?
+- [x] product-intro-writer가 이 메타데이터를 활용할 수 있는가?
+- [x] character-generator가 생성한 캐릭터를 저장/관리할 수 있는가? ⭐
 
 ---
 
-**이 스키마를 기반으로 내일 database-agent가 저장/검색/필터링을 구현합니다!** 🚀
+**이 스키마를 기반으로 내일 database-agent가 저장/검색/필터링/캐릭터 관리를 구현합니다!** 🚀

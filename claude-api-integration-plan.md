@@ -1,6 +1,7 @@
 # claude-api-integration-plan.md — Claude API 웹앱 통합 계획 (수정본)
 
 **작성일**: 2026.08.03  
+**수정일**: 2026.08.03 (character-generator 호출 함수 추가)  
 **용도**: 웹앱(React)에서 Claude API를 직접 호출하는 방법 정의  
 **대상**: backend-agent (내일 구현 기준)
 
@@ -10,6 +11,7 @@
 
 내일(8/4) 웹앱 기능1, 기능4에서 다음을 실시간으로 처리하기 위함:
 - **기능1**: 자료 업로드 시 → resource-analyzer Skill 호출 → 자동 메타데이터 생성
+- **기능1**: 메타데이터 생성 후 → character-generator Skill 호출 → 추천 캐릭터 생성 ⭐
 - **기능4**: "AI 생성" 버튼 클릭 시 → product-intro-writer Skill 호출 → 실시간 스토리 생성
 
 ---
@@ -105,7 +107,7 @@ your_api_key_here 부분을 자신의 API 키로 교체하면 됩니다."
 **현재 추천**: `claude-sonnet-4-6`
 - 정확도 높음 (복잡한 지시사항도 잘 이해)
 - 가격 중간
-- 우리 작업 (카피라이팅, 검증)에 최적
+- 우리 작업 (카피라이팅, 검증, 캐릭터 생성)에 최적
 
 ```javascript
 model: "claude-sonnet-4-6"
@@ -266,7 +268,79 @@ export default analyzeResource;
 
 ---
 
-### 함수 2: product-intro-writer 호출 (기능4용)
+### 함수 2: character-generator 호출 (기능1용 - 캐릭터 자동 생성) ⭐ 새로 추가
+
+```javascript
+// utils/characterGenerator.js
+import callClaudeAPI from './claudeApi';
+
+async function generateCharacter(resourceMetadata, productName) {
+  const { categories, ageGroups, targets, focus } = resourceMetadata;
+
+  const prompt = `
+# 역할
+너는 제주소금의 새로운 캐릭터를 만드는 AI야.
+자료의 특성에 맞는 고유한 캐릭터를 창조하거나 기존 캐릭터 중 최적의 특징을 조합해서 추천해.
+
+# 입력
+- 제품명: ${productName}
+- 카테고리: ${categories.join(', ')}
+- 타겟 나이대: ${ageGroups.join(', ')}
+- 타겟 고객: ${targets.join(', ')}
+- 강조점: ${focus.join(', ')}
+
+# 기존 기본 캐릭터 8개
+- 결이: 당찬 소금알갱이, 주인공, 변화와 신뢰 강조
+- 용암이: 따뜻한 아버지, 보호자, 포근함과 함께 강조
+- 해수: 신비롭고 우아한 여성, 지혜자, 정성과 자연성 강조
+- 미내: 포용적인 누나, 격려자, 밝음과 공감 강조
+- 현무: 신뢰로운 형, 실행자, 안정감과 신뢰 강조
+- 가마할방: 따뜻한 할아버지, 안정감 제공자, 전통과 따뜻함 강조
+- 불이: 발랄한 친구, 응원자, 에너지와 활기 강조
+- 한라: 지혜로운 할머니, 수호자, 역사와 지혜 강조
+
+# 출력 형식 (JSON만 출력, 다른 텍스트 없이)
+[
+  {
+    "name": "캐릭터명",
+    "description": "한 문장 설명",
+    "traits": ["특징1", "특징2", "특징3"],
+    "focus": ["강조점1", "강조점2"],
+    "recommendation": "이 캐릭터를 추천하는 구체적인 이유",
+    "baseCharacter": "결이|용암이|해수|미내|현무|가마할방|불이|한라|새로운캐릭터"
+  }
+]
+`;
+
+  const result = await callClaudeAPI(prompt, 800);
+  
+  try {
+    // JSON 파싱
+    const cleaned = result.replace(/```json|```/g, '').trim();
+    const characters = JSON.parse(cleaned);
+    return Array.isArray(characters) ? characters : [characters];
+  } catch (e) {
+    console.error("캐릭터 생성 파싱 실패:", e);
+    // 파싱 실패 시 기본 추천
+    return [
+      {
+        name: "결이",
+        description: "당찬 소금알갱이",
+        traits: ["신뢰", "변화", "당찬"],
+        focus: ["신뢰", "기술"],
+        recommendation: "기본 캐릭터로 시작합니다",
+        baseCharacter: "결이"
+      }
+    ];
+  }
+}
+
+export default generateCharacter;
+```
+
+---
+
+### 함수 3: product-intro-writer 호출 (기능4용)
 
 ```javascript
 // utils/productIntroWriter.js
@@ -312,16 +386,20 @@ export default generateProductIntro;
 
 ## 🎨 3. React 컴포넌트에서 사용 예시
 
-### 기능1: UploadCategorizer.jsx (자료 업로드 & 자동 분류)
+### 기능1: UploadCategorizer.jsx (자료 업로드 & 자동 분류 & 캐릭터 생성) ⭐ 수정됨
 
 ```javascript
 import React, { useState } from 'react';
 import analyzeResource from '../utils/resourceAnalyzer';
+import generateCharacter from '../utils/characterGenerator';
 
 function UploadCategorizer() {
   const [inputText, setInputText] = useState('');
+  const [inputTitle, setInputTitle] = useState('');
   const [metadata, setMetadata] = useState(null);
+  const [generatedCharacters, setGeneratedCharacters] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingCharacter, setIsGeneratingCharacter] = useState(false);
   const [error, setError] = useState(null);
 
   const handleAnalyze = async () => {
@@ -329,35 +407,64 @@ function UploadCategorizer() {
     setError(null);
     
     try {
+      // Step 1: 메타데이터 분석
       const result = await analyzeResource(inputText);
       setMetadata(result);
+
+      // Step 2: 캐릭터 생성 ⭐
+      setIsGeneratingCharacter(true);
+      const characters = await generateCharacter(result, inputTitle);
+      setGeneratedCharacters(characters);
+      
     } catch (e) {
       setError(e.message);
     } finally {
       setIsAnalyzing(false);
+      setIsGeneratingCharacter(false);
     }
   };
 
   return (
     <div>
+      <input 
+        type="text"
+        value={inputTitle}
+        onChange={(e) => setInputTitle(e.target.value)}
+        placeholder="제품명을 입력하세요..."
+      />
       <textarea 
         value={inputText}
         onChange={(e) => setInputText(e.target.value)}
         placeholder="제품 정보를 입력하세요..."
       />
-      <button onClick={handleAnalyze} disabled={isAnalyzing}>
-        {isAnalyzing ? "분석 중..." : "분석하기"}
+      <button onClick={handleAnalyze} disabled={isAnalyzing || isGeneratingCharacter}>
+        {isAnalyzing ? "분석 중..." : isGeneratingCharacter ? "캐릭터 생성 중..." : "분석 & 캐릭터 생성"}
       </button>
 
       {error && <p style={{color: 'red'}}>{error}</p>}
       
       {metadata && (
         <div>
+          <h3>자료 분석 결과</h3>
           <p>카테고리: {metadata.categories.join(', ')}</p>
           <p>나이대: {metadata.ageGroups.join(', ')}</p>
           <p>대상: {metadata.targets.join(', ')}</p>
-          <p>추천 캐릭터: {metadata.characters.join(', ')}</p>
           <p>신뢰도: {(metadata.confidence * 100).toFixed(0)}%</p>
+        </div>
+      )}
+
+      {generatedCharacters && (
+        <div>
+          <h3>추천 캐릭터</h3>
+          {generatedCharacters.map((char, idx) => (
+            <div key={idx} style={{border: '1px solid #ccc', padding: '10px', marginBottom: '10px'}}>
+              <h4>{char.name}</h4>
+              <p>{char.description}</p>
+              <p>특징: {char.traits.join(', ')}</p>
+              <p>추천 이유: {char.recommendation}</p>
+              <button>이 캐릭터 선택</button>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -496,6 +603,17 @@ export default StoryToVideoFlow;
 
 **발표 후**: 
 - `.env.example` 문서와 함께 제주소금에 인수인계
+
+---
+
+## 📊 호출 함수 요약
+
+| 함수 | 용도 | 입력 | 출력 |
+|---|---|---|---|
+| **callClaudeAPI** | 공통 호출 | prompt, maxTokens | 텍스트 |
+| **analyzeResource** ⭐ | 메타데이터 생성 | 자료 텍스트 | JSON metadata |
+| **generateCharacter** ⭐ | 캐릭터 생성 | metadata, productName | 캐릭터 배열 |
+| **generateProductIntro** | 스토리 생성 | params | 마크다운 텍스트 |
 
 ---
 
