@@ -1,7 +1,7 @@
-# claude-api-integration-plan.md — Claude API 웹앱 통합 계획 (수정본)
+# claude-api-integration-plan.md — Claude API 웹앱 통합 계획 (v3)
 
 **작성일**: 2026.08.03  
-**수정일**: 2026.08.03 (character-generator 호출 함수 추가)  
+**수정일**: 2026.08.03 (productSpec→productInfo 통일, keywords 파라미터 추가)  
 **용도**: 웹앱(React)에서 Claude API를 직접 호출하는 방법 정의  
 **대상**: backend-agent (내일 구현 기준)
 
@@ -11,7 +11,7 @@
 
 내일(8/4) 웹앱 기능1, 기능4에서 다음을 실시간으로 처리하기 위함:
 - **기능1**: 자료 업로드 시 → resource-analyzer Skill 호출 → 자동 메타데이터 생성
-- **기능1**: 메타데이터 생성 후 → character-generator Skill 호출 → 추천 캐릭터 생성 ⭐
+- **기능1**: 메타데이터 생성 후 → character-generator Skill 호출 → 추천 캐릭터 생성
 - **기능4**: "AI 생성" 버튼 클릭 시 → product-intro-writer Skill 호출 → 실시간 스토리 생성
 
 ---
@@ -61,11 +61,6 @@
 REACT_APP_CLAUDE_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxx
 ```
 
-**예시**:
-```bash
-REACT_APP_CLAUDE_API_KEY=sk-ant-6abcdef1234567890ghijklmnopqrst
-```
-
 ---
 
 ### Step 3: .gitignore에 추가 (보안! 절대 필수!)
@@ -89,15 +84,7 @@ node_modules/
 
 ```bash
 # .env.example (Git에 커밋 OK! 실제 키는 없음)
-
-# 제주소금이 자신의 API 키로 교체할 템플릿
 REACT_APP_CLAUDE_API_KEY=your_api_key_here
-```
-
-**인수인계 시 제주소금에게 설명**:
-```
-"이 .env.example 파일을 .env로 이름을 바꾸고,
-your_api_key_here 부분을 자신의 API 키로 교체하면 됩니다."
 ```
 
 ---
@@ -105,34 +92,22 @@ your_api_key_here 부분을 자신의 API 키로 교체하면 됩니다."
 ### 🔄 모델 선택 (현재 설정)
 
 **현재 추천**: `claude-sonnet-4-6`
-- 정확도 높음 (복잡한 지시사항도 잘 이해)
-- 가격 중간
-- 우리 작업 (카피라이팅, 검증, 캐릭터 생성)에 최적
+- 정확도 높음, 가격 중간, 카피라이팅/검증/캐릭터 생성에 최적
 
 ```javascript
 model: "claude-sonnet-4-6"
-```
-
-**나중에 변경하고 싶으면**:
-```javascript
-// Haiku로 빠르게 (비용 저렴)
-model: "claude-haiku-4-5"
-
-// Opus로 매우 정확하게 (비용 비쌈)
-model: "claude-opus-4-1"
 ```
 
 ---
 
 ## 🛠️ 2. API 호출 함수 설계
 
-### 기본 호출 함수 (공통) - 강화된 버전
+### 기본 호출 함수 (공통)
 
 ```javascript
 // utils/claudeApi.js
 
 async function callClaudeAPI(prompt, maxTokens = 1000) {
-  // 1️⃣ API 키 확인 (필수!)
   const apiKey = process.env.REACT_APP_CLAUDE_API_KEY;
   
   if (!apiKey) {
@@ -147,22 +122,20 @@ async function callClaudeAPI(prompt, maxTokens = 1000) {
   if (!apiKey.startsWith("sk-ant-")) {
     throw new Error(
       "❌ API 키 형식이 잘못되었습니다.\n" +
-      "sk-ant- 로 시작해야 합니다.\n" +
-      "https://console.anthropic.com에서 확인해주세요."
+      "sk-ant- 로 시작해야 합니다."
     );
   }
 
   try {
-    // 2️⃣ API 호출
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,  // ← 박주미 또는 제주소금 키 자동 사용
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",  // ← 필요시 변경 가능
+        model: "claude-sonnet-4-6",
         max_tokens: maxTokens,
         messages: [
           { role: "user", content: prompt }
@@ -170,26 +143,16 @@ async function callClaudeAPI(prompt, maxTokens = 1000) {
       })
     });
 
-    // 3️⃣ 에러 처리
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      
       if (response.status === 401) {
-        throw new Error(
-          "❌ API 키가 잘못되었습니다.\n" +
-          "https://console.anthropic.com에서 확인하고 .env를 수정해주세요."
-        );
+        throw new Error("❌ API 키가 잘못되었습니다. .env를 확인해주세요.");
       } else if (response.status === 429) {
-        throw new Error(
-          "⏳ 요청이 너무 많습니다.\n" +
-          "30초 후 다시 시도해주세요."
-        );
+        throw new Error("⏳ 요청이 너무 많습니다. 30초 후 다시 시도해주세요.");
       } else {
         throw new Error(`API 호출 실패: ${response.status}`);
       }
     }
 
-    // 4️⃣ 응답 처리
     const data = await response.json();
     if (!data.content || !data.content[0]) {
       throw new Error("응답 형식이 올바르지 않습니다.");
@@ -208,19 +171,23 @@ export default callClaudeAPI;
 
 ---
 
-### 함수 1: resource-analyzer 호출 (기능1용)
+### 함수 1: resource-analyzer 호출 (기능1용) — ⭐ productInfo, keywords 반영
 
 ```javascript
 // utils/resourceAnalyzer.js
 import callClaudeAPI from './claudeApi';
 
-async function analyzeResource(resourceText) {
+async function analyzeResource(productInfo, keywords = []) {
+  const keywordText = keywords.length > 0 
+    ? `\n\n# 강조 키워드\n${keywords.join(', ')}` 
+    : '';
+
   const prompt = `
 # 역할
-너는 제주소금 자료를 분석해서 메타데이터를 자동 생성하는 AI야.
+너는 제주소금 제품 정보를 분석해서 메타데이터를 자동 생성하는 AI야.
 
-# 입력 자료
-${resourceText}
+# 입력 제품 정보
+${productInfo}${keywordText}
 
 # 분류 기준 (data-schema.md 참고)
 - categories: 식품 / 뷰티 / 헬스케어
@@ -229,6 +196,9 @@ ${resourceText}
 - targets: 개인케어 / 가족밥상 / 운동애호가 / 관광객 / 선물기념품
 - characters: 결이 / 용암이 / 해수 / 미내 / 현무 / 가마할방 / 불이 / 한라
 - focus: 신뢰 / 기술 / 건강 / 자기관리 / 일상 / 감정 / 자연성
+
+# 참고
+키워드가 제공된 경우, 이를 focus나 targets 분석에 우선적으로 반영해줘.
 
 # 출력 형식 (JSON만 출력, 다른 텍스트 없이)
 {
@@ -245,12 +215,10 @@ ${resourceText}
   const result = await callClaudeAPI(prompt, 500);
   
   try {
-    // JSON 파싱 (```json 태그 제거)
     const cleaned = result.replace(/```json|```/g, '').trim();
     return JSON.parse(cleaned);
   } catch (e) {
     console.error("메타데이터 파싱 실패:", e);
-    // 파싱 실패 시 기본값 반환
     return {
       categories: ["식품"],
       ageGroups: ["40~60대"],
@@ -268,26 +236,29 @@ export default analyzeResource;
 
 ---
 
-### 함수 2: character-generator 호출 (기능1용 - 캐릭터 자동 생성) ⭐ 새로 추가
+### 함수 2: character-generator 호출 (기능1용 - 캐릭터 자동 생성)
 
 ```javascript
 // utils/characterGenerator.js
 import callClaudeAPI from './claudeApi';
 
-async function generateCharacter(resourceMetadata, productName) {
+async function generateCharacter(resourceMetadata, productName, keywords = []) {
   const { categories, ageGroups, targets, focus } = resourceMetadata;
+  const keywordText = keywords.length > 0 
+    ? `\n- 강조 키워드: ${keywords.join(', ')}` 
+    : '';
 
   const prompt = `
 # 역할
 너는 제주소금의 새로운 캐릭터를 만드는 AI야.
-자료의 특성에 맞는 고유한 캐릭터를 창조하거나 기존 캐릭터 중 최적의 특징을 조합해서 추천해.
+제품 정보의 특성에 맞는 고유한 캐릭터를 창조하거나 기존 캐릭터 중 최적의 특징을 조합해서 추천해.
 
 # 입력
 - 제품명: ${productName}
 - 카테고리: ${categories.join(', ')}
 - 타겟 나이대: ${ageGroups.join(', ')}
 - 타겟 고객: ${targets.join(', ')}
-- 강조점: ${focus.join(', ')}
+- 강조점: ${focus.join(', ')}${keywordText}
 
 # 기존 기본 캐릭터 8개
 - 결이: 당찬 소금알갱이, 주인공, 변화와 신뢰 강조
@@ -315,13 +286,11 @@ async function generateCharacter(resourceMetadata, productName) {
   const result = await callClaudeAPI(prompt, 800);
   
   try {
-    // JSON 파싱
     const cleaned = result.replace(/```json|```/g, '').trim();
     const characters = JSON.parse(cleaned);
     return Array.isArray(characters) ? characters : [characters];
   } catch (e) {
     console.error("캐릭터 생성 파싱 실패:", e);
-    // 파싱 실패 시 기본 추천
     return [
       {
         name: "결이",
@@ -340,14 +309,17 @@ export default generateCharacter;
 
 ---
 
-### 함수 3: product-intro-writer 호출 (기능4용)
+### 함수 3: product-intro-writer 호출 (기능4용) — ⭐ productInfo, videoType 동적 반영
 
 ```javascript
 // utils/productIntroWriter.js
 import callClaudeAPI from './claudeApi';
 
 async function generateProductIntro(params) {
-  const { category, character, productName, productSpec, videoType } = params;
+  const { category, character, productName, productInfo, keywords = [], videoType } = params;
+  const keywordText = keywords.length > 0 
+    ? `\n- 강조 키워드: ${keywords.join(', ')}` 
+    : '';
 
   const prompt = `
 # 역할
@@ -358,7 +330,7 @@ brand-voice.md의 3원칙(정직하게·제주와 기술·일상)을 반드시 �
 - 카테고리: ${category}
 - 캐릭터: ${character}
 - 제품명: ${productName}
-- 제품 스펙: ${productSpec}
+- 제품 정보: ${productInfo}${keywordText}
 - 영상유형: ${videoType}
 
 # 출력 (마크다운 형식)
@@ -386,7 +358,7 @@ export default generateProductIntro;
 
 ## 🎨 3. React 컴포넌트에서 사용 예시
 
-### 기능1: UploadCategorizer.jsx (자료 업로드 & 자동 분류 & 캐릭터 생성) ⭐ 수정됨
+### 기능1: UploadCategorizer.jsx (자료 업로드 & 자동 분류 & 캐릭터 생성) — ⭐ productInfo/keywords 반영
 
 ```javascript
 import React, { useState } from 'react';
@@ -394,8 +366,9 @@ import analyzeResource from '../utils/resourceAnalyzer';
 import generateCharacter from '../utils/characterGenerator';
 
 function UploadCategorizer() {
-  const [inputText, setInputText] = useState('');
   const [inputTitle, setInputTitle] = useState('');
+  const [inputProductInfo, setInputProductInfo] = useState('');  // ⭐ productInfo
+  const [inputKeywords, setInputKeywords] = useState('');         // ⭐ keywords (콤마 구분 텍스트)
   const [metadata, setMetadata] = useState(null);
   const [generatedCharacters, setGeneratedCharacters] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -406,14 +379,20 @@ function UploadCategorizer() {
     setIsAnalyzing(true);
     setError(null);
     
+    // 키워드 텍스트를 배열로 변환 (예: "프리미엄, 건강" → ["프리미엄", "건강"])
+    const keywordsArray = inputKeywords
+      .split(',')
+      .map(k => k.trim())
+      .filter(k => k.length > 0);
+    
     try {
       // Step 1: 메타데이터 분석
-      const result = await analyzeResource(inputText);
+      const result = await analyzeResource(inputProductInfo, keywordsArray);
       setMetadata(result);
 
-      // Step 2: 캐릭터 생성 ⭐
+      // Step 2: 캐릭터 생성
       setIsGeneratingCharacter(true);
-      const characters = await generateCharacter(result, inputTitle);
+      const characters = await generateCharacter(result, inputTitle, keywordsArray);
       setGeneratedCharacters(characters);
       
     } catch (e) {
@@ -426,17 +405,29 @@ function UploadCategorizer() {
 
   return (
     <div>
+      <label>제품명</label>
       <input 
         type="text"
         value={inputTitle}
         onChange={(e) => setInputTitle(e.target.value)}
-        placeholder="제품명을 입력하세요..."
+        placeholder="예: 제주용암프리미엄솔트"
       />
+
+      <label>제품 정보</label>
       <textarea 
-        value={inputText}
-        onChange={(e) => setInputText(e.target.value)}
-        placeholder="제품 정보를 입력하세요..."
+        value={inputProductInfo}
+        onChange={(e) => setInputProductInfo(e.target.value)}
+        placeholder="나트륨, 마그네슘 수치, 인증 정보, 특징 등을 자유롭게 입력하세요..."
       />
+
+      <label>키워드 (선택, 콤마로 구분)</label>
+      <input 
+        type="text"
+        value={inputKeywords}
+        onChange={(e) => setInputKeywords(e.target.value)}
+        placeholder="예: 프리미엄, 건강, 가족, 전통"
+      />
+
       <button onClick={handleAnalyze} disabled={isAnalyzing || isGeneratingCharacter}>
         {isAnalyzing ? "분석 중..." : isGeneratingCharacter ? "캐릭터 생성 중..." : "분석 & 캐릭터 생성"}
       </button>
@@ -445,7 +436,7 @@ function UploadCategorizer() {
       
       {metadata && (
         <div>
-          <h3>자료 분석 결과</h3>
+          <h3>제품 정보 분석 결과</h3>
           <p>카테고리: {metadata.categories.join(', ')}</p>
           <p>나이대: {metadata.ageGroups.join(', ')}</p>
           <p>대상: {metadata.targets.join(', ')}</p>
@@ -476,15 +467,16 @@ export default UploadCategorizer;
 
 ---
 
-### 기능4: StoryToVideoFlow.jsx ("AI 생성" 버튼)
+### 기능4: StoryToVideoFlow.jsx ("AI 생성" 버튼) — ⭐ videoType 동적 옵션 반영
 
 ```javascript
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import generateProductIntro from '../utils/productIntroWriter';
 
-function StoryToVideoFlow({ selectedResource }) {
+function StoryToVideoFlow({ selectedResource, videoTypeOptions }) {
+  // videoTypeOptions: data-schema.md의 metadata.videoTypes.options에서 동적으로 전달받음
   const [character, setCharacter] = useState('결이');
-  const [videoType, setVideoType] = useState('제품스토리');
+  const [videoType, setVideoType] = useState(videoTypeOptions?.[0] || '제품스토리');
   const [generatedStory, setGeneratedStory] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
@@ -498,7 +490,8 @@ function StoryToVideoFlow({ selectedResource }) {
         category: selectedResource.metadata.categories[0],
         character: character,
         productName: selectedResource.title,
-        productSpec: selectedResource.content,
+        productInfo: selectedResource.productInfo,  // ⭐ productInfo
+        keywords: selectedResource.keywords || [],   // ⭐ keywords
         videoType: videoType
       });
       setGeneratedStory(story);
@@ -517,10 +510,11 @@ function StoryToVideoFlow({ selectedResource }) {
         <option value="해수">해수</option>
       </select>
 
+      {/* ⭐ videoTypeOptions는 data-schema.md의 metadata.videoTypes.options에서 동적으로 렌더링 */}
       <select value={videoType} onChange={(e) => setVideoType(e.target.value)}>
-        <option value="캐릭터소개">캐릭터 소개</option>
-        <option value="제품스토리">제품 스토리</option>
-        <option value="일상밥상">일상 밥상</option>
+        {(videoTypeOptions || ['캐릭터소개', '제품스토리', '일상밥상']).map(type => (
+          <option key={type} value={type}>{type}</option>
+        ))}
       </select>
 
       <button onClick={handleGenerate} disabled={isGenerating}>
@@ -551,8 +545,6 @@ export default StoryToVideoFlow;
 
 ## ⚠️ 4. 에러 처리 전략
 
-### 시나리오별 처리
-
 | 상황 | 처리 방법 |
 |---|---|
 | **API 키 없음/잘못됨** | ".env 파일을 확인하세요" 메시지 |
@@ -567,13 +559,9 @@ export default StoryToVideoFlow;
 
 ### ⚠️ 프로토타입 단계의 한계
 
-**현재 방식 (클라이언트에서 직접 API 호출)의 문제**:
-- API 키가 브라우저에 노출됨 (개발자 도구로 확인 가능)
-- 프로덕션에서는 절대 사용하면 안 됨
+**현재 방식의 문제**: API 키가 브라우저에 노출됨 (개발자 도구로 확인 가능)
 
-**부트캠프 프로토타입에서는 허용**:
-- 시연 목적이므로 임시로 사용 가능
-- 발표 시 "실제 운영 시에는 백엔드 서버를 통해 API 호출해야 함"을 언급
+**부트캠프 프로토타입에서는 허용**: 시연 목적이므로 임시로 사용 가능
 
 ### 향후 실제 운영 시 (제주소금이 도입할 때)
 
@@ -591,18 +579,13 @@ export default StoryToVideoFlow;
 
 ## ✅ 6. 요약: .env 설정 확인표
 
-**오늘(8/3)**: 클로드가 이 문서 작성 ✅
-
 **내일(8/4) 아침**:
 - [ ] Anthropic 계정 생성
 - [ ] API 키 발급
-- [ ] `.env` 파일 생성 (`REACT_APP_CLAUDE_API_KEY=sk-ant-xxxx`)
-- [ ] `.env.example` 파일 생성 (템플릿용)
+- [ ] `.env` 파일 생성
+- [ ] `.env.example` 파일 생성
 - [ ] `.gitignore`에 `.env` 추가
 - [ ] 웹앱 코드에서 API 호출 연결
-
-**발표 후**: 
-- `.env.example` 문서와 함께 제주소금에 인수인계
 
 ---
 
@@ -611,9 +594,19 @@ export default StoryToVideoFlow;
 | 함수 | 용도 | 입력 | 출력 |
 |---|---|---|---|
 | **callClaudeAPI** | 공통 호출 | prompt, maxTokens | 텍스트 |
-| **analyzeResource** ⭐ | 메타데이터 생성 | 자료 텍스트 | JSON metadata |
-| **generateCharacter** ⭐ | 캐릭터 생성 | metadata, productName | 캐릭터 배열 |
-| **generateProductIntro** | 스토리 생성 | params | 마크다운 텍스트 |
+| **analyzeResource** | 메타데이터 생성 | productInfo, keywords | JSON metadata |
+| **generateCharacter** | 캐릭터 생성 | metadata, productName, keywords | 캐릭터 배열 |
+| **generateProductIntro** | 스토리 생성 | category, character, productName, productInfo, keywords, videoType | 마크다운 텍스트 |
+
+---
+
+## 🔄 v3 변경 이력
+
+| 항목 | v2 | v3 |
+|---|---|---|
+| 변수명 | `productSpec` | **`productInfo`** ⭐ |
+| 키워드 | 없음 | **`keywords` 파라미터 추가** ⭐ |
+| 영상유형 옵션 | 하드코딩 (결이/용암이/해수만) | **동적 렌더링 (videoTypeOptions)** ⭐ |
 
 ---
 
