@@ -126,28 +126,55 @@ async function callTimelyAIAgent(agentName, payload) {
   // 세션 ID는 에이전트 호출마다 고유하게 (각 요청이 독립적)
   const sessionId = `agent_${agentName}_${Date.now()}`;
 
-  const response = await client.chat.completions.create({
-    session_id: sessionId,
-    messages: [
-      {
-        role: "system",
-        content: `${systemPrompt}\n\n${outputSpec}`,
-      },
-      {
-        role: "user",
-        content: JSON.stringify(payload, null, 2),
-      },
-    ],
-    model: "gpt-5.1", // TimelyAI 기본 모델
-    temperature: 0.7,
-    max_tokens: 2000,
-    locale: "ko",
-  });
+  // ⚠️ 중요: TimelyAI SDK의 Message.role은 'user' | 'assistant' | 'tool'만 허용.
+  //    'system' 역할이 없으므로 시스템 프롬프트는 반드시 instructions 필드에 넣어야 함.
+  //    (이전 버전은 messages 배열에 role:"system"을 넣어서 매번 요청이 거부되고 있었음)
+  let response;
+  try {
+    response = await client.chat.completions.create({
+      session_id: sessionId,
+      instructions: `${systemPrompt}\n\n${outputSpec}`,
+      messages: [
+        {
+          role: "user",
+          content: JSON.stringify(payload, null, 2),
+        },
+      ],
+      model: "gpt-5.1",
+      locale: "ko",
+    });
+  } catch (sdkError) {
+    // SDK/네트워크 단계에서 실패한 경우 - 상세 정보를 그대로 드러냄
+    console.error(`  [TimelyAI SDK 호출 실패 상세]`);
+    console.error(`    message: ${sdkError.message}`);
+    if (sdkError.statusCode) console.error(`    statusCode: ${sdkError.statusCode}`);
+    if (sdkError.error) console.error(`    error: ${JSON.stringify(sdkError.error)}`);
+    if (sdkError.response?.data) console.error(`    response.data: ${JSON.stringify(sdkError.response.data)}`);
+    throw sdkError;
+  }
 
-  // 응답 처리
+  // 응답 타입 확인 (final_response가 아니면 예외 처리)
+  if (response.type && response.type !== "final_response") {
+    console.error(`  [TimelyAI 예상치 못한 응답 타입] type: ${response.type}`);
+    console.error(`    전체 응답: ${JSON.stringify(response).slice(0, 500)}`);
+    throw new Error(`TimelyAI가 final_response가 아닌 '${response.type}' 타입을 반환함`);
+  }
+
   const responseText = response.message || response.content || "";
+
+  if (!responseText) {
+    console.error(`  [TimelyAI 빈 응답] 전체 응답: ${JSON.stringify(response).slice(0, 500)}`);
+    throw new Error("TimelyAI 응답에 message/content가 비어있음");
+  }
+
+  // JSON 파싱 (실패하면 원본 텍스트를 로그로 남겨서 원인 파악 가능하게 함)
   const cleaned = responseText.replace(/```json|```/g, "").trim();
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch (parseError) {
+    console.error(`  [JSON 파싱 실패] 원본 응답(앞 500자): ${responseText.slice(0, 500)}`);
+    throw new Error(`TimelyAI 응답이 유효한 JSON이 아님: ${parseError.message}`);
+  }
 }
 
 // ============================================================================
