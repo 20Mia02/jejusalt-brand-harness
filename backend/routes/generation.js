@@ -17,8 +17,26 @@
 const express = require("express");
 const router = express.Router();
 
-const { callAgent, callHiggsfield, pollHiggsfield } = require("../agents/backend-agent");
+const { callAgent, callHiggsfield } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
+
+// ─────────────────────────────────────────────────────
+// 호환성: POST /api/generate (resourceId in body)
+// ─────────────────────────────────────────────────────
+router.post("/", async (req, res) => {
+  const { resourceId, requestType } = req.body;
+
+  if (!resourceId) {
+    return res.status(400).json({
+      success: false,
+      message: "필수 항목 누락: resourceId가 필요합니다",
+    });
+  }
+
+  // 새 엔드포인트로 리다이렉트
+  return router.stack.find(r => r.route && r.route.path === "/:resourceId/start")
+    .handle(Object.assign(req, { params: { resourceId } }), res);
+});
 
 // ─────────────────────────────────────────────────────
 // POST /api/generate/:resourceId/start
@@ -299,6 +317,13 @@ router.post("/:resourceId/start", async (req, res) => {
 
     // ── 7. Step 9: Higgsfield 호출 ──
     console.log("[Step 9] Higgsfield 영상 생성 요청...");
+    let higgsfieldId = null;
+    let videoUrl = null;
+    let generationStatus = "pending";
+    let generationProgress = 0;
+    let videosRowId = null;
+    let higgsfieldError = null;
+
     const higgsfieldResult = await callHiggsfield(
       {
         character: selectedCharacter.character_name,
@@ -310,57 +335,27 @@ router.post("/:resourceId/start", async (req, res) => {
       contentId
     );
 
-    if (!higgsfieldResult.success) {
-      return res.status(502).json({
-        success: false,
-        message: "Higgsfield 영상 생성 요청에 실패했습니다",
-        resourceId,
-        contentId,
-      });
+    if (higgsfieldResult.success) {
+      higgsfieldId = higgsfieldResult.data.higgsfield_id;
+      videoUrl = higgsfieldResult.data.video_url;
+      generationStatus = higgsfieldResult.data.generation_status;
+      generationProgress = higgsfieldResult.data.generation_progress;
+      videosRowId = higgsfieldResult.data.videos_row_id;
+      console.log(`[Step 9] Higgsfield ID: ${higgsfieldId}, 진행률: ${generationProgress}%`);
+    } else {
+      higgsfieldError = higgsfieldResult.error || "Unknown error";
+      console.warn(`[Step 9] Higgsfield 호출 실패: ${higgsfieldError}`);
     }
 
-    const higgsfieldId = higgsfieldResult.data.higgsfield_id;
-    const videoUrl = higgsfieldResult.data.video_url;
-    const generationStatus = higgsfieldResult.data.generation_status;
-    const generationProgress = higgsfieldResult.data.generation_progress;
-    const videosRowId = higgsfieldResult.data.videos_row_id;
-
-    console.log(`[Step 9] Higgsfield ID: ${higgsfieldId}, 진행률: ${generationProgress}%`);
-
-    // ── 7-1. pollHiggsfield 백그라운드 실행 (await 하지 않음) ──
-    // ⚠️ 응답을 지연시키지 않기 위해 fire-and-forget 방식으로 실행.
-    //    videos 테이블은 pollHiggsfield 내부에서 5초마다 알아서 UPDATE됨.
-    //    프론트엔드(GenerationUI.jsx)는 GET /api/generation/:resourceId/status 등
-    //    별도 조회 엔드포인트로 videos 테이블을 폴링해서 진행률을 확인한다.
-    if (videosRowId) {
-      pollHiggsfield(higgsfieldId, videosRowId)
-        .then(() => {
-          console.log(`[✓] Higgsfield 폴링 완료: ${higgsfieldId}`);
-          // 성공 로그 기록
-          callDatabase("generation_logs", "create", {
-            resource_id: resourceId,
-            step: "Step 9-폴링",
-            status: "success",
-            duration_ms: 0,
-          }).catch((e) => console.error("[로그 기록 실패]", e));
-        })
-        .catch((err) => {
-          console.error("[✗] Higgsfield 폴링 실패:", err.message);
-          // 실패 로그 기록
-          callDatabase("generation_logs", "create", {
-            resource_id: resourceId,
-            step: "Step 9-폴링",
-            status: "fail",
-            error_message: err.message,
-          }).catch((e) => console.error("[로그 기록 실패]", e));
-          // videos 테이블 상태 업데이트 (실패 표시)
-          callDatabase("videos", "update", {
-            id: videosRowId,
-            status: "failed",
-          }).catch((e) => console.error("[영상 상태 업데이트 실패]", e));
-        });
-    } else {
-      console.warn("[Step 9] videos_row_id가 없어 폴링을 시작하지 못했습니다");
+    // ── 7-1. 최종 상태 업데이트 ──
+    // ✅ CLI의 --wait 플래그로 완료까지 기다렸으므로 pollHiggsfield 불필요
+    if (higgsfieldResult.success && videosRowId) {
+      await callDatabase("videos", "update", {
+        id: videosRowId,
+        generation_status: "completed",
+        generation_progress: 100,
+        video_url: higgsfieldResult.data.video_url,
+      }).catch((e) => console.error("[영상 상태 업데이트 실패]", e));
     }
 
     // ── 8. 최종 응답 ──────────────────────────────
@@ -371,10 +366,9 @@ router.post("/:resourceId/start", async (req, res) => {
       contentId,
       validationStatus,
       validationScore,
-      higgsfieldId,
-      generationStatus,
-      generationProgress,
-      videoUrl: videoUrl || null,
+      videoUrl: higgsfieldResult.success ? higgsfieldResult.data.video_url : null,
+      videoStatus: higgsfieldResult.success ? "completed" : "failed",
+      higgsfieldError: higgsfieldError,
     });
   } catch (error) {
     console.error("[POST /api/generate] 예외 발생:", error);
@@ -396,14 +390,11 @@ router.get("/:resourceId/status", async (req, res) => {
 
   try {
     // generation_logs에서 최근 상태 조회
-    const logs = await callDatabase("generation_logs", "read", {
-      filter: { resource_id: resourceId },
-      orderBy: "created_at",
-      orderDirection: "desc",
-      limit: 10,
+    const logsResult = await callDatabase("generation_logs", "read", null, {
+      resource_id: resourceId,
     });
 
-    if (!logs || logs.length === 0) {
+    if (!logsResult.success || !logsResult.rows || logsResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: "생성 이력을 찾을 수 없습니다",
@@ -411,6 +402,7 @@ router.get("/:resourceId/status", async (req, res) => {
       });
     }
 
+    const logs = logsResult.rows;
     const currentStep = logs[0];
     const successCount = logs.filter((l) => l.status === "success").length;
     const totalSteps = 10; // Step 1~9 + Higgsfield

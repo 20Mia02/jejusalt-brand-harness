@@ -12,6 +12,9 @@
  */
 
 const axios = require("axios");
+const { exec } = require("child_process");
+const util = require("util");
+const execPromise = util.promisify(exec);
 const { callDatabase } = require("./database-agent");
 
 // OpenAI SDK (TimelyAI OpenAI 호환 모드) ✅
@@ -345,73 +348,65 @@ function getOutputSpecForAgent(agentName) {
 
 async function callHiggsfield(videoConfig, resourceId, contentId) {
   try {
-    if (!videoConfig.character || !videoConfig.generatedContent) {
-      throw new Error("character 또는 generatedContent가 비어있습니다");
+    if (!videoConfig.generatedContent) {
+      throw new Error("generatedContent가 비어있습니다");
     }
 
-    console.log(`[Step 9] Higgsfield API 호출 시작`);
-    console.log(`  캐릭터: ${videoConfig.character}`);
-    console.log(`  음성톤: ${videoConfig.voiceTone}`);
-    console.log(`  지속시간: ${videoConfig.duration}초`);
+    const prompt = videoConfig.generatedContent.replace(/"/g, '\\"');
+    const duration = videoConfig.duration === 120 ? 8 : 4;
 
-    const response = await axios.post(
-      `${process.env.HIGGSFIELD_API_URL}/v1/videos`,
-      {
-        character: videoConfig.character,
-        script: videoConfig.generatedContent,
-        voiceTone: videoConfig.voiceTone || "기본",
-        duration: videoConfig.duration || 120,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.HIGGSFIELD_API_KEY_SECRET}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000,
-      }
-    );
+    console.log(`[Step 9] Higgsfield CLI 호출 시작`);
+    console.log(`  명령: higgsfield generate create seedance1_5`);
+    console.log(`  prompt: ${prompt.substring(0, 50)}...`);
+    console.log(`  duration: ${duration}초`);
 
-    const higgsfieldId = response.data.id;
-    console.log(`[✓] Higgsfield 요청 성공: ${higgsfieldId}`);
+    const command = `higgsfield generate create seedance1_5 --prompt "${prompt}" --duration ${duration} --resolution 720p --wait`;
+
+    console.log(`[Step 9] 명령 실행 중...`);
+    const { stdout, stderr } = await execPromise(command, {
+      timeout: 600000,
+      maxBuffer: 10 * 1024 * 1024
+    });
+
+    console.log(`[✓] CLI 완료`);
+    console.log(`  출력: ${stdout}`);
+
+    const videoUrl = stdout.trim();
+
+    if (!videoUrl.startsWith("https://")) {
+      throw new Error(`유효하지 않은 URL: ${videoUrl}`);
+    }
+
+    console.log(`[✓] 영상 생성 완료`);
+    console.log(`  URL: ${videoUrl}`);
 
     const videoResult = await callDatabase("videos", "create", {
       resource_id: resourceId,
       content_id: contentId,
-      higgsfield_id: higgsfieldId,
-      generation_status: "processing",
-      generation_progress: 0,
+      generation_status: "completed",
+      generation_progress: 100,
+      video_url: videoUrl,
       generation_start_time: new Date(),
+      generation_end_time: new Date(),
     });
-
-    console.log(`[✓] videos 테이블 INSERT 완료`);
 
     return {
       success: true,
       data: {
-        higgsfield_id: higgsfieldId,
-        video_url: null,
-        generation_status: "processing",
-        generation_progress: 0,
+        video_url: videoUrl,
+        generation_status: "completed",
+        generation_progress: 100,
         videos_row_id: videoResult.rows?.[0]?.id,
       },
     };
   } catch (error) {
-    console.error(`[✗] Higgsfield API 호출 실패: ${error.message}`);
-
-    let errorType = "NETWORK_ERROR";
-    if (error.response?.status === 401) {
-      errorType = "UNAUTHORIZED";
-    } else if (error.response?.status === 402) {
-      errorType = "INSUFFICIENT_CREDITS";
-    } else if (error.response?.status === 422) {
-      errorType = "INVALID_REQUEST";
-    }
+    console.error(`[✗] Higgsfield CLI 실패: ${error.message}`);
 
     return {
       success: false,
-      error: errorType,
+      error: "HIGGSFIELD_CLI_ERROR",
       message: error.message,
-      statusCode: error.response?.status,
+      statusCode: error.code,
     };
   }
 }
@@ -427,24 +422,28 @@ async function pollHiggsfield(higgsfieldId, videoRowId) {
   console.log(
     `[Step 9-폴링] Higgsfield 진행률 폴링 시작 (최대 10분)`
   );
+  console.log(`  generation_id: ${higgsfieldId}`);
+  console.log(`  상태 조회 엔드포인트: GET ${process.env.HIGGSFIELD_API_URL}/api/v1/status/${higgsfieldId}`);
 
   while (attempt < maxAttempts) {
     try {
       attempt++;
 
       const response = await axios.get(
-        `${process.env.HIGGSFIELD_API_URL}/v1/videos/${higgsfieldId}`,
+        `${process.env.HIGGSFIELD_API_URL}/api/v1/status/${higgsfieldId}`,
         {
           headers: {
-            Authorization: `Bearer ${process.env.HIGGSFIELD_API_KEY_SECRET}`,
+            Authorization: `Bearer ${process.env.HIGGSFIELD_API_KEY}`,
           },
           timeout: 30000,
         }
       );
 
-      const { progress, status, video_url } = response.data;
+      const status = response.data.status;
+      const progress = response.data.progress || 0;
+      const videoUrl = response.data.video_url || response.data.url || null;
 
-      console.log(`  [${attempt}회차] 진행률: ${progress}% | 상태: ${status}`);
+      console.log(`  [${attempt}/120] 진행률: ${progress}% | 상태: ${status}`);
 
       const updateData = {
         generation_progress: progress || 0,
@@ -452,45 +451,70 @@ async function pollHiggsfield(higgsfieldId, videoRowId) {
         updated_at: new Date(),
       };
 
-      if (video_url) {
-        updateData.video_url = video_url;
+      if (videoUrl) {
+        updateData.video_url = videoUrl;
       }
 
-      if (status === "completed" || status === "failed") {
+      if (status === "completed" || status === "done" || status === "success") {
         updateData.generation_end_time = new Date();
-      }
+        updateData.generation_status = "completed";
 
-      await callDatabase("videos", "update", updateData, { id: videoRowId });
+        await callDatabase("videos", "update", updateData, { id: videoRowId });
 
-      if (status === "completed") {
-        console.log(`[✓] 영상 생성 완료! URL: ${video_url}`);
+        console.log(`[✓] 영상 생성 완료!`);
+        if (videoUrl) {
+          console.log(`  URL: ${videoUrl}`);
+        }
+
         return {
           success: true,
-          generation_progress: progress || 100,
+          generation_progress: 100,
           generation_status: "completed",
-          video_url: video_url || null,
+          video_url: videoUrl || null,
         };
       }
 
-      if (status === "failed") {
+      if (status === "failed" || status === "error") {
+        updateData.generation_end_time = new Date();
+        updateData.generation_status = "failed";
+
+        await callDatabase("videos", "update", updateData, { id: videoRowId });
+
         console.log(`[✗] 영상 생성 실패`);
+        console.log(`  에러 정보:`, response.data.error || "상세정보 없음");
+
         return {
           success: false,
           generation_progress: progress || 0,
           generation_status: "failed",
           error: "HIGGSFIELD_GENERATION_FAILED",
           message: "Higgsfield 서버에서 영상 생성에 실패했습니다",
+          details: response.data.error || null,
+        };
+      }
+
+      await callDatabase("videos", "update", updateData, { id: videoRowId });
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    } catch (error) {
+      console.error(`  [${attempt}/120] 폴링 에러: ${error.message}`);
+
+      if (error.response?.status === 404) {
+        console.error(`    404 Not Found - generation_id가 잘못되었을 수 있습니다`);
+      } else if (error.response?.status === 401) {
+        console.error(`    401 Unauthorized - API 키를 확인하세요`);
+        return {
+          success: false,
+          error: "UNAUTHORIZED",
+          message: "Higgsfield API 인증 실패",
         };
       }
 
       await new Promise((resolve) => setTimeout(resolve, 5000));
-    } catch (error) {
-      console.error(`  [폴링 에러] ${error.message}`);
-      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 
-  console.log(`[✗] 폴링 타임아웃 (10분 초과)`);
+  console.log(`[⚠️] 폴링 타임아웃 (10분 초과)`);
   return {
     success: false,
     error: "TIMEOUT",
