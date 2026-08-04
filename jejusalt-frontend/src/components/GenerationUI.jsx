@@ -1,22 +1,24 @@
 /**
  * frontend/components/GenerationUI.jsx
- * 
+ *
  * 기능4: AI 콘텐츠 생성 + Higgsfield 영상화
  * 담당: 고수아(UI) + 박주미(API)
- * 
+ *
  * 역할:
- * 1. "AI 생성" 버튼 클릭 → POST /api/generate 호출 (Step 4~9)
- * 2. frontend-agent.md 기준 5초 폴링으로 진행률 조회
- * 3. 진행률 바(%) 실시간 표시
- * 4. 완료 시 비디오 URL 표시 및 재생 UI
- * 
- * 파이프라인:
- * Step 4: character-designer-agent
- * Step 5: shortform-scenario-writer-agent
- * Step 6: naming-generator-agent
- * Step 7: product-intro/detail-writer-agent
- * Step 8: compliance-reviewer-agent
- * Step 9: Higgsfield 영상 생성 + 폴링
+ * 1. Step 3 메타데이터 검토 완료 후 "AI 생성" 버튼 클릭
+ * 2. POST /api/generate 호출 (Step 5~10)
+ * 3. frontend-agent.md 기준 5초 폴링으로 진행률 조회
+ * 4. 진행률 바(%) 실시간 표시
+ * 5. 완료 시 비디오 URL 표시 및 재생 UI
+ *
+ * 파이프라인 (Step 3 메타데이터 검토 후):
+ * Step 4: 캐릭터 추천 (character-generator-agent)
+ * Step 5: 캐릭터 상세 설계 (character-designer-agent)
+ * Step 6: 120초 시나리오 작성 (shortform-scenario-writer-agent)
+ * Step 7: 제품명/콘텐츠명 생성 (naming-generator-agent)
+ * Step 8: 마케팅 카피 작성 (product-intro/detail-writer-agent)
+ * Step 9: 컴플라이언스 검증 (compliance-reviewer-agent)
+ * Step 10: Higgsfield 영상 생성 + 폴링
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -203,12 +205,14 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
 
           {/* 단계별 체크리스트 */}
           <div className="bg-gray-50 p-4 rounded space-y-2 text-sm">
-            <StepItem label="Step 4: 캐릭터 디자인" done={progress > 10} />
-            <StepItem label="Step 5: 시나리오 작성" done={progress > 20} />
-            <StepItem label="Step 6: 네이밍 생성" done={progress > 30} />
-            <StepItem label="Step 7: 카피 작성" done={progress > 40} />
-            <StepItem label="Step 8: 컴플라이언스 검증" done={progress > 50} />
-            <StepItem label="Step 9: Higgsfield 영상 생성" done={progress > 60} />
+            <StepItem label="Step 3: 메타데이터 검토" done={true} />
+            <StepItem label="Step 4: 캐릭터 추천" done={progress > 10} />
+            <StepItem label="Step 5: 캐릭터 상세 설계" done={progress > 20} />
+            <StepItem label="Step 6: 120초 시나리오 작성" done={progress > 30} />
+            <StepItem label="Step 7: 제품명/콘텐츠명 생성" done={progress > 40} />
+            <StepItem label="Step 8: 마케팅 카피 작성" done={progress > 50} />
+            <StepItem label="Step 9: 컴플라이언스 검증" done={progress > 60} />
+            <StepItem label="Step 10: Higgsfield 영상 생성" done={progress > 70} />
           </div>
 
           {/* 취소 버튼 (생성 중 취소는 모의: 실제로는 무시) */}
@@ -299,14 +303,15 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
             <>
               {/* 생성 전: 정보 표시 */}
               <div className="bg-blue-50 p-4 rounded mb-4 text-sm">
-                <div className="font-semibold mb-2">📌 생성 과정</div>
+                <div className="font-semibold mb-2">📌 이제 시작할 생성 과정</div>
                 <ul className="list-disc list-inside space-y-1 text-gray-700">
-                  <li>Step 4: 캐릭터 디자인</li>
-                  <li>Step 5: 120초 시나리오 작성</li>
-                  <li>Step 6: 제품명/콘텐츠명 생성</li>
-                  <li>Step 7: 마케팅 카피 작성</li>
-                  <li>Step 8: 컴플라이언스 검증</li>
-                  <li>Step 9: Higgsfield에서 숏폼 영상 생성</li>
+                  <li>Step 4: 캐릭터 추천</li>
+                  <li>Step 5: 캐릭터 상세 설계</li>
+                  <li>Step 6: 120초 시나리오 작성</li>
+                  <li>Step 7: 제품명/콘텐츠명 생성</li>
+                  <li>Step 8: 마케팅 카피 작성</li>
+                  <li>Step 9: 컴플라이언스 검증</li>
+                  <li>Step 10: Higgsfield에서 숏폼 영상 생성</li>
                 </ul>
               </div>
 
