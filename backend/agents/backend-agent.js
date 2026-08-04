@@ -116,8 +116,8 @@ async function callAgent(agentName, payload, context = {}) {
 async function callTimelyAIAgent(agentName, payload) {
   // ========== TimelyAI SDK 사용 ✅ ==========
   const client = new TimelyGPTClient({
-    apiKey: process.env.TIMELY_API_KEY,
-    baseURL: process.env.TIMELY_BASE_URL || "https://hello.timelygpt.co.kr/api/v2/chat",
+    apiKey: process.env.TIMELY_AI_API_KEY,
+    baseURL: process.env.TIMELY_AI_BASE_URL || "https://hello.timelygpt.co.kr/api/v2/chat",
   });
 
   const systemPrompt = getSystemPromptForAgent(agentName);

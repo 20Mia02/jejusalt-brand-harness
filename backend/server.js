@@ -59,6 +59,62 @@ app.get("/health", (req, res) => {
 });
 
 // ============================================================================
+// Pipeline Status Summary (모든 리소스의 생성 상태 요약)
+// ============================================================================
+
+app.get("/api/pipeline/status", async (req, res) => {
+  try {
+    const { callDatabase } = require("./agents/database-agent");
+
+    // 모든 리소스 조회
+    const resources = await callDatabase("resources", "query", {});
+
+    if (!resources || resources.length === 0) {
+      return res.json({
+        success: true,
+        totalResources: 0,
+        statuses: [],
+      });
+    }
+
+    // 각 리소스별 생성 로그 조회
+    const statusSummary = await Promise.all(
+      resources.map(async (resource) => {
+        const logs = await callDatabase("generation_logs", "query", {
+          filter: { resource_id: resource.id },
+        }).catch(() => []);
+
+        const successCount = (logs || []).filter((l) => l.status === "success").length;
+        const failureCount = (logs || []).filter((l) => l.status === "fail").length;
+
+        return {
+          resourceId: resource.id,
+          productName: resource.product_name,
+          status: resource.status,
+          progressPercent: Math.round((successCount / 10) * 100),
+          completedSteps: successCount,
+          failedSteps: failureCount,
+          lastUpdate: logs?.[logs.length - 1]?.created_at || null,
+        };
+      })
+    );
+
+    return res.json({
+      success: true,
+      totalResources: resources.length,
+      statuses: statusSummary,
+      timestamp: new Date(),
+    });
+  } catch (error) {
+    console.error("[GET /api/pipeline/status] 예외:", error);
+    return res.status(500).json({
+      success: false,
+      message: "파이프라인 상태 조회 중 오류가 발생했습니다",
+    });
+  }
+});
+
+// ============================================================================
 // 404 Handler
 // ============================================================================
 

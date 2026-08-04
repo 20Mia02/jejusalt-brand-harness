@@ -21,12 +21,13 @@ const { callAgent, callHiggsfield, pollHiggsfield } = require("../agents/backend
 const { callDatabase } = require("../agents/database-agent");
 
 // ─────────────────────────────────────────────────────
-// POST /api/generate
+// POST /api/generate/:resourceId/start
 // AI 콘텐츠 생성 (Step 4~9)
 // ─────────────────────────────────────────────────────
 
 /**
- * 입력: { resourceId, requestType: "intro"|"detail"|"both" }
+ * 입력: { requestType: "intro"|"detail"|"both" } in body
+ * URL params: { resourceId }
  * 출력: {
  *   success: true,
  *   contentId,
@@ -38,8 +39,9 @@ const { callDatabase } = require("../agents/database-agent");
  *   videoUrl
  * }
  */
-router.post("/", async (req, res) => {
-  const { resourceId, requestType } = req.body;
+router.post("/:resourceId/start", async (req, res) => {
+  const { resourceId } = req.params;
+  const { requestType } = req.body;
 
   // ── 0. 입력 검증 ────────────────────────────────
   if (!resourceId || !requestType) {
@@ -331,9 +333,32 @@ router.post("/", async (req, res) => {
     //    프론트엔드(GenerationUI.jsx)는 GET /api/generation/:resourceId/status 등
     //    별도 조회 엔드포인트로 videos 테이블을 폴링해서 진행률을 확인한다.
     if (videosRowId) {
-      pollHiggsfield(higgsfieldId, videosRowId).catch((err) => {
-        console.error("[Step 9-폴링] 백그라운드 폴링 중 예외:", err);
-      });
+      pollHiggsfield(higgsfieldId, videosRowId)
+        .then(() => {
+          console.log(`[✓] Higgsfield 폴링 완료: ${higgsfieldId}`);
+          // 성공 로그 기록
+          callDatabase("generation_logs", "create", {
+            resource_id: resourceId,
+            step: "Step 9-폴링",
+            status: "success",
+            duration_ms: 0,
+          }).catch((e) => console.error("[로그 기록 실패]", e));
+        })
+        .catch((err) => {
+          console.error("[✗] Higgsfield 폴링 실패:", err.message);
+          // 실패 로그 기록
+          callDatabase("generation_logs", "create", {
+            resource_id: resourceId,
+            step: "Step 9-폴링",
+            status: "fail",
+            error_message: err.message,
+          }).catch((e) => console.error("[로그 기록 실패]", e));
+          // videos 테이블 상태 업데이트 (실패 표시)
+          callDatabase("videos", "update", {
+            id: videosRowId,
+            status: "failed",
+          }).catch((e) => console.error("[영상 상태 업데이트 실패]", e));
+        });
     } else {
       console.warn("[Step 9] videos_row_id가 없어 폴링을 시작하지 못했습니다");
     }
@@ -358,6 +383,109 @@ router.post("/", async (req, res) => {
       success: false,
       message: "서버 내부 오류가 발생했습니다",
       resourceId: resourceId || null,
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// GET /api/generate/:resourceId/status
+// 생성 진행 상태 조회 (프론트엔드 폴링용)
+// ─────────────────────────────────────────────────────
+router.get("/:resourceId/status", async (req, res) => {
+  const { resourceId } = req.params;
+
+  try {
+    // generation_logs에서 최근 상태 조회
+    const logs = await callDatabase("generation_logs", "query", {
+      filter: { resource_id: resourceId },
+      orderBy: "created_at",
+      orderDirection: "desc",
+      limit: 10,
+    });
+
+    if (!logs || logs.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "생성 이력을 찾을 수 없습니다",
+        resourceId,
+      });
+    }
+
+    const currentStep = logs[0];
+    const successCount = logs.filter((l) => l.status === "success").length;
+    const totalSteps = 10; // Step 1~9 + Higgsfield
+
+    return res.json({
+      success: true,
+      resourceId,
+      currentStep: currentStep.step,
+      currentStatus: currentStep.status,
+      progress: Math.round((successCount / totalSteps) * 100),
+      completedSteps: successCount,
+      totalSteps,
+      lastUpdate: currentStep.created_at,
+    });
+  } catch (error) {
+    console.error("[GET /api/generate/:resourceId/status] 예외:", error);
+    return res.status(500).json({
+      success: false,
+      message: "상태 조회 중 오류가 발생했습니다",
+      resourceId,
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// GET /api/generate/:resourceId/result
+// 생성 완료 결과 조회
+// ─────────────────────────────────────────────────────
+router.get("/:resourceId/result", async (req, res) => {
+  const { resourceId } = req.params;
+
+  try {
+    // 1. Contents 조회
+    const contents = await callDatabase("contents", "query", {
+      filter: { resource_id: resourceId },
+    });
+
+    // 2. Videos 조회
+    const videos = await callDatabase("videos", "query", {
+      filter: { resource_id: resourceId },
+    });
+
+    // 3. Scenarios 조회
+    const scenarios = await callDatabase("scenarios", "query", {
+      filter: { resource_id: resourceId },
+    });
+
+    // 4. Characters 조회
+    const characters = await callDatabase("characters", "query", {
+      filter: { resource_id: resourceId },
+    });
+
+    if (!contents || contents.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "생성 결과를 찾을 수 없습니다",
+        resourceId,
+      });
+    }
+
+    return res.json({
+      success: true,
+      resourceId,
+      contents: contents || [],
+      videos: videos || [],
+      scenarios: scenarios || [],
+      characters: characters || [],
+      generatedAt: contents[0]?.created_at || null,
+    });
+  } catch (error) {
+    console.error("[GET /api/generate/:resourceId/result] 예외:", error);
+    return res.status(500).json({
+      success: false,
+      message: "결과 조회 중 오류가 발생했습니다",
+      resourceId,
     });
   }
 });
