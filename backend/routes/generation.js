@@ -321,8 +321,22 @@ router.post("/", async (req, res) => {
     const videoUrl = higgsfieldResult.data.video_url;
     const generationStatus = higgsfieldResult.data.generation_status;
     const generationProgress = higgsfieldResult.data.generation_progress;
+    const videosRowId = higgsfieldResult.data.videos_row_id;
 
     console.log(`[Step 9] Higgsfield ID: ${higgsfieldId}, 진행률: ${generationProgress}%`);
+
+    // ── 7-1. pollHiggsfield 백그라운드 실행 (await 하지 않음) ──
+    // ⚠️ 응답을 지연시키지 않기 위해 fire-and-forget 방식으로 실행.
+    //    videos 테이블은 pollHiggsfield 내부에서 5초마다 알아서 UPDATE됨.
+    //    프론트엔드(GenerationUI.jsx)는 GET /api/generation/:resourceId/status 등
+    //    별도 조회 엔드포인트로 videos 테이블을 폴링해서 진행률을 확인한다.
+    if (videosRowId) {
+      pollHiggsfield(higgsfieldId, videosRowId).catch((err) => {
+        console.error("[Step 9-폴링] 백그라운드 폴링 중 예외:", err);
+      });
+    } else {
+      console.warn("[Step 9] videos_row_id가 없어 폴링을 시작하지 못했습니다");
+    }
 
     // ── 8. 최종 응답 ──────────────────────────────
     console.log(`✅ POST /api/generate 완료`);
