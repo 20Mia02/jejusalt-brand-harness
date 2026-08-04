@@ -184,24 +184,26 @@ async function getResourcesByFilter(filters = {}) {
     
     // metadata JSONB 필터링 (categories)
     if (categories && categories.length > 0) {
-      // JSONB contains 쿼리 (PostgreSQL 문법)
-      // metadata->>'categories'가 특정 값을 포함하는지 확인
+      // PostgreSQL @> (contains) 연산자 사용
+      // metadata->categories 배열이 특정 값을 포함하는지 확인
       categories.forEach((cat) => {
-        query = query.ilike("metadata->categories", `%${cat}%`);
+        query = query.filter("metadata->categories", "contains", cat);
       });
     }
-    
+
     // metadata JSONB 필터링 (ageGroups)
     if (ageGroups && ageGroups.length > 0) {
+      // metadata->ageGroups 배열이 특정 값을 포함하는지 확인
       ageGroups.forEach((age) => {
-        query = query.ilike("metadata->ageGroups", `%${age}%`);
+        query = query.filter("metadata->ageGroups", "contains", age);
       });
     }
-    
+
     // metadata JSONB 필터링 (targets)
     if (targets && targets.length > 0) {
+      // metadata->targets 배열이 특정 값을 포함하는지 확인
       targets.forEach((target) => {
-        query = query.ilike("metadata->targets", `%${target}%`);
+        query = query.filter("metadata->targets", "contains", target);
       });
     }
     

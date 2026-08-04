@@ -33,9 +33,8 @@ router.post("/", async (req, res) => {
     });
   }
 
-  // 새 엔드포인트로 리다이렉트
-  return router.stack.find(r => r.route && r.route.path === "/:resourceId/start")
-    .handle(Object.assign(req, { params: { resourceId } }), res);
+  // 302 리다이렉트: 새 엔드포인트로 이동
+  return res.redirect(302, `/api/generate/${resourceId}/start`);
 });
 
 // ─────────────────────────────────────────────────────

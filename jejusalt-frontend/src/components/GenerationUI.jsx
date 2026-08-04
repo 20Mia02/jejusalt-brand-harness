@@ -48,9 +48,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       setProgress(0);
       setCurrentStep('초기화 중...');
 
-      // Step 4~9: POST /api/generate
-      const res = await axios.post('/api/generate', {
-        resourceId,
+      // Step 4~9: POST /api/generate/:resourceId/start
+      const res = await axios.post(`/api/generate/${resourceId}/start`, {
         requestType,
       });
 
@@ -94,22 +93,21 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       try {
         pollCount++;
 
-        // 비디오 진행상황 조회 (videos 테이블에서)
-        // TODO: backend에서 /api/videos/:higgsfieldId 엔드포인트 필요
-        const res = await axios.get(`/api/videos/${higgsfieldId}`);
+        // 비디오 진행상황 조회 (generation_logs 조회)
+        const res = await axios.get(`/api/generate/${resourceId}/status`);
 
-        const { generation_progress, generation_status, video_url } = res.data;
+        const { progress: progressPercent, currentStatus, lastUpdate } = res.data;
 
         // 진행률 업데이트
-        setProgress(Math.max(5, generation_progress || 0));
+        setProgress(Math.max(5, progressPercent || 0));
 
         // 상태 메시지 업데이트
-        if (generation_status === 'processing') {
-          setCurrentStep(`영상 생성 중... (${generation_progress}%)`);
-        } else if (generation_status === 'completed') {
+        if (currentStatus === 'processing') {
+          setCurrentStep(`영상 생성 중... (${progressPercent}%)`);
+        } else if (currentStatus === 'completed') {
           setProgress(100);
           setCurrentStep('✅ 완료!');
-          setVideoUrl(video_url || null);
+          setVideoUrl(generationData?.videoUrl || null);
           clearInterval(pollingInterval.current);
           setGenerating(false);
           setSuccessMessage('영상이 생성되었습니다!');
@@ -120,7 +118,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
               generationStatus: 'completed',
             });
           }
-        } else if (generation_status === 'failed') {
+        } else if (currentStatus === 'failed') {
           setCurrentStep('❌ 생성 실패');
           setError('영상 생성에 실패했습니다. 다시 시도해주세요.');
           clearInterval(pollingInterval.current);
@@ -354,50 +352,21 @@ function StepItem({ label, done }) {
   );
 }
 
-export const callHiggsfield = async (videoScript) => {
+export const callHiggsfield = async (videoConfig) => {
   const HIGGSFIELD_API_KEY = import.meta.env.REACT_APP_HIGGSFIELD_API_KEY;
   const HIGGSFIELD_API_URL = import.meta.env.REACT_APP_HIGGSFIELD_API_URL;
-  
-  try {
-    const response = await axios.post(
-      ${HIGGSFIELD_API_URL}/generate,
-      {
-        script: videoScript,
-        duration: 120,
-        style: 'short-form'
-      },
-      {
-        headers: {
-          Authorization: Bearer ,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    return {
-      success: true,
-      higgsfieldId: response.data.id,
-      videoUrl: response.data.video_url
-    };
-  } catch (error) {
-    console.error('Higgsfield API Error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
 
-export const callHiggsfield = async (videoScript) => {
-  const HIGGSFIELD_API_KEY = import.meta.env.REACT_APP_HIGGSFIELD_API_KEY;
-  const HIGGSFIELD_API_URL = import.meta.env.REACT_APP_HIGGSFIELD_API_URL;
-  
   try {
+    // ✅ 메타데이터만 전달 (한글/영문 텍스트 완전 제거)
+    const character = videoConfig.character || 'woman';
+    const voiceTone = videoConfig.voiceTone || 'professional';
+    const metadata = `${character} character, ${voiceTone} tone, product promotion`;
+
     const response = await axios.post(
       `${HIGGSFIELD_API_URL}/generate`,
       {
-        script: videoScript,
-        duration: 120,
+        prompt: metadata,
+        duration: videoConfig.duration || 8,
         style: 'short-form'
       },
       {
@@ -407,7 +376,7 @@ export const callHiggsfield = async (videoScript) => {
         }
       }
     );
-    
+
     return {
       success: true,
       higgsfieldId: response.data.id,

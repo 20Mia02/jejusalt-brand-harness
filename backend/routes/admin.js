@@ -181,6 +181,64 @@ router.delete("/characters/:id", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// GET /api/admin/naming/:resourceId — 네이밍 옵션 조회 (AdminMode.jsx)
+//
+// naming 테이블에서 주어진 resourceId의 네이밍 결과를 조회한다.
+// ─────────────────────────────────────────────
+router.get("/naming/:resourceId", async (req, res) => {
+  const { resourceId } = req.params;
+
+  try {
+    // naming 테이블에서 조회
+    const namingResult = await callDatabase("naming", "read", null, {
+      resource_id: resourceId,
+    });
+
+    if (!namingResult.success || namingResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "해당 자료의 네이밍 결과를 찾을 수 없습니다.",
+      });
+    }
+
+    const namingData = namingResult.rows[0];
+
+    // naming 데이터를 AdminMode.jsx 형식으로 변환
+    const naming = {
+      product_name_1: namingData.product_name_1,
+      product_name_1_score: namingData.product_name_1_score,
+      product_name_1_meaning: namingData.product_name_1_meaning,
+      product_name_2: namingData.product_name_2,
+      product_name_2_score: namingData.product_name_2_score,
+      product_name_2_meaning: namingData.product_name_2_meaning,
+      product_name_3: namingData.product_name_3,
+      product_name_3_score: namingData.product_name_3_score,
+      product_name_3_meaning: namingData.product_name_3_meaning,
+      content_name_1: namingData.content_name_1,
+      content_name_1_score: namingData.content_name_1_score,
+      content_name_1_meaning: namingData.content_name_1_meaning,
+      content_name_2: namingData.content_name_2,
+      content_name_2_score: namingData.content_name_2_score,
+      content_name_2_meaning: namingData.content_name_2_meaning,
+      content_name_3: namingData.content_name_3,
+      content_name_3_score: namingData.content_name_3_score,
+      content_name_3_meaning: namingData.content_name_3_meaning,
+    };
+
+    return res.json({
+      success: true,
+      naming: naming,
+    });
+  } catch (error) {
+    console.error("[GET /api/admin/naming/:resourceId] 예외:", error);
+    return res.status(500).json({
+      success: false,
+      message: "네이밍 조회 중 오류가 발생했습니다.",
+    });
+  }
+});
+
+// ─────────────────────────────────────────────
 // PUT /api/admin/naming/:resourceId — 제품명/콘텐츠명 최종 선택 변경
 //
 // naming-generator-agent.md 원본 설계는 "마케터가 3개 중 1개 선택"하는 UI 흐름.

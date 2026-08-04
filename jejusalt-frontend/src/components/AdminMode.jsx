@@ -58,9 +58,9 @@ export default function AdminMode() {
       const charRes = await axios.get(`/api/resources/${resource.id}`);
       setCharacters(charRes.data.characters || []);
 
-      // 🆕 네이밍 조회 (GET /api/naming/:resourceId)
+      // 🆕 네이밍 조회 (GET /api/admin/naming/:resourceId)
       try {
-        const namingRes = await axios.get(`/api/naming/${resource.id}`);
+        const namingRes = await axios.get(`/api/admin/naming/${resource.id}`);
         if (namingRes.data.naming) {
           setNaming(namingRes.data.naming);
           setSelectedProductIdx(0);   // 기본값: 1순위

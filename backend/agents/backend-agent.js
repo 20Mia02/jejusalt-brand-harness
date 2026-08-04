@@ -348,19 +348,19 @@ function getOutputSpecForAgent(agentName) {
 
 async function callHiggsfield(videoConfig, resourceId, contentId) {
   try {
-    if (!videoConfig.generatedContent) {
-      throw new Error("generatedContent가 비어있습니다");
-    }
-
-    const prompt = videoConfig.generatedContent.replace(/"/g, '\\"');
     const duration = videoConfig.duration === 120 ? 8 : 4;
+
+    // ✅ 메타데이터 기반 프롬프트 생성 (텍스트 제거)
+    const character = videoConfig.character || 'woman';
+    const voiceTone = videoConfig.voiceTone || 'professional';
+    const metadata = `${character} character, ${voiceTone} tone, product promotion`;
 
     console.log(`[Step 9] Higgsfield CLI 호출 시작`);
     console.log(`  명령: higgsfield generate create seedance1_5`);
-    console.log(`  prompt: ${prompt.substring(0, 50)}...`);
+    console.log(`  메타데이터: ${metadata}`);
     console.log(`  duration: ${duration}초`);
 
-    const command = `higgsfield generate create seedance1_5 --prompt "${prompt}" --duration ${duration} --resolution 720p --wait`;
+    const command = `higgsfield generate create seedance1_5 --prompt "${metadata}" --duration ${duration} --resolution 720p --wait`;
 
     console.log(`[Step 9] 명령 실행 중...`);
     const { stdout, stderr } = await execPromise(command, {

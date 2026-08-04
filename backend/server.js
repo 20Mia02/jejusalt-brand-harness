@@ -17,6 +17,28 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ============================================================================
+// 환경변수 검증 (서버 시작 시)
+// ============================================================================
+
+const requiredEnvVars = [
+  "SUPABASE_URL",
+  "SUPABASE_SERVICE_KEY",
+  "TIMELY_AI_API_KEY",
+  "HIGGSFIELD_API_KEY",
+];
+
+const missingEnvVars = requiredEnvVars.filter((env) => !process.env[env]);
+
+if (missingEnvVars.length > 0) {
+  console.error(
+    "❌ 필수 환경변수가 누락되었습니다:",
+    missingEnvVars.join(", ")
+  );
+  console.error("❌ .env 파일을 확인하세요.");
+  process.exit(1);
+}
+
+// ============================================================================
 // Middleware
 // ============================================================================
 
