@@ -44,6 +44,9 @@ async function callDatabase(table, operation, data, filter) {
   try {
     // ========== CREATE (INSERT) ==========
     if (operation === "create") {
+      if (!data) {
+        throw new Error("INSERT 작업에 data가 필요합니다");
+      }
       if (!Array.isArray(data)) {
         data = [data];
       }

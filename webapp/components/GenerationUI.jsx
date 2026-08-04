@@ -48,9 +48,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       setProgress(0);
       setCurrentStep('초기화 중...');
 
-      // Step 4~9: POST /api/generate
-      const res = await axios.post('/api/generate', {
-        resourceId,
+      // Step 4~9: POST /api/generate/:resourceId/start
+      const res = await axios.post(`/api/generate/${resourceId}/start`, {
         requestType,
       });
 

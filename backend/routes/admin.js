@@ -127,14 +127,17 @@ router.put("/characters/:id", async (req, res) => {
     });
     if (others.success) {
       const otherIds = others.rows.filter((c) => c.id !== id).map((c) => c.id);
-      for (const otherId of otherIds) {
-        await callDatabase(
-          "characters",
-          "update",
-          { selected: false },
-          { id: otherId }
-        );
-      }
+      // Promise.all로 동시 실행 (race condition 방지)
+      await Promise.all(
+        otherIds.map((otherId) =>
+          callDatabase(
+            "characters",
+            "update",
+            { selected: false },
+            { id: otherId }
+          )
+        )
+      );
     }
   }
 

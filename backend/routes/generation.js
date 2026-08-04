@@ -396,7 +396,7 @@ router.get("/:resourceId/status", async (req, res) => {
 
   try {
     // generation_logs에서 최근 상태 조회
-    const logs = await callDatabase("generation_logs", "query", {
+    const logs = await callDatabase("generation_logs", "read", {
       filter: { resource_id: resourceId },
       orderBy: "created_at",
       orderDirection: "desc",
@@ -444,22 +444,22 @@ router.get("/:resourceId/result", async (req, res) => {
 
   try {
     // 1. Contents 조회
-    const contents = await callDatabase("contents", "query", {
+    const contents = await callDatabase("contents", "read", {
       filter: { resource_id: resourceId },
     });
 
     // 2. Videos 조회
-    const videos = await callDatabase("videos", "query", {
+    const videos = await callDatabase("videos", "read", {
       filter: { resource_id: resourceId },
     });
 
     // 3. Scenarios 조회
-    const scenarios = await callDatabase("scenarios", "query", {
+    const scenarios = await callDatabase("scenarios", "read", {
       filter: { resource_id: resourceId },
     });
 
     // 4. Characters 조회
-    const characters = await callDatabase("characters", "query", {
+    const characters = await callDatabase("characters", "read", {
       filter: { resource_id: resourceId },
     });
 

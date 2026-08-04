@@ -116,14 +116,15 @@ async function callAgent(agentName, payload, context = {}) {
 async function callTimelyAIAgent(agentName, payload) {
   // ========== OpenAI SDK (TimelyAI OpenAI 호환 모드) ✅ ==========
   const apiKey = process.env.TIMELY_AI_API_KEY;
+  const baseURL = "https://hello.timelygpt.co.kr/api/v2/chat/bridge/openai";
 
   if (!apiKey) {
-    throw new Error("TIMELY_AI_API_KEY 환경변수가 설정되지 않았습니다");
+    throw new Error("TIMELY_AI_API_KEY 환경변수가 설정되지 않았습니다. .env 파일을 확인하세요.");
   }
 
   const client = new OpenAI({
     apiKey: apiKey,
-    baseURL: "https://hello.timelygpt.co.kr/api/v2/chat/bridge/openai",
+    baseURL: baseURL,
   });
 
   const systemPrompt = getSystemPromptForAgent(agentName);
@@ -147,7 +148,6 @@ async function callTimelyAIAgent(agentName, payload) {
       ],
       temperature: 0.7,
       max_tokens: 2000,
-      timeout: 30000, // 30초 타임아웃
     });
 
     console.log(`  [✓] 응답 수신 성공`);
