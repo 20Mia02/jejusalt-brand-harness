@@ -92,7 +92,7 @@ router.post("/", async (req, res) => {
     const designerResult = await callAgent(
       "character-designer-agent",
       {
-        character: selectedCharacter.name,
+        character: selectedCharacter.character_name,
         productName: resource.product_name,
         productInfo: resource.product_info,
         metadata,
@@ -105,7 +105,7 @@ router.post("/", async (req, res) => {
     }
 
     const completeBrief = designerResult.data?.brief || {
-      character: selectedCharacter.name,
+      character: selectedCharacter.character_name,
       voice_tone: selectedCharacter.voice_tone || "기본",
     };
 
@@ -140,12 +140,19 @@ router.post("/", async (req, res) => {
     }
 
     // scenarios 테이블에 저장
+    // ⚠️ schema.sql 컬럼명과 정확히 일치시킴:
+    //    scenario_title, story_content, scenario_json,
+    //    total_duration_seconds, dialogue_seconds, narration_seconds, timing_valid
     const scenarioDBResult = await callDatabase("scenarios", "create", {
       resource_id: resourceId,
       character_id: selectedCharacter.id,
-      title: scenario.title,
-      total_duration: 120,
-      acts: scenario.acts, // JSONB로 저장
+      scenario_title: scenario.title,
+      story_content: scenario.story_content || scenario.content || "",
+      scenario_json: scenario.acts || scenario,
+      total_duration_seconds: scenarioResult.data.timing_verification?.total_duration || 120,
+      dialogue_seconds: scenarioResult.data.timing_verification?.dialogue_seconds || null,
+      narration_seconds: scenarioResult.data.timing_verification?.narration_seconds || null,
+      timing_valid: scenarioResult.data.timing_verification?.total_duration === 120,
     });
 
     if (!scenarioDBResult.success) {
@@ -161,7 +168,7 @@ router.post("/", async (req, res) => {
     const namingResult = await callAgent(
       "naming-generator-agent",
       {
-        scenario_id: scenario.id,
+        scenario_id: scenarioDBResult.rows?.[0]?.id || null,
         primary_message: metadata.focus?.join(", ") || "제품의 가치",
         tone_analysis: metadata.focus || ["기본"],
         business_area: metadata.categories?.[0] || "일반",
@@ -184,8 +191,24 @@ router.post("/", async (req, res) => {
     // naming 테이블에 저장
     const namingDBResult = await callDatabase("naming", "create", {
       resource_id: resourceId,
-      product_names: productNameOptions.map(p => p.name),
-      content_names: contentNameOptions.map(c => c.name),
+      product_name_1: productNameOptions[0]?.name || "",
+      product_name_1_score: productNameOptions[0]?.score || 0,
+      product_name_1_meaning: productNameOptions[0]?.meaning || "",
+      product_name_2: productNameOptions[1]?.name || "",
+      product_name_2_score: productNameOptions[1]?.score || 0,
+      product_name_2_meaning: productNameOptions[1]?.meaning || "",
+      product_name_3: productNameOptions[2]?.name || "",
+      product_name_3_score: productNameOptions[2]?.score || 0,
+      product_name_3_meaning: productNameOptions[2]?.meaning || "",
+      content_name_1: contentNameOptions[0]?.name || "",
+      content_name_1_score: contentNameOptions[0]?.score || 0,
+      content_name_1_meaning: contentNameOptions[0]?.meaning || "",
+      content_name_2: contentNameOptions[1]?.name || "",
+      content_name_2_score: contentNameOptions[1]?.score || 0,
+      content_name_2_meaning: contentNameOptions[1]?.meaning || "",
+      content_name_3: contentNameOptions[2]?.name || "",
+      content_name_3_score: contentNameOptions[2]?.score || 0,
+      content_name_3_meaning: contentNameOptions[2]?.meaning || "",
     });
 
     // ── 5. Step 7: product-intro-writer-agent 또는 product-detail-page-writer-agent ──
@@ -204,7 +227,7 @@ router.post("/", async (req, res) => {
       agentName,
       {
         category: metadata.categories?.[0] || "일반",
-        character: selectedCharacter.name,
+        character: selectedCharacter.character_name,
         productName: selectedProductName,
         productInfo: resource.product_info,
         keywords: resource.keywords || [],
@@ -256,6 +279,8 @@ router.post("/", async (req, res) => {
     // contents 테이블에 저장
     const contentDBResult = await callDatabase("contents", "create", {
       resource_id: resourceId,
+      scenario_id: scenarioDBResult.rows?.[0]?.id || null,
+      naming_id: namingDBResult.rows?.[0]?.id || null,
       content_type: requestType === "intro" ? "intro" : "detail",
       generated_content: generatedContent,
       validation_status: validationStatus,
@@ -267,17 +292,20 @@ router.post("/", async (req, res) => {
     }
 
     const contentId = contentDBResult.rows?.[0]?.id || null;
+    const scenarioId = scenarioDBResult.rows?.[0]?.id || null;
+    const namingId = namingDBResult.rows?.[0]?.id || null;
 
     // ── 7. Step 9: Higgsfield 호출 ──
     console.log("[Step 9] Higgsfield 영상 생성 요청...");
     const higgsfieldResult = await callHiggsfield(
       {
-        character: selectedCharacter.name,
+        character: selectedCharacter.character_name,
         generatedContent,
         voiceTone: selectedCharacter.voice_tone || "기본",
         duration: 120,
       },
-      resourceId
+      resourceId,
+      contentId
     );
 
     if (!higgsfieldResult.success) {

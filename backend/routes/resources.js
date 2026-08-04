@@ -143,8 +143,8 @@ router.post("/", async (req, res) => {
     // ── 5. characters 3개 저장 (1순위를 selected: true로) ──
     const characterRows = characters.map((c, idx) => ({
       resource_id: resourceId,
-      name: c.name,
-      description: c.description,
+      character_name: c.name,
+      character_profile: c.description,
       reason: c.reason,
       score: c.score,
       selected: idx === 0,

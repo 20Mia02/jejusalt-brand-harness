@@ -88,7 +88,7 @@ router.put("/resources/:id", async (req, res) => {
 // ─────────────────────────────────────────────
 router.put("/characters/:id", async (req, res) => {
   const { id } = req.params;
-  const { name, description, reason, score, selected } = req.body;
+  const { character_name, character_profile, reason, score, selected, voice_tone, personality_traits, edited_by } = req.body;
 
   // 캐릭터가 존재하는지 + resource_id 확인 (다른 캐릭터 selected 해제할 때 필요)
   const existing = await callDatabase("characters", "read", null, { id });
@@ -101,11 +101,17 @@ router.put("/characters/:id", async (req, res) => {
   const resourceId = existing.rows[0].resource_id;
 
   const updateData = {};
-  if (name !== undefined) updateData.name = name;
-  if (description !== undefined) updateData.description = description;
+  if (character_name !== undefined) updateData.character_name = character_name;
+  if (character_profile !== undefined) updateData.character_profile = character_profile;
   if (reason !== undefined) updateData.reason = reason;
   if (score !== undefined) updateData.score = score;
   if (selected !== undefined) updateData.selected = selected;
+  if (voice_tone !== undefined) updateData.voice_tone = voice_tone;
+  if (personality_traits !== undefined) updateData.personality_traits = personality_traits;
+  if (edited_by !== undefined) {
+    updateData.edited_at = new Date();
+    updateData.edited_by = edited_by;
+  }
 
   if (Object.keys(updateData).length === 0) {
     return res.status(400).json({
@@ -242,8 +248,16 @@ router.put("/naming/:resourceId", async (req, res) => {
     success: true,
     resource: updateResult.rows[0],
     availableOptions: {
-      productNames: namingResult.rows[0].product_names,
-      contentNames: namingResult.rows[0].content_names,
+      productNames: [
+        { name: namingResult.rows[0].product_name_1, score: namingResult.rows[0].product_name_1_score, meaning: namingResult.rows[0].product_name_1_meaning },
+        { name: namingResult.rows[0].product_name_2, score: namingResult.rows[0].product_name_2_score, meaning: namingResult.rows[0].product_name_2_meaning },
+        { name: namingResult.rows[0].product_name_3, score: namingResult.rows[0].product_name_3_score, meaning: namingResult.rows[0].product_name_3_meaning },
+      ],
+      contentNames: [
+        { name: namingResult.rows[0].content_name_1, score: namingResult.rows[0].content_name_1_score, meaning: namingResult.rows[0].content_name_1_meaning },
+        { name: namingResult.rows[0].content_name_2, score: namingResult.rows[0].content_name_2_score, meaning: namingResult.rows[0].content_name_2_meaning },
+        { name: namingResult.rows[0].content_name_3, score: namingResult.rows[0].content_name_3_score, meaning: namingResult.rows[0].content_name_3_meaning },
+      ],
     },
   });
 });
