@@ -80,32 +80,38 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <div style={{ marginBottom: "20px" }}>
-          {/* 제주소금 공식 BI 로고 */}
-          <svg
-            className="logo-icon"
-            viewBox="0 0 100 100"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{ width: "70px", height: "70px" }}
-          >
-            {/* 원형 테두리 */}
-            <circle cx="50" cy="50" r="42" fill="none" stroke="#000000" strokeWidth="2.5"/>
+        <div className="app-header-content">
+          <div className="logo-section">
+            <svg
+              className="logo-icon"
+              viewBox="0 0 100 100"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style={{stopColor: "#ffffff", stopOpacity: 1}} />
+                  <stop offset="100%" style={{stopColor: "#00AEEF", stopOpacity: 1}} />
+                </linearGradient>
+              </defs>
+              <circle cx="50" cy="50" r="42" fill="none" stroke="url(#logoGradient)" strokeWidth="3"/>
+              <path d="M 35 60 Q 40 35 45 60" fill="none" stroke="#00AEEF" strokeWidth="3.5" strokeLinecap="round"/>
+              <path d="M 55 60 Q 60 35 65 60" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round"/>
+            </svg>
+          </div>
 
-            {/* 왼쪽 곡선 (한라산 왼쪽 봉우리) */}
-            <path d="M 35 60 Q 40 35 45 60" fill="none" stroke="#000000" strokeWidth="2.5" strokeLinecap="round"/>
-
-            {/* 오른쪽 곡선 (한라산 오른쪽 봉우리) */}
-            <path d="M 55 60 Q 60 35 65 60" fill="none" stroke="#000000" strokeWidth="2.5" strokeLinecap="round"/>
-          </svg>
+          <div className="header-text">
+            <div className="header-text-korean">제주도 라바 씨솔트</div>
+            <h1>JEJU LAVA<br/>SEA SALT</h1>
+            <div className="header-divider"></div>
+            <nav className="app-header-nav">
+              <Link to="/" className={!isAdmin ? 'active' : ''}>메인</Link>
+              <Link to="/admin" className={isAdmin ? 'active' : ''}>관리자 모드</Link>
+            </nav>
+            <p className="header-subtitle">
+              {isAdmin ? '관리자 모드' : STEP_LABELS[currentStep]}
+            </p>
+          </div>
         </div>
-        <h1>제주도 라바 씨솔트</h1>
-        <nav className="app-header-nav">
-          <Link to="/" className={!isAdmin ? 'active' : ''}>메인</Link>
-          <Link to="/admin" className={isAdmin ? 'active' : ''}>관리자 모드</Link>
-        </nav>
-        {!isAdmin && (
-          <p className="app-header-subtitle">{STEP_LABELS[currentStep]}</p>
-        )}
       </header>
 
       <Routes>
