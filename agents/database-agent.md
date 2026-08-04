@@ -1,359 +1,596 @@
----
-title: database-agent
-role: Supabase CRUD 전담 에이전트
-type: Agent
-version: 1.0
-owner: 박주미
-tables:
-  - resources
-  - characters
-  - scenarios
-  - naming
-  - contents
-  - videos
-  - generation_logs
-used_by:
-  - backend-agent (모든 저장/조회 위임받음)
-  - routes/resources.js
-  - routes/admin.js
-  - routes/generation.js
----
-
 # database-agent.md
 
-## 역할
+## 1. 역할 (Role)
 
-**Supabase(PostgreSQL) 7개 테이블에 대한 모든 CRUD를 전담하는 에이전트**
+**Supabase(PostgreSQL)와의 모든 CRUD를 담당하는 데이터베이스 에이전트**
 
-backend-agent(그리고 routes 파일들)는 Supabase 클라이언트를 직접 만지지 않고,
-반드시 database-agent의 `callDatabase()`를 통해서만 데이터를 읽고 쓴다.
-
-**목적**:
-- 저장 순서(자식 테이블이 부모 테이블의 id를 참조)를 한 곳에서 보장
-- 각 route 파일이 테이블 구조를 몰라도 되게 함 (필드명 오타, FK 누락 등 실수 방지)
-- 실패 시 어디까지 저장됐는지 generation_logs로 추적 가능
+- 7개 테이블의 모든 쓰기/읽기 작업
+- 저장 순서 보장 (FK 위반 방지)
+- 에러 분류 및 처리
+- 롤백 정책 (hard delete 금지)
 
 ---
 
-## 테이블 구조 (오늘 생성한 schema.sql 기준)
+## 2. 통합 CRUD 함수 (callDatabase)
 
+### 2-1. 함수 목적
+Supabase의 모든 데이터베이스 작업을 단일 인터페이스로 처리
+
+### 2-2. 입력 (Input)
 ```
-resources (자료 = 파이프라인의 루트)
-  ├─ characters        (resource_id FK)
-  ├─ scenarios          (resource_id FK, character_id FK)
-  ├─ naming             (resource_id FK)
-  ├─ contents           (resource_id FK)
-  ├─ videos             (resource_id FK)
-  └─ generation_logs    (resource_id FK)
+table: string
+  - "resources"
+  - "characters"
+  - "scenarios"
+  - "naming"
+  - "contents"
+  - "videos"
+  - "generation_logs"
+
+operation: string
+  - "create" (INSERT)
+  - "read" (SELECT)
+  - "update" (UPDATE)
+  - "delete" (DELETE)
+
+data: object (create/update 시 필수)
+  - {product_name: "...", metadata: {...}, ...}
+
+filter: object (read/update/delete 시 필수)
+  - {id: "uuid"}
+  - {resource_id: "uuid", selected: true}
 ```
 
-| 테이블 | 주요 컬럼 | 채워지는 시점 |
-|---|---|---|
-| `resources` | product_name, product_info, keywords, metadata(jsonb), status | Step 1 시작 시 생성, Step 2 후 metadata 업데이트 |
-| `characters` | resource_id, name, description, reason, score, selected | Step 2 (character-generator) 후 3개 insert |
-| `scenarios` | resource_id, character_id, title, total_duration, acts(jsonb) | Step 4 (shortform-scenario-writer) 후 |
-| `naming` | resource_id, product_names(text[]), content_names(text[]) | Step 5 (naming-generator) 후 |
-| `contents` | resource_id, content_type, generated_content, tone, length, validation_status, validation_score | Step 6~7 (writer + compliance) 후 |
-| `videos` | resource_id, video_url, thumbnail_url, duration, status | Step 8 (Higgsfield 완료) 후 |
-| `generation_logs` | resource_id, step, status, error_message, duration_ms, attempt | 매 Agent 호출마다 (backend-agent가 자동 기록) |
-
-> `resources.metadata`는 JSONB로 저장한다 (`data-schema.md`의 metadata 구조를 그대로 사용:
-> categories, ageGroups, genders, targets, focus, confidence).
-
----
-
-## 입력
-
-```javascript
+### 2-3. 출력 (Output)
+```
+성공 시:
 {
-  "table": "resources",              // 필수: 테이블명
-  "operation": "create" | "read" | "update" | "delete",
-  "data": { ... },                   // create/update 시 저장할 데이터
-  "filter": { id: "uuid" },          // read/update/delete 시 조건
-  "resourceId": "uuid"               // 로그 연결용 (선택, generation_logs 저장 시 제외)
+  success: true,
+  rows: [...]  // INSERT/UPDATE/DELETE한 행들
 }
-```
-
-## 출력
-
-```javascript
-{
-  "success": true,
-  "rows": [ { ... } ]     // create/read/update: 반영된 행, delete: 삭제된 행
-}
-```
 
 실패 시:
-```javascript
 {
-  "success": false,
-  "error": "FK_VIOLATION" | "NOT_FOUND" | "VALIDATION_ERROR" | "DB_ERROR",
-  "message": "resource_id가 존재하지 않습니다"
+  success: false,
+  error: "FK_VIOLATION|NOT_FOUND|VALIDATION_ERROR|...",
+  message: "상세 에러 메시지",
+  rows: []
+}
+```
+
+### 2-4. 작업별 상세
+
+#### CREATE (삽입)
+```
+입력:
+callDatabase("resources", "create", {
+  product_name: "제주용암프리미엄솔트",
+  product_info: "...",
+  metadata: {...}
+})
+
+처리: INSERT INTO resources (...)
+
+출력:
+{
+  success: true,
+  rows: [{id: "uuid", product_name: "...", ...}]
+}
+```
+
+#### READ (조회)
+```
+입력:
+callDatabase("resources", "read", null, {
+  id: "uuid"
+})
+
+처리: SELECT * FROM resources WHERE id = "uuid"
+     ORDER BY created_at DESC
+
+출력:
+{
+  success: true,
+  rows: [{...}, {...}, ...]
+}
+```
+
+#### UPDATE (수정)
+```
+입력:
+callDatabase("resources", "update", 
+  {metadata: {...}, status: "completed"},
+  {id: "uuid"}
+)
+
+처리: UPDATE resources SET metadata=..., status=... 
+     WHERE id = "uuid"
+
+출력:
+{
+  success: true,
+  rows: [{id: "uuid", metadata: {...}, ...}]
+}
+
+실패 시 (해당 행이 없음):
+{
+  success: false,
+  error: "NOT_FOUND",
+  message: "업데이트할 행이 없습니다",
+  rows: []
+}
+```
+
+#### DELETE (삭제)
+```
+입력:
+callDatabase("characters", "delete", null, {
+  id: "uuid"
+})
+
+처리: DELETE FROM characters WHERE id = "uuid"
+
+출력:
+{
+  success: true,
+  rows: [{id: "uuid", ...}]  // 삭제한 행
+}
+
+주의: hard delete (복구 불가)
+```
+
+---
+
+## 3. 저장 순서 보장 (매우 중요!)
+
+### 3-1. 필수 순서
+```
+1️⃣ resources 생성
+   INSERT INTO resources (product_name, product_info, metadata, ...)
+
+2️⃣ resources 메타데이터 업데이트
+   UPDATE resources SET metadata = {...}, status = "analyzed"
+
+3️⃣ characters 저장 (1순위부터)
+   INSERT INTO characters (resource_id, character_name, voice_tone, personality_traits, ...)
+
+4️⃣ scenarios 저장
+   INSERT INTO scenarios (resource_id, character_id, ...)
+
+5️⃣ naming 저장
+   INSERT INTO naming (resource_id, ...)
+
+6️⃣ contents 저장
+   INSERT INTO contents (resource_id, ...)
+
+7️⃣ videos 저장
+   INSERT INTO videos (resource_id, ...)
+
+8️⃣ resources 최종 상태 업데이트
+   UPDATE resources SET status = "completed"
+```
+
+### 3-2. 왜 순서가 중요한가?
+
+**FK(Foreign Key) 제약**
+```
+❌ characters를 resources 이전에 생성
+   → FK 위반 에러 (resource_id가 존재하지 않음)
+
+✅ resources 생성 → characters 생성
+   → 정상 작동
+```
+
+### 3-3. 각 테이블의 FK
+```
+characters → resources (resource_id)
+scenarios → resources (resource_id)
+scenarios → characters (character_id)
+naming → resources (resource_id)
+contents → resources (resource_id)
+contents → scenarios (scenario_id)        ← ⭐ 추가
+contents → naming (naming_id)             ← ⭐ 추가
+videos → resources (resource_id)
+videos → contents (content_id)            ← ⭐ 추가
+generation_logs → resources (resource_id)
+```
+
+---
+
+## 4. 테이블별 상세 정의
+
+### 4-1. characters 테이블 (캐릭터 - 편집 가능)
+
+**생성 시 저장할 필드**:
+```
+character_name: "용암이"
+score: 95
+reason: "신뢰감 있는 목소리"
+selected: true|false
+```
+
+**Step 4 후 저장할 필드** (character-designer-agent):
+```
+voice_tone: "따뜻한 아버지 목소리"
+personality_traits: ["따뜨함", "신뢰", "보호본능"]
+visual_description: "주름진 손, 밝은 눈빛..."
+preferred_expressions: ["함께", "이 맛", "우리 가족"]
+avoid_expressions: ["최고", "유일", "기적"]
+```
+
+**편집 시 업데이트할 필드**:
+```
+voice_tone: "새로운 톤..."
+personality_traits: [...]
+edited_at: NOW()
+edited_by: "마케터A"
+```
+
+---
+
+### 4-2. videos 테이블 (Higgsfield 영상 - 진행률 추적)
+
+**Step 9 시작 시 INSERT**:
+```
+resource_id: UUID (FK)
+content_id: UUID (FK) ← ⭐ 추가!
+higgsfield_id: "abc123"
+generation_status: "processing" ← ⭐ 진행 중!
+generation_progress: 0         ← ⭐ 0%로 시작!
+generation_start_time: NOW()
+```
+
+**5초마다 UPDATE** (pollHiggsfield):
+```
+generation_progress: 0 → 25 → 50 → 75 → 100
+generation_status: "processing" → "completed"
+video_url: "https://..."
+updated_at: NOW()
+generation_end_time: NOW() (완료 시)
+```
+
+**중요**: 진행 중에도 videos 테이블에 row가 존재하고, 5초마다 업데이트됨!
+
+---
+
+### 4-3. naming 테이블 (제품명/콘텐츠명 - 점수 포함)
+
+**Step 6 후 저장**:
+```
+resource_id: UUID (FK)
+
+product_name_1: "용암빛"
+product_name_1_score: 95
+product_name_1_meaning: "제주 화산의 검은색..."
+
+product_name_2: "70년의 정성"
+product_name_2_score: 89
+product_name_2_meaning: "오래된 기술..."
+
+product_name_3: "제주의 선물"
+product_name_3_score: 86
+product_name_3_meaning: "선물 같은..."
+
+content_name_1: "제주의 바다가 주는 따뜬한 선물"
+content_name_1_score: 93
+content_name_1_meaning: "감정적 연결..."
+
+content_name_2: "70년 기술, 현대의 마음"
+content_name_2_score: 88
+content_name_2_meaning: "과거와 현재..."
+
+content_name_3: "자연과 기술의 만남"
+content_name_3_score: 82
+content_name_3_meaning: "조화..."
+
+selected_product_name: "용암빛" (마케터 선택)
+selected_content_name: "제주의 바다가 주는 따뜬한 선물" (마케터 선택)
+```
+
+---
+
+### 4-4. contents 테이블 (생성된 콘텐츠)
+
+**Step 7~8 후 저장**:
+```
+resource_id: UUID (FK)
+scenario_id: UUID (FK) ← ⭐ 추가!
+naming_id: UUID (FK)   ← ⭐ 추가!
+
+content_type: "intro"|"detail"|"both"
+generated_content: "실제 카피 텍스트..."
+tone: "따뜨함, 신뢰감"
+length: 156
+
+validation_status: "APPROVED"|"NEEDS REVISION"|"REJECTED"
+validation_score: 92
+validation_details: {issues: [...], corrections: [...]}
+```
+
+---
+
+## 5. 에러 분류 (errorCode별)
+
+### 4-1. FK_VIOLATION (23503)
+```
+원인: 참조하는 부모 행이 없음
+예시: characters를 resources 이전에 생성
+해결: 저장 순서 확인 후 재시도
+```
+
+### 4-2. VALIDATION_ERROR (23502)
+```
+원인: NOT NULL 필드가 비워져 있음
+예시: product_name = null인 resources 생성
+해결: 필수 필드 확인 후 재시도
+```
+
+### 4-3. UNIQUE_VIOLATION (23505)
+```
+원인: Unique 제약 위반 (중복)
+해결: 중복 값 제거 후 재시도
+```
+
+### 4-4. NOT_FOUND
+```
+원인: UPDATE/DELETE할 행이 없음
+예시: 존재하지 않는 UUID 업데이트
+해결: ID 확인 후 재시도
+```
+
+### 4-5. DB_ERROR
+```
+원인: 그 외 데이터베이스 에러
+해결: 로그 확인 후 원인 파악
+```
+
+---
+
+## 6. 전체 저장 파이프라인 (saveFullPipeline)
+
+### 5-1. 함수 목적
+8개 단계의 저장을 자동으로 순서대로 처리하고, 실패 시 롤백
+
+### 5-2. 입력
+```
+pipelineData: {
+  productName: "...",
+  productInfo: "...",
+  metadata: {...},
+  characters: [{name, score, ...}, ...],
+  scenario: {title, acts, ...},
+  naming: {product_names, content_names},
+  contents: {content_type, generated_content, ...},
+  videos: {higgsfield_id, ...}
+}
+```
+
+### 5-3. 처리 흐름
+```
+Step 1: resources 생성
+  IF 실패 → 종료, 에러 반환
+  
+Step 2: metadata 업데이트
+  IF 실패 → 종료, 에러 반환
+  
+Step 3: characters 저장
+  IF 실패 → 종료, 에러 반환
+  
+Step 4: scenarios 저장
+  IF 실패 → 종료, 에러 반환
+  
+Step 5: naming 저장
+  IF 실패 → 종료, 에러 반환
+  
+Step 6: contents 저장
+  IF 실패 → 종료, 에러 반환
+  
+Step 7: videos 저장
+  IF 실패 → 종료, 에러 반환
+  
+Step 8: resources 최종 상태 = "completed"
+  완료!
+```
+
+### 5-4. 실패 시 처리
+```
+어느 단계든 실패 시:
+1. 해당 step에서 멈춤
+2. resources.status = "failed" 로 표시
+3. 생성된 데이터는 보존 (디버깅용)
+4. 에러 메시지와 함께 반환
+```
+
+### 5-5. 출력
+```
+성공:
+{
+  success: true,
+  resourceId: "uuid",
+  message: "모든 데이터가 정상적으로 저장되었습니다"
+}
+
+실패:
+{
+  success: false,
+  error: "FK_VIOLATION | VALIDATION_ERROR | ...",
+  message: "파이프라인 저장 중 오류가 발생했습니다"
 }
 ```
 
 ---
 
-## 공통 함수
+## 7. 필터링 (getResourcesByFilter)
 
-```javascript
-async function callDatabase(table, operation, data = null, filter = null) {
-  try {
-    let query = supabase.from(table);
+### 6-1. 함수 목적
+metadata의 JSONB 필드를 기반으로 동적 필터링
 
-    switch (operation) {
-      case "create": {
-        const { data: rows, error } = await query.insert(data).select();
-        if (error) throw error;
-        return { success: true, rows };
-      }
-      case "read": {
-        let q = query.select("*");
-        if (filter) Object.entries(filter).forEach(([k, v]) => (q = q.eq(k, v)));
-        const { data: rows, error } = await q;
-        if (error) throw error;
-        return { success: true, rows };
-      }
-      case "update": {
-        let q = query.update(data);
-        if (filter) Object.entries(filter).forEach(([k, v]) => (q = q.eq(k, v)));
-        const { data: rows, error } = await q.select();
-        if (error) throw error;
-        return { success: true, rows };
-      }
-      case "delete": {
-        let q = query.delete();
-        if (filter) Object.entries(filter).forEach(([k, v]) => (q = q.eq(k, v)));
-        const { data: rows, error } = await q.select();
-        if (error) throw error;
-        return { success: true, rows };
-      }
-      default:
-        throw new Error(`알 수 없는 operation: ${operation}`);
-    }
-  } catch (error) {
-    return { success: false, error: classifyDbError(error), message: error.message };
-  }
+### 6-2. 입력
+```
+filters: {
+  categories: ["식품", "헬스케어"],
+  ageGroups: ["40~60대"],
+  targets: ["가족밥상"],
+  videoTypes: [...]
+}
+```
+
+### 6-3. 처리 로직
+```
+SELECT * FROM resources
+WHERE status = "completed"
+  AND metadata->>'categories' LIKE '%식품%'
+  AND metadata->>'ageGroups' LIKE '%40~60대%'
+  AND metadata->>'targets' LIKE '%가족밥상%'
+ORDER BY created_at DESC
+```
+
+### 6-4. 출력
+```
+{
+  success: true,
+  rows: [
+    {
+      id: "uuid",
+      product_name: "...",
+      metadata: {categories: [...], ageGroups: [...], ...},
+      ...
+    },
+    ...
+  ]
 }
 ```
 
 ---
 
-## 저장 순서 (매우 중요! FK 위반 방지)
+## 8. 롤백 정책
 
-**반드시 이 순서로 저장한다** (부모 → 자식 순서). backend-agent가 이 순서를 지켜서 호출한다.
-
+### 7-1. Hard Delete 금지
 ```
-1️⃣ resources (create)        — resourceId 생성, status: "analyzing"
-   ↓ (Step 1: resource-analyzer 완료 후)
-2️⃣ resources (update)         — metadata 채움, status: "analyzed"
-   ↓ (Step 2: character-generator 완료 후)
-3️⃣ characters (create × 3)    — resource_id로 연결, 1번째를 selected: true
-   ↓ (Step 4: shortform-scenario-writer 완료 후)
-4️⃣ scenarios (create)         — resource_id + character_id로 연결
-   ↓ (Step 5: naming-generator 완료 후)
-5️⃣ naming (create)            — resource_id로 연결
-   ↓ (Step 6~7: writer + compliance 완료 후)
-6️⃣ contents (create)          — resource_id로 연결, validation_status/score 포함
-   ↓ (Step 8: Higgsfield 완료 후)
-7️⃣ videos (create)            — resource_id로 연결, status: "completed"
-   ↓ (전체 완료)
-8️⃣ resources (update)         — status: "completed"
+❌ DELETE FROM resources WHERE id = "uuid"
 
-⚠️ generation_logs는 위 순서와 무관하게 매 Agent 호출마다 즉시 기록됨 (성공/실패 모두)
+✅ UPDATE resources SET status = "failed"
+```
+
+### 7-2. 이유
+```
+- 데이터 복구 가능성 (디버깅)
+- 감사 추적 (audit trail)
+- 실수에 대한 보호
+```
+
+### 7-3. Status 변경으로 논리적 삭제
+```
+생성됨: status = "created"
+분석됨: status = "analyzed"
+실패: status = "failed"
+완료: status = "completed"
 ```
 
 ---
 
-## 각 단계별 실제 호출 예시
+## 9. 필드명 일관성
 
-### 1️⃣ resources 생성 (Step 1 시작)
+### 9-1. Snake Case 사용
+```
+✅ generation_status (DB 컬럼명)
+❌ generationStatus
 
-```javascript
-const created = await callDatabase("resources", "create", {
-  product_name: productName,
-  product_info: productInfo,
-  keywords: keywords || [],
-  status: "analyzing"
-});
-if (!created.success) {
-  return res.status(500).json({ success: false, message: "자료 저장 실패", detail: created });
+✅ generation_progress
+❌ generationProgress
+
+✅ video_url
+❌ videoUrl
+
+✅ voice_tone
+❌ voiceTone
+
+✅ personality_traits
+❌ personalityTraits
+
+✅ visual_description
+❌ visualDescription
+
+✅ edited_at
+❌ editedAt
+
+✅ edited_by
+❌ editedBy
+```
+
+### 9-2. JSONB 필드
+```
+resources.metadata:
+{
+  "categories": ["식품"],
+  "ageGroups": ["40~60대"],
+  "targets": ["가족밥상"],
+  "focus": ["신뢰", "건강"],
+  "confidence": 0.96
 }
-const resourceId = created.rows[0].id;
-```
 
-### 2️⃣ resources 메타데이터 업데이트 (Step 1 완료 후)
+characters.personality_traits:
+["따뜨함", "신뢰", "보호본능"]
 
-```javascript
-await callDatabase("resources", "update",
-  { metadata: metadata, status: "analyzed" },
-  { id: resourceId }
-);
-```
-
-### 3️⃣ characters 3개 저장 (Step 2 완료 후)
-
-```javascript
-const characterRows = characters.map((c, idx) => ({
-  resource_id: resourceId,
-  name: c.name,
-  description: c.description,
-  reason: c.reason,
-  score: c.score,
-  selected: idx === 0   // 1순위(가장 높은 점수)를 기본 선택으로
-}));
-
-await callDatabase("characters", "create", characterRows);
-```
-
-### 4️⃣ scenarios 저장 (Step 4 완료 후)
-
-```javascript
-await callDatabase("scenarios", "create", {
-  resource_id: resourceId,
-  character_id: selectedCharacterId,
-  title: scenario.title,
-  total_duration: scenario.total_duration,
-  acts: scenario.acts   // JSONB
-});
-```
-
-### 5️⃣ naming 저장 (Step 5 완료 후)
-
-```javascript
-await callDatabase("naming", "create", {
-  resource_id: resourceId,
-  product_names: namingResult.product_names.map(p => p.name),   // text[]
-  content_names: namingResult.content_names.map(c => c.name)    // text[]
-});
-```
-
-### 6️⃣ contents 저장 (Step 6~7 완료 후)
-
-```javascript
-await callDatabase("contents", "create", {
-  resource_id: resourceId,
-  content_type: requestType,             // "intro" | "detail"
-  generated_content: generatedContent,
-  tone: complianceResult.validation.tone || null,
-  length: generatedContent.length,
-  validation_status: complianceResult.validation.status,
-  validation_score: complianceResult.validation.score
-});
-```
-
-### 7️⃣ videos 저장 (Step 8, Higgsfield 완료 후)
-
-```javascript
-await callDatabase("videos", "create", {
-  resource_id: resourceId,
-  video_url: higgsfieldResult.videoUrl,
-  thumbnail_url: higgsfieldResult.thumbnailUrl,
-  duration: 120,
-  status: "completed"
-});
-
-await callDatabase("resources", "update", { status: "completed" }, { id: resourceId });
-```
-
-### 8️⃣ 필터 조회 (FilterUI.jsx → routes/resources.js → database-agent)
-
-```javascript
-// GET /api/resources/filter?categories=식품&ageGroups=40~60대
-// metadata는 JSONB이므로 Supabase의 containedBy/contains 연산자 사용
-
-async function getResourcesByFilter(filters) {
-  let query = supabase.from("resources").select("*").eq("status", "completed");
-
-  if (filters.categories?.length) {
-    query = query.contains("metadata->categories", filters.categories);
-  }
-  if (filters.ageGroups?.length) {
-    query = query.contains("metadata->ageGroups", filters.ageGroups);
-  }
-  if (filters.targets?.length) {
-    query = query.contains("metadata->targets", filters.targets);
-  }
-
-  const { data: rows, error } = await query.order("created_at", { ascending: false });
-  if (error) return { success: false, error: "DB_ERROR", message: error.message };
-  return { success: true, rows };
+contents.validation_details:
+{
+  "issues": ["과장 표현 3개"],
+  "corrections": ["고쳐야 할 부분"],
+  "compliant_score": 92
 }
 ```
 
 ---
 
-## generation_logs 기록 (backend-agent가 호출)
+## 10. 에러 처리 전략
 
-database-agent는 스스로 로그를 남기지 않는다 (무한 루프 방지). **backend-agent가 매 Agent 호출 후 database-agent를 통해 기록**한다.
+### 10-1. 재시도 정책
+```
+FK_VIOLATION
+  → 저장 순서 확인 필요
+  → 재시도 X (구조적 문제)
 
-```javascript
-// backend-agent.md의 logStep()이 이렇게 호출함
-await callDatabase("generation_logs", "create", {
-  resource_id: resourceId,
-  step: "resource-analyzer",
-  status: "success",
-  error_message: null,
-  duration_ms: 1240,
-  attempt: 1
-});
+VALIDATION_ERROR
+  → 입력값 검증 필요
+  → 재시도 X (데이터 문제)
+
+NOT_FOUND
+  → ID 확인 필요
+  → 재시도 X (존재하지 않는 행)
+
+DB_ERROR
+  → 로그 확인 후 원인 파악
+  → 재시도 가능 (일시적 오류일 수 있음)
+```
+
+### 10-2. 사용자 메시지
+```
+백엔드 로그: 상세한 에러 내용
+사용자 응답: 친화적 메시지만
+
+예:
+백엔드: "FK_VIOLATION: resource_id=uuid가 존재하지 않음"
+사용자: "자료 저장에 실패했습니다. 관리자에게 문의하세요."
 ```
 
 ---
 
-## 롤백 정책
+## 11. 요약 (Summary)
 
-Supabase 무료 플랜에서는 **다중 테이블 트랜잭션(BEGIN/COMMIT)을 애플리케이션 레벨에서 직접 제어하기 어렵다.**
-따라서 완전한 롤백 대신 **"실패 지점까지 기록 + status로 상태 추적"** 방식을 쓴다.
-
-```javascript
-// 예: characters 저장까지 성공했는데 scenarios 저장이 실패한 경우
-// → characters는 그대로 두고, resources.status를 "failed"로 변경
-// → generation_logs에 실패 step과 error_message 기록
-// → 사용자는 AdminMode에서 해당 resource를 보고 "재시도" 가능
-
-async function markFailed(resourceId, failedStep, errorMessage) {
-  await callDatabase("resources", "update",
-    { status: "failed" },
-    { id: resourceId }
-  );
-  await callDatabase("generation_logs", "create", {
-    resource_id: resourceId,
-    step: failedStep,
-    status: "fail",
-    error_message: errorMessage,
-    duration_ms: null,
-    attempt: null
-  });
-}
-```
-
-> **완전 삭제(hard delete)는 하지 않는다.** 실패해도 데이터는 남기고 status만 바꾼다.
-> 이유: 디버깅 시 "어디까지 됐었는지" 확인 가능해야 하고, Day 3 RLS 정책 적용 전까지는 데이터 보존이 우선.
+| 함수 | 목적 | 입력 | 출력 |
+|------|------|------|------|
+| **callDatabase** | CRUD 통합 | table, operation, data, filter | {success, rows} |
+| **saveFullPipeline** | 전체 저장 | pipelineData | {success, resourceId} |
+| **getResourcesByFilter** | 필터링 | filters | {success, rows} |
 
 ---
 
-## 에러 분류 (classifyDbError)
+## 12. 참고 사항
 
-| 분류 | 조건 | 처리 |
-|---|---|---|
-| `FK_VIOLATION` | resource_id가 resources에 없음 (23503) | 즉시 실패 반환, 재시도 안 함 |
-| `VALIDATION_ERROR` | NOT NULL 컬럼 누락 (23502) | 즉시 실패 반환 |
-| `NOT_FOUND` | update/delete 대상 행 없음 | 즉시 실패 반환 |
-| `DB_ERROR` | 그 외 (연결 끊김 등) | backend-agent 재시도 정책 따름 |
-
----
-
-## 체크리스트
-
-- [ ] resources → characters → scenarios → naming → contents → videos 순서 준수
-- [ ] resources.status가 analyzing → analyzed → completed(또는 failed)로 정확히 전이하는가
-- [ ] characters 저장 시 1순위를 selected: true로 표시했는가
-- [ ] metadata, acts는 JSONB, product_names/content_names는 text[]로 저장했는가
-- [ ] 실패 시 hard delete 하지 않고 status만 "failed"로 변경했는가
-- [ ] generation_logs는 database-agent가 아니라 backend-agent가 기록 주체인가 (역할 분리)
-- [ ] 필터 조회 시 metadata JSONB 필드에 `.contains()` 사용했는가
-
----
-
-✅ **완성! routes/resources.js(저장), routes/admin.js(수정), routes/generation.js(전체 파이프라인 저장)에서 이 인터페이스를 사용합니다.**
+- **저장 순서**: 절대 변경 금지 (FK 위반) - 8개 단계 순서 준수
+- **Hard Delete**: 금지 (soft delete 사용)
+- **generation_logs**: backend-agent가 기록 (database-agent X)
+- **JSONB**: Supabase가 자동 변환 (JSON.stringify 불필요)
+- **에러 분류**: DB 에러코드(23503 등)로 판단
+- **FK 순서**: resources → characters → scenarios → naming → contents → videos
+- **진행 중 업데이트**: videos 테이블은 생성 후 5초마다 UPDATE (중요!)
