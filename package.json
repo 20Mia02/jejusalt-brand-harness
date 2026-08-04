@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "제주소금 AI 콘텐츠 생성 엔진 - TimelyAI 기반 멀티 에이전트 시스템",
   "main": "backend/server.js",
-  "type": "module",
   "scripts": {
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
