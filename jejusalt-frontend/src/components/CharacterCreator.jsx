@@ -1,30 +1,54 @@
 /**
  * frontend/components/CharacterCreator.jsx
- * 
+ *
  * 캐릭터 생성/편집/선택 UI
  * 담당: 고수아(UI) + 박주미(API)
- * 
+ *
  * 역할:
- * 1. AI가 추천한 캐릭터 3개를 카드로 표시
+ * 1. AI가 추천한 캐릭터 3개를 카드로 표시 (characters prop이 비어 있으면 resourceId로 직접 조회)
  * 2. 각 캐릭터의 voice_tone, personality_traits 편집
  * 3. 한 개만 "선택" 가능 (selected = true)
  * 4. 캐릭터 프로필 전체 보기/숨기기
- * 5. 저장 및 다음 단계로 진행
+ * 5. 영상유형(캐릭터소개/제품스토리/일상밥상) 선택
+ * 6. 저장 및 다음 단계로 진행 → onSelect(character, videoType)
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+
+const VIDEO_TYPES = ['캐릭터소개', '제품스토리', '일상밥상'];
 
 export default function CharacterCreator({ characters = [], resourceId, onSelect }) {
   const [localCharacters, setLocalCharacters] = useState(characters);
   const [selectedId, setSelectedId] = useState(
     characters.find((c) => c.selected)?.id || characters[0]?.id
   );
+  const [videoType, setVideoType] = useState(VIDEO_TYPES[1]); // 기본값: 제품스토리
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  // characters prop이 비어 있으면 resourceId로 직접 조회 (App.jsx가 캐릭터를 안 넘겨줘도 동작)
+  useEffect(() => {
+    if (characters.length > 0 || !resourceId) return;
+
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await axios.get(`/api/resources/${resourceId}`);
+        const fetched = res.data.characters || [];
+        setLocalCharacters(fetched);
+        setSelectedId(fetched.find((c) => c.selected)?.id || fetched[0]?.id);
+      } catch (err) {
+        console.error('캐릭터 목록 조회 실패:', err);
+        setError('캐릭터 목록을 불러올 수 없습니다.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [resourceId, characters.length]);
 
   /**
    * 캐릭터 선택 (selected = true)
@@ -48,10 +72,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
       setSuccessMessage('캐릭터가 선택되었습니다.');
       setTimeout(() => setSuccessMessage(null), 2000);
-
-      if (onSelect) {
-        onSelect(localCharacters.find((c) => c.id === characterId));
-      }
+      // 다음 단계로의 진행은 "다음 단계로" 버튼에서만 트리거 (카드 클릭만으로 자동 진행하지 않음)
     } catch (err) {
       console.error('캐릭터 선택 실패:', err);
       setError('선택에 실패했습니다.');
@@ -306,17 +327,45 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
         </div>
       )}
 
+      {/* 영상유형 선택 */}
+      {selectedId && (
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <h4 className="font-semibold mb-3">🎬 영상유형 선택</h4>
+          <div className="flex flex-wrap gap-3">
+            {VIDEO_TYPES.map((type) => (
+              <label
+                key={type}
+                className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition ${
+                  videoType === type
+                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="videoType"
+                  checked={videoType === type}
+                  onChange={() => setVideoType(type)}
+                  className="w-4 h-4"
+                />
+                <span>{type}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 다음 단계 안내 */}
       {selectedId && (
         <div className="bg-green-50 border border-green-300 rounded-lg p-4 text-center">
           <p className="text-green-800">
-            ✨ <strong>{localCharacters.find((c) => c.id === selectedId)?.character_name}</strong>로
-            계속 진행할 준비가 되었습니다.
+            ✨ <strong>{localCharacters.find((c) => c.id === selectedId)?.character_name}</strong>로,
+            <strong> {videoType}</strong> 형식으로 계속 진행할 준비가 되었습니다.
           </p>
           <button
             onClick={() => {
               if (onSelect) {
-                onSelect(localCharacters.find((c) => c.id === selectedId));
+                onSelect(localCharacters.find((c) => c.id === selectedId), videoType);
               }
             }}
             className="mt-3 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
@@ -329,8 +378,14 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       {/* 캐릭터가 없는 경우 */}
       {localCharacters.length === 0 && (
         <div className="text-center py-12 text-gray-500">
-          <p className="mb-4">아직 캐릭터가 생성되지 않았습니다.</p>
-          <p className="text-sm">먼저 자료를 업로드하고 AI 분석을 완료하세요.</p>
+          {loading ? (
+            <p>캐릭터를 불러오는 중...</p>
+          ) : (
+            <>
+              <p className="mb-4">아직 캐릭터가 생성되지 않았습니다.</p>
+              <p className="text-sm">먼저 자료를 업로드하고 AI 분석을 완료하세요.</p>
+            </>
+          )}
         </div>
       )}
     </div>

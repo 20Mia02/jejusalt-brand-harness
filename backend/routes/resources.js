@@ -222,7 +222,7 @@ router.get("/", async (req, res) => {
 // metadata는 JSONB이므로 .contains() 연산자로 필터링한다.
 // ─────────────────────────────────────────────
 router.get("/filter", async (req, res) => {
-  const { categories, ageGroups, targets, videoTypes } = req.query;
+  const { categories, ageGroups, targets, focus, videoTypes } = req.query;
 
   const toArray = (v) => (v ? (Array.isArray(v) ? v : [v]) : []);
 
@@ -230,6 +230,7 @@ router.get("/filter", async (req, res) => {
     categories: toArray(categories),
     ageGroups: toArray(ageGroups),
     targets: toArray(targets),
+    focus: toArray(focus),
     videoTypes: toArray(videoTypes),
   };
 

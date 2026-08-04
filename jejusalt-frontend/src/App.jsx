@@ -1,13 +1,23 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import FilterUI from "./components/FilterUI"
 import GenerationUI from "./components/GenerationUI"
 import MetadataReviewUI from "./components/MetadataReviewUI"
+import CharacterCreator from "./components/CharacterCreator"
+import AdminMode from "./components/AdminMode"
 import "./App.css"
 
-function App() {
-  const [currentStep, setCurrentStep] = useState('filter'); // 'filter', 'metadata', 'generation'
+const STEP_LABELS = {
+  filter: '자료 필터링',
+  metadata: '메타데이터 검토',
+  character: '캐릭터 선택',
+  generation: 'AI 콘텐츠 생성',
+};
+
+function MainFlow({ currentStep, setCurrentStep }) {
   const [resourceId, setResourceId] = useState(null);
   const [metadata, setMetadata] = useState(null);
+  const [videoType, setVideoType] = useState('제품스토리');
 
   const handleResourceCreated = (newResourceId) => {
     setResourceId(newResourceId);
@@ -16,6 +26,11 @@ function App() {
 
   const handleMetadataReviewed = (reviewedMetadata) => {
     setMetadata(reviewedMetadata);
+    setCurrentStep('character');
+  };
+
+  const handleCharacterSelected = (character, selectedVideoType) => {
+    setVideoType(selectedVideoType);
     setCurrentStep('generation');
   };
 
@@ -24,7 +39,43 @@ function App() {
     setCurrentStep('filter');
     setResourceId(null);
     setMetadata(null);
+    setVideoType('제품스토리');
   };
+
+  return (
+    <main className="app-main">
+      {currentStep === 'filter' && (
+        <FilterUI onResourceCreated={handleResourceCreated} />
+      )}
+      {currentStep === 'metadata' && resourceId && (
+        <MetadataReviewUI
+          resourceId={resourceId}
+          onComplete={handleMetadataReviewed}
+          onError={() => setCurrentStep('filter')}
+        />
+      )}
+      {currentStep === 'character' && resourceId && (
+        <CharacterCreator
+          resourceId={resourceId}
+          onSelect={handleCharacterSelected}
+        />
+      )}
+      {currentStep === 'generation' && resourceId && (
+        <GenerationUI
+          resourceId={resourceId}
+          onSuccess={handleGenerationComplete}
+          requestType="intro"
+          videoType={videoType}
+        />
+      )}
+    </main>
+  );
+}
+
+function App() {
+  const location = useLocation();
+  const isAdmin = location.pathname.startsWith('/admin');
+  const [currentStep, setCurrentStep] = useState('filter'); // 'filter', 'metadata', 'character', 'generation'
 
   return (
     <div className="app">
@@ -48,32 +99,22 @@ function App() {
           </svg>
         </div>
         <h1>제주도 라바 씨솔트</h1>
-        <p className="app-header-subtitle">
-          {currentStep === 'filter' && '자료 필터링'}
-          {currentStep === 'metadata' && '메타데이터 검토'}
-          {currentStep === 'generation' && 'AI 콘텐츠 생성'}
-        </p>
+        <nav className="app-header-nav">
+          <Link to="/" className={!isAdmin ? 'active' : ''}>메인</Link>
+          <Link to="/admin" className={isAdmin ? 'active' : ''}>관리자 모드</Link>
+        </nav>
+        {!isAdmin && (
+          <p className="app-header-subtitle">{STEP_LABELS[currentStep]}</p>
+        )}
       </header>
 
-      <main className="app-main">
-        {currentStep === 'filter' && (
-          <FilterUI onResourceCreated={handleResourceCreated} />
-        )}
-        {currentStep === 'metadata' && resourceId && (
-          <MetadataReviewUI
-            resourceId={resourceId}
-            onComplete={handleMetadataReviewed}
-            onError={() => setCurrentStep('filter')}
-          />
-        )}
-        {currentStep === 'generation' && resourceId && (
-          <GenerationUI
-            resourceId={resourceId}
-            onSuccess={handleGenerationComplete}
-            requestType="intro"
-          />
-        )}
-      </main>
+      <Routes>
+        <Route
+          path="/"
+          element={<MainFlow currentStep={currentStep} setCurrentStep={setCurrentStep} />}
+        />
+        <Route path="/admin" element={<AdminMode />} />
+      </Routes>
     </div>
   )
 }

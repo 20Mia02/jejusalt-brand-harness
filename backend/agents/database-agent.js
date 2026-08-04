@@ -164,12 +164,12 @@ async function callDatabase(table, operation, data, filter) {
 /**
  * 자료를 카테고리/나이대로 필터링해서 조회
  * 
- * @param {object} filters - {categories: [...], ageGroups: [...], targets: [...], status: '...'}
+ * @param {object} filters - {categories: [...], ageGroups: [...], targets: [...], focus: [...], status: '...'}
  * @returns {object} {success, rows, total}
  */
 async function getResourcesByFilter(filters = {}) {
   try {
-    const { categories, ageGroups, targets, status } = filters;
+    const { categories, ageGroups, targets, focus, status } = filters;
 
     console.log(`[DB] 자료 필터링 조회: ${JSON.stringify(filters)}`);
 
@@ -177,8 +177,9 @@ async function getResourcesByFilter(filters = {}) {
     const hasCategories = categories && categories.length > 0;
     const hasAgeGroups = ageGroups && ageGroups.length > 0;
     const hasTargets = targets && targets.length > 0;
+    const hasFocus = focus && focus.length > 0;
 
-    if (!hasCategories && !hasAgeGroups && !hasTargets) {
+    if (!hasCategories && !hasAgeGroups && !hasTargets && !hasFocus) {
       console.log(`  [✓] 필터 미선택: 빈 결과 반환`);
       return { success: true, rows: [], total: 0 };
     }
@@ -212,7 +213,15 @@ async function getResourcesByFilter(filters = {}) {
         query = query.filter("metadata->targets", "contains", target);
       });
     }
-    
+
+    // metadata JSONB 필터링 (focus / 강조점)
+    if (focus && focus.length > 0) {
+      // metadata->focus 배열이 특정 값을 포함하는지 확인
+      focus.forEach((f) => {
+        query = query.filter("metadata->focus", "contains", f);
+      });
+    }
+
     // 최신순 정렬
     query = query.order("created_at", { ascending: false });
     

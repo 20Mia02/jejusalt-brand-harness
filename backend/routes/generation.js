@@ -43,7 +43,7 @@ router.post("/", async (req, res) => {
 // ─────────────────────────────────────────────────────
 
 /**
- * 입력: { requestType: "intro"|"detail"|"both" } in body
+ * 입력: { requestType: "intro"|"detail"|"both", videoType?: "캐릭터소개"|"제품스토리"|"일상밥상" } in body
  * URL params: { resourceId }
  * 출력: {
  *   success: true,
@@ -58,7 +58,7 @@ router.post("/", async (req, res) => {
  */
 router.post("/:resourceId/start", async (req, res) => {
   const { resourceId } = req.params;
-  const { requestType } = req.body;
+  const { requestType, videoType } = req.body;
 
   // ── 0. 입력 검증 ────────────────────────────────
   if (!resourceId || !requestType) {
@@ -241,7 +241,7 @@ router.post("/:resourceId/start", async (req, res) => {
       agentName = "product-intro-writer-agent";
     }
 
-    console.log(`[Step 7] ${agentName} 호출...`);
+    console.log(`[Step 7] ${agentName} 호출... (videoType: ${videoType || "제품스토리"})`);
     const contentResult = await callAgent(
       agentName,
       {
@@ -251,6 +251,7 @@ router.post("/:resourceId/start", async (req, res) => {
         productInfo: resource.product_info,
         keywords: resource.keywords || [],
         scenario,
+        videoType: videoType || "제품스토리",
       },
       { resourceId, step: agentName }
     );

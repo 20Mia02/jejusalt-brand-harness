@@ -24,7 +24,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro' }) {
+export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro', videoType }) {
   // 상태 관리
   const [generating, setGenerating] = useState(false);
   const [generationData, setGenerationData] = useState(null);
@@ -33,10 +33,18 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const [videoErrorDetail, setVideoErrorDetail] = useState(null);
   const pollingInterval = useRef(null);
 
   /**
    * "AI 생성" 버튼 클릭
+   *
+   * routes/generation.js는 Higgsfield CLI --wait로 완료까지 기다린 뒤
+   * videoUrl/videoStatus를 응답에 바로 담아 반환한다 (higgsfieldId를 별도로 주지 않음).
+   * 이 POST는 1~2분 걸릴 수 있으므로, 응답을 기다리는 동안
+   * GET /api/generate/:resourceId/status(generation_logs 기반 실제 진행률)를 병렬로 폴링해서
+   * 진행률 바에 실제 단계 정보를 보여준다.
    */
   const handleGenerate = async () => {
     if (!resourceId) {
@@ -44,38 +52,49 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       return;
     }
 
-    try {
-      setGenerating(true);
-      setError(null);
-      setProgress(0);
-      setCurrentStep('초기화 중...');
+    setGenerating(true);
+    setError(null);
+    setProgress(0);
+    setCurrentStep('초기화 중...');
+    setVideoFailed(false);
+    setVideoErrorDetail(null);
 
+    startStatusPolling();
+
+    try {
       // Step 4~9: POST /api/generate/:resourceId/start
       const res = await axios.post(`/api/generate/${resourceId}/start`, {
         requestType,
+        videoType,
       });
+
+      stopStatusPolling();
 
       if (!res.data.success) {
         throw new Error(res.data.message || '생성 실패');
       }
 
       setGenerationData(res.data);
-      setProgress(5); // 요청 성공 후 5%
-      setCurrentStep('영상 생성 중...');
+      setProgress(100);
+      setGenerating(false);
 
-      // Higgsfield 폴링 시작
-      if (res.data.higgsfieldId) {
-        startPolling(res.data.higgsfieldId, resourceId);
+      if (res.data.videoStatus === 'failed' || res.data.higgsfieldError) {
+        // 콘텐츠(카피)는 생성됐지만 Higgsfield 영상화는 실패한 경우
+        setCurrentStep('⚠️ 콘텐츠는 생성됨 (영상 생성 실패)');
+        setVideoFailed(true);
+        setVideoErrorDetail(res.data.higgsfieldError || '영상 생성에 실패했습니다.');
+        setVideoUrl(null);
       } else {
-        // 폴링 없이 바로 완료
-        setProgress(100);
-        setCurrentStep('완료!');
+        setCurrentStep('✅ 완료!');
+        setSuccessMessage('영상이 생성되었습니다!');
         setVideoUrl(res.data.videoUrl);
-        if (onSuccess) {
-          onSuccess(res.data);
-        }
+      }
+
+      if (onSuccess) {
+        onSuccess(res.data);
       }
     } catch (err) {
+      stopStatusPolling();
       console.error('AI 생성 실패:', err);
       setError(
         err.response?.data?.message || err.message || '생성 중 오류가 발생했습니다.'
@@ -85,77 +104,33 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   };
 
   /**
-   * Higgsfield 진행률 5초 폴링 (frontend-agent.md 기준)
+   * 생성 진행 중 실제 백엔드 진행률(GET /status)을 3초 간격으로 폴링.
+   * POST /start 응답이 오면(성공/실패 모두) stopStatusPolling으로 정리한다.
    */
-  const startPolling = (higgsfieldId, resId) => {
-    let pollCount = 0;
-    const maxPolls = 120; // 5초 x 120 = 10분
-
+  const startStatusPolling = () => {
     pollingInterval.current = setInterval(async () => {
       try {
-        pollCount++;
-
-        // 비디오 진행상황 조회 (generation_logs 조회)
         const res = await axios.get(`/api/generate/${resourceId}/status`);
+        const { progress: progressPercent, completedSteps, totalSteps } = res.data;
 
-        const { progress: progressPercent, currentStatus, lastUpdate } = res.data;
-
-        // 진행률 업데이트
-        setProgress(Math.max(5, progressPercent || 0));
-
-        // 상태 메시지 업데이트
-        if (currentStatus === 'processing') {
-          setCurrentStep(`영상 생성 중... (${progressPercent}%)`);
-        } else if (currentStatus === 'completed') {
-          setProgress(100);
-          setCurrentStep('✅ 완료!');
-          setVideoUrl(generationData?.videoUrl || null);
-          clearInterval(pollingInterval.current);
-          setGenerating(false);
-          setSuccessMessage('영상이 생성되었습니다!');
-          if (onSuccess) {
-            onSuccess({
-              ...generationData,
-              videoUrl: video_url,
-              generationStatus: 'completed',
-            });
-          }
-        } else if (currentStatus === 'failed') {
-          setCurrentStep('❌ 생성 실패');
-          setError('영상 생성에 실패했습니다. 다시 시도해주세요.');
-          clearInterval(pollingInterval.current);
-          setGenerating(false);
-        }
-
-        // 타임아웃: 10분 초과
-        if (pollCount > maxPolls) {
-          setCurrentStep('⏱️ 타임아웃 (10분 초과)');
-          setError('영상 생성이 10분 이상 소요되었습니다. 다시 시도해주세요.');
-          clearInterval(pollingInterval.current);
-          setGenerating(false);
-        }
-      } catch (err) {
-        console.error('폴링 실패:', err);
-        
-        // 404 에러면 영상을 찾을 수 없는 것이므로 즉시 중단
-        if (err.response?.status === 404) {
-          setCurrentStep('❌ 영상을 찾을 수 없습니다');
-          setError('영상 데이터가 존재하지 않습니다. 다시 생성해주세요.');
-          clearInterval(pollingInterval.current);
-          setGenerating(false);
-        }
-        // 그 외 네트워크 에러는 재시도
+        setProgress((prev) => Math.max(prev, progressPercent || 0, 5));
+        setCurrentStep(`AI 생성 중... (${completedSteps || 0}/${totalSteps || 10} 단계)`);
+      } catch {
+        // 아직 generation_logs가 없거나(404) 일시적인 네트워크 오류 → 조용히 무시하고 계속 시도
       }
-    }, 5000); // 5초 간격
+    }, 3000);
+  };
+
+  const stopStatusPolling = () => {
+    if (pollingInterval.current) {
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
+    }
   };
 
   // 언마운트 시 폴링 중지
   useEffect(() => {
-    return () => {
-      if (pollingInterval.current) {
-        clearInterval(pollingInterval.current);
-      }
-    };
+    return () => stopStatusPolling();
   }, []);
 
   // ─────────────────────────────────────────────────────
@@ -215,15 +190,13 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
             <StepItem label="Step 10: Higgsfield 영상 생성" done={progress > 70} />
           </div>
 
-          {/* 취소 버튼 (생성 중 취소는 모의: 실제로는 무시) */}
+          {/* 취소 버튼 (진행률 폴링만 중단 — 백엔드 생성 자체는 계속 진행됨) */}
           <button
             onClick={() => {
               setGenerating(false);
               setProgress(0);
               setCurrentStep(null);
-              if (pollingInterval.current) {
-                clearInterval(pollingInterval.current);
-              }
+              stopStatusPolling();
             }}
             className="w-full px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
           >
@@ -233,7 +206,35 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       ) : (
         <>
           {/* 생성 전/후 UI */}
-          {videoUrl ? (
+          {videoFailed ? (
+            // 콘텐츠(카피)는 생성됐지만 Higgsfield 영상화는 실패한 상태
+            <div className="space-y-4">
+              <div className="bg-yellow-50 p-4 rounded border border-yellow-300">
+                <div className="text-lg font-bold text-yellow-800 mb-2">
+                  ⚠️ 콘텐츠는 생성됐지만 영상 생성에 실패했습니다
+                </div>
+                {generationData && (
+                  <div className="text-sm text-gray-700 space-y-1 mb-2">
+                    <div>
+                      <strong>검증 상태:</strong> {generationData.validationStatus}
+                    </div>
+                    <div>
+                      <strong>검증 점수:</strong> {generationData.validationScore}/100
+                    </div>
+                  </div>
+                )}
+                <div className="text-sm text-yellow-800 bg-yellow-100 rounded p-2 mt-2">
+                  {videoErrorDetail}
+                </div>
+              </div>
+              <button
+                onClick={handleGenerate}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                🔄 영상 다시 생성
+              </button>
+            </div>
+          ) : videoUrl ? (
             // 완료 상태: 비디오 표시
             <div className="space-y-4">
               <div className="bg-green-50 p-4 rounded border border-green-200">
@@ -290,6 +291,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
               <button
                 onClick={() => {
                   setVideoUrl(null);
+                  setVideoFailed(false);
+                  setVideoErrorDetail(null);
                   setGenerationData(null);
                   setProgress(0);
                   setCurrentStep(null);
@@ -356,42 +359,3 @@ function StepItem({ label, done }) {
     </div>
   );
 }
-
-export const callHiggsfield = async (videoConfig) => {
-  const HIGGSFIELD_API_KEY = import.meta.env.REACT_APP_HIGGSFIELD_API_KEY;
-  const HIGGSFIELD_API_URL = import.meta.env.REACT_APP_HIGGSFIELD_API_URL;
-
-  try {
-    // ✅ 메타데이터만 전달 (한글/영문 텍스트 완전 제거)
-    const character = videoConfig.character || 'woman';
-    const voiceTone = videoConfig.voiceTone || 'professional';
-    const metadata = `${character} character, ${voiceTone} tone, product promotion`;
-
-    const response = await axios.post(
-      `${HIGGSFIELD_API_URL}/generate`,
-      {
-        prompt: metadata,
-        duration: videoConfig.duration || 8,
-        style: 'short-form'
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${HIGGSFIELD_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    return {
-      success: true,
-      higgsfieldId: response.data.id,
-      videoUrl: response.data.video_url
-    };
-  } catch (error) {
-    console.error('Higgsfield API Error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-};
