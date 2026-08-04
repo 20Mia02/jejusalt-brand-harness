@@ -14,18 +14,8 @@
 const axios = require("axios");
 const { callDatabase } = require("./database-agent");
 
-// TimelyAI SDK 임포트 (설치 후)
-// npm install timelyai 또는 TimelyAI 공식 SDK 패키지명에 따라
-let TimelyGPTClient;
-try {
-  // TimelyAI SDK 패키지 이름이 정확하지 않으니, 일단 주석 처리
-  // 실제 패키지 이름이 나오면 활성화
-  // const TimlelyAIModule = require("@timelyai/sdk");
-  // TimelyGPTClient = TimlelyAIModule.TimelyGPTClient;
-  console.warn("[주의] TimelyAI SDK 패키지를 아직 import하지 않았습니다. npm install로 패키지를 먼저 설치하세요.");
-} catch (e) {
-  console.warn("[경고] TimelyAI SDK를 찾을 수 없습니다. 나중에 설치하세요:", e.message);
-}
+// TimelyAI SDK 임포트 ✅
+const { TimelyGPTClient } = require("@timely/gpt-sdk");
 
 // ============================================================================
 // [함수 1] callAgent - TimelyAI SDK를 통한 에이전트 호출
@@ -124,62 +114,38 @@ async function callAgent(agentName, payload, context = {}) {
  * - SDK가 없으면: REST API (axios) 폴백
  */
 async function callTimelyAIAgent(agentName, payload) {
-  // ========== Option 1: TimelyAI SDK를 사용하는 경우 ==========
-  if (TimelyGPTClient) {
-    const client = new TimelyGPTClient({
-      apiKey: process.env.TIMELY_API_KEY,
-      baseURL: process.env.TIMELY_BASE_URL || "https://hello.timelygpt.co.kr/api/v2/chat",
-    });
-
-    const systemPrompt = getSystemPromptForAgent(agentName);
-    const outputSpec = getOutputSpecForAgent(agentName);
-
-    const response = await client.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content: `${systemPrompt}\n\n${outputSpec}`,
-        },
-        {
-          role: "user",
-          content: JSON.stringify(payload, null, 2),
-        },
-      ],
-      model: "default", // TimelyAI 기본 모델, 필요시 수정
-      temperature: 0.7,
-      max_tokens: 2000,
-    });
-
-    const responseText = response.choices?.[0]?.message?.content || "";
-    const cleaned = responseText.replace(/```json|```/g, "").trim();
-    return JSON.parse(cleaned);
-  }
-
-  // ========== Option 2: REST API 폴백 ==========
-  console.log("[폴백] TimelyAI SDK를 찾을 수 없어 REST API 사용");
+  // ========== TimelyAI SDK 사용 ✅ ==========
+  const client = new TimelyGPTClient({
+    apiKey: process.env.TIMELY_API_KEY,
+    baseURL: process.env.TIMELY_BASE_URL || "https://hello.timelygpt.co.kr/api/v2/chat",
+  });
 
   const systemPrompt = getSystemPromptForAgent(agentName);
   const outputSpec = getOutputSpecForAgent(agentName);
 
-  const response = await axios.post(
-    `${process.env.TIMELY_BASE_URL || "https://hello.timelygpt.co.kr/api/v2/chat"}/completions`,
-    {
-      messages: [
-        {
-          role: "system",
-          content: `${systemPrompt}\n\n${outputSpec}`,
-        },
-        {
-          role: "user",
-          content: JSON.stringify(payload, null, 2),
-        },
-      ],
-      apiKey: process.env.TIMELY_API_KEY,
-    },
-    { timeout: 60000 }
-  );
+  // 세션 ID는 에이전트 호출마다 고유하게 (각 요청이 독립적)
+  const sessionId = `agent_${agentName}_${Date.now()}`;
 
-  const responseText = response.data?.content || response.data?.message?.content || "";
+  const response = await client.chat.completions.create({
+    session_id: sessionId,
+    messages: [
+      {
+        role: "system",
+        content: `${systemPrompt}\n\n${outputSpec}`,
+      },
+      {
+        role: "user",
+        content: JSON.stringify(payload, null, 2),
+      },
+    ],
+    model: "gpt-5.1", // TimelyAI 기본 모델
+    temperature: 0.7,
+    max_tokens: 2000,
+    locale: "ko",
+  });
+
+  // 응답 처리
+  const responseText = response.message || response.content || "";
   const cleaned = responseText.replace(/```json|```/g, "").trim();
   return JSON.parse(cleaned);
 }
