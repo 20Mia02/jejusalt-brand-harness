@@ -170,17 +170,23 @@ async function callDatabase(table, operation, data, filter) {
 async function getResourcesByFilter(filters = {}) {
   try {
     const { categories, ageGroups, targets, status } = filters;
-    
+
     console.log(`[DB] 자료 필터링 조회: ${JSON.stringify(filters)}`);
-    
-    let query = supabase.from("resources").select("*");
-    
-    // status 필터 (기본값: 'completed')
-    if (status) {
-      query = query.eq("status", status);
-    } else {
-      query = query.eq("status", "completed");
+
+    // ✅ 필터가 하나도 없으면 빈 배열 반환 (필터 선택 후에만 결과 표시)
+    const hasCategories = categories && categories.length > 0;
+    const hasAgeGroups = ageGroups && ageGroups.length > 0;
+    const hasTargets = targets && targets.length > 0;
+
+    if (!hasCategories && !hasAgeGroups && !hasTargets) {
+      console.log(`  [✓] 필터 미선택: 빈 결과 반환`);
+      return { success: true, rows: [], total: 0 };
     }
+
+    let query = supabase.from("resources").select("*");
+
+    // status는 항상 'completed'로만 필터링
+    query = query.eq("status", "completed");
     
     // metadata JSONB 필터링 (categories)
     if (categories && categories.length > 0) {

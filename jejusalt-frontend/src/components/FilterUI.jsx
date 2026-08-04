@@ -195,6 +195,14 @@ export default function FilterUI() {
         </div>
       </div>
 
+      {/* 검색 안내 메시지 */}
+      {filteredResources.length === 0 &&
+        !Object.values(filters).some((f) => f.length > 0) && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mt-6 text-center">
+            💡 필터를 선택하고 "검색" 버튼을 클릭하면 자료를 찾을 수 있습니다.
+          </div>
+        )}
+
       {/* 결과 섹션 */}
       {filteredResources.length > 0 && (
         <div>
