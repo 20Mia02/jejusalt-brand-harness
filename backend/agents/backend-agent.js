@@ -14,8 +14,8 @@
 const axios = require("axios");
 const { callDatabase } = require("./database-agent");
 
-// TimelyAI SDK 임포트 ✅
-const { TimelyGPTClient } = require("@timely/gpt-sdk");
+// OpenAI SDK (TimelyAI OpenAI 호환 모드) ✅
+const OpenAI = require("openai");
 
 // ============================================================================
 // [함수 1] callAgent - TimelyAI SDK를 통한 에이전트 호출
@@ -114,66 +114,75 @@ async function callAgent(agentName, payload, context = {}) {
  * - SDK가 없으면: REST API (axios) 폴백
  */
 async function callTimelyAIAgent(agentName, payload) {
-  // ========== TimelyAI SDK 사용 ✅ ==========
-  const client = new TimelyGPTClient({
-    apiKey: process.env.TIMELY_AI_API_KEY,
-    baseURL: process.env.TIMELY_AI_BASE_URL || "https://hello.timelygpt.co.kr/api/v2/chat",
+  // ========== OpenAI SDK (TimelyAI OpenAI 호환 모드) ✅ ==========
+  const apiKey = process.env.TIMELY_AI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("TIMELY_AI_API_KEY 환경변수가 설정되지 않았습니다");
+  }
+
+  const client = new OpenAI({
+    apiKey: apiKey,
+    baseURL: "https://hello.timelygpt.co.kr/api/v2/chat/bridge/openai",
   });
 
   const systemPrompt = getSystemPromptForAgent(agentName);
   const outputSpec = getOutputSpecForAgent(agentName);
 
-  // 세션 ID는 에이전트 호출마다 고유하게 (각 요청이 독립적)
-  const sessionId = `agent_${agentName}_${Date.now()}`;
+  console.log(`  [OpenAI SDK] 에이전트 호출: ${agentName}`);
+  console.log(`    모델: openai/gpt-4.1-mini`);
 
-  // ⚠️ 중요: TimelyAI SDK의 Message.role은 'user' | 'assistant' | 'tool'만 허용.
-  //    'system' 역할이 없으므로 시스템 프롬프트는 반드시 instructions 필드에 넣어야 함.
-  //    (이전 버전은 messages 배열에 role:"system"을 넣어서 매번 요청이 거부되고 있었음)
-  let response;
   try {
-    response = await client.chat.completions.create({
-      session_id: sessionId,
-      instructions: `${systemPrompt}\n\n${outputSpec}`,
+    const completion = await client.chat.completions.create({
+      model: "openai/gpt-4.1-mini",
       messages: [
+        {
+          role: "system",
+          content: `${systemPrompt}\n\n${outputSpec}`,
+        },
         {
           role: "user",
           content: JSON.stringify(payload, null, 2),
         },
       ],
-      model: "gpt-5.1",
-      locale: "ko",
+      temperature: 0.7,
+      max_tokens: 2000,
+      timeout: 30000, // 30초 타임아웃
     });
-  } catch (sdkError) {
-    // SDK/네트워크 단계에서 실패한 경우 - 상세 정보를 그대로 드러냄
-    console.error(`  [TimelyAI SDK 호출 실패 상세]`);
-    console.error(`    message: ${sdkError.message}`);
-    if (sdkError.statusCode) console.error(`    statusCode: ${sdkError.statusCode}`);
-    if (sdkError.error) console.error(`    error: ${JSON.stringify(sdkError.error)}`);
-    if (sdkError.response?.data) console.error(`    response.data: ${JSON.stringify(sdkError.response.data)}`);
-    throw sdkError;
-  }
 
-  // 응답 타입 확인 (final_response가 아니면 예외 처리)
-  if (response.type && response.type !== "final_response") {
-    console.error(`  [TimelyAI 예상치 못한 응답 타입] type: ${response.type}`);
-    console.error(`    전체 응답: ${JSON.stringify(response).slice(0, 500)}`);
-    throw new Error(`TimelyAI가 final_response가 아닌 '${response.type}' 타입을 반환함`);
-  }
+    console.log(`  [✓] 응답 수신 성공`);
 
-  const responseText = response.message || response.content || "";
+    const responseText = completion.choices?.[0]?.message?.content || "";
 
-  if (!responseText) {
-    console.error(`  [TimelyAI 빈 응답] 전체 응답: ${JSON.stringify(response).slice(0, 500)}`);
-    throw new Error("TimelyAI 응답에 message/content가 비어있음");
-  }
+    if (!responseText) {
+      console.error(`  [TimelyAI 빈 응답]`);
+      throw new Error("TimelyAI 응답이 비어있습니다");
+    }
 
-  // JSON 파싱 (실패하면 원본 텍스트를 로그로 남겨서 원인 파악 가능하게 함)
-  const cleaned = responseText.replace(/```json|```/g, "").trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch (parseError) {
-    console.error(`  [JSON 파싱 실패] 원본 응답(앞 500자): ${responseText.slice(0, 500)}`);
-    throw new Error(`TimelyAI 응답이 유효한 JSON이 아님: ${parseError.message}`);
+    // JSON 파싱
+    const cleaned = responseText.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+
+    console.log(`  [✓] JSON 파싱 성공`);
+    return parsed;
+
+  } catch (error) {
+    console.error(`  [✗ OpenAI API 호출 실패]`);
+
+    // TimelyAI 특정 에러 처리
+    if (error.status === 401) {
+      console.error(`    401 인증 실패: API 키를 확인하세요`);
+    } else if (error.status === 402) {
+      console.error(`    402 크레딧 부족: 크레딧을 충전하세요`);
+    } else if (error.status === 429) {
+      console.error(`    429 Rate Limit 초과: 잠시 후 다시 시도하세요`);
+    } else if (error.status === 404) {
+      console.error(`    404 모델을 찾을 수 없음: 모델 이름을 확인하세요`);
+    } else if (error.message) {
+      console.error(`    ${error.message}`);
+    }
+
+    throw error;
   }
 }
 
