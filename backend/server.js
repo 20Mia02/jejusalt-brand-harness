@@ -65,10 +65,12 @@ app.use((req, res, next) => {
 const resourcesRouter = require("./routes/resources");
 const adminRouter = require("./routes/admin");
 const generationRouter = require("./routes/generation");
+const charactersRouter = require("./routes/characters");
 
 app.use("/api/resources", resourcesRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/generate", generationRouter);
+app.use("/api/characters", charactersRouter);
 
 // ============================================================================
 // Health Check

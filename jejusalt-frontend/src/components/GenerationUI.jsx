@@ -24,7 +24,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro', videoType, duration = 120 }) {
+export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro', videoType, duration = 120, referenceMaterials = [] }) {
   // 상태 관리
   const [generating, setGenerating] = useState(false);
   const [generationData, setGenerationData] = useState(null);
@@ -37,6 +37,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoErrorDetail, setVideoErrorDetail] = useState(null);
   const [failedStep, setFailedStep] = useState(null);
+  // 업로드된 참고자료를 시나리오 작성에 반영할지 여부 (기본: 반영)
+  const [useReferenceMaterials, setUseReferenceMaterials] = useState(true);
   const pollingInterval = useRef(null);
 
   // 성공/실패 배너 자동 소멸 (전 화면 통일 규칙: 성공 2.5초, 에러 4초)
@@ -82,6 +84,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
         requestType,
         videoType,
         duration,
+        useReferenceMaterials: referenceMaterials.length > 0 ? useReferenceMaterials : undefined,
       });
 
       stopStatusPolling();
@@ -399,6 +402,31 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                   <li>Step 10: Higgsfield에서 숏폼 영상 생성</li>
                 </ul>
               </div>
+
+              {/* 참고자료 반영 여부 확인 */}
+              {referenceMaterials.length > 0 && (
+                <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4 mb-4 text-sm">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useReferenceMaterials}
+                      onChange={(e) => setUseReferenceMaterials(e.target.checked)}
+                      className="mt-1 w-4 h-4"
+                    />
+                    <span>
+                      <strong>📎 업로드한 참고자료를 시나리오에 반영할까요?</strong>
+                      <ul className="mt-1 text-dark-text-muted list-disc list-inside">
+                        {referenceMaterials.map((f) => (
+                          <li key={f.filename}>{f.filename}</li>
+                        ))}
+                      </ul>
+                      <span className="text-xs text-dark-text-muted">
+                        체크하면 AI가 이 파일 내용을 분석해서 시나리오 작성에 반영합니다.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              )}
 
               {/* 생성 버튼 */}
               <button

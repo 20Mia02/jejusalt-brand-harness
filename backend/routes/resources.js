@@ -28,7 +28,7 @@ const { callDatabase } = require("../agents/database-agent"); // database-agent.
 // POST /api/resources — 자료 업로드 + 분석 (Step 1~2)
 // ─────────────────────────────────────────────
 router.post("/", async (req, res) => {
-  const { productName, productInfo, keywords, trendKeywords, customStyle } = req.body;
+  const { productName, productInfo, keywords, trendKeywords, customStyle, referenceMaterials } = req.body;
 
   // ── 0. 입력 유효성 검증 ──────────────────────────
   if (!productName || !productInfo) {
@@ -50,59 +50,6 @@ router.post("/", async (req, res) => {
     });
   }
 
-  // ── MOCK MODE: 개발 환경에서 DB 연결 없이 테스트 ──
-  const isMockMode = process.env.NODE_ENV === "development" &&
-    (!process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes("your-project"));
-
-  if (isMockMode) {
-    console.log("[Mock Mode] 자료 저장 API 응답");
-    const resourceId = "mock-" + Date.now();
-    const keywordsArray = keywords
-      ? Array.isArray(keywords) ? keywords : String(keywords).split(",").map(k => k.trim())
-      : [];
-
-    return res.status(201).json({
-      success: true,
-      resourceId,
-      metadata: {
-        categories: ["식품", "뷰티"],
-        ageGroups: ["20~30대", "40~60대"],
-        targets: ["개인", "가족"],
-        focus: ["신뢰", "건강"],
-        confidence: 85
-      },
-      characters: [
-        {
-          id: "mock-char-1",
-          resource_id: resourceId,
-          character_name: "결이",
-          character_profile: "당찬 소년, 도전적이고 에너지 넘침",
-          reason: "타겟층의 긍정적 이미지 대표",
-          score: 90,
-          selected: true
-        },
-        {
-          id: "mock-char-2",
-          resource_id: resourceId,
-          character_name: "용암이",
-          character_profile: "따뜨한 아버지, 신뢰감과 보호본능",
-          reason: "제품의 신뢰성 강조",
-          score: 85,
-          selected: false
-        },
-        {
-          id: "mock-char-3",
-          resource_id: resourceId,
-          character_name: "해수",
-          character_profile: "자유로운 영혼, 경쾌함과 순수함",
-          reason: "자연스러운 제품 특성",
-          score: 80,
-          selected: false
-        }
-      ]
-    });
-  }
-
   // 키워드 문자열/배열 모두 허용 (resource-analyzer-agent.md 규칙과 동일)
   const keywordsArray = keywords
     ? Array.isArray(keywords)
@@ -121,6 +68,11 @@ router.post("/", async (req, res) => {
     : [];
   const customStyleText = customStyle ? String(customStyle).trim() : null;
 
+  // 추가 참고자료 (기업자료_요약.md 등) — [{filename, content}] 형태로 업로드됨
+  const referenceMaterialsArray = Array.isArray(referenceMaterials)
+    ? referenceMaterials.filter((f) => f && f.content && f.content.trim().length > 0)
+    : [];
+
   let resourceId;
 
   try {
@@ -129,23 +81,8 @@ router.post("/", async (req, res) => {
       product_name: productName,
       product_info: productInfo,
       keywords: keywordsArray,
+      reference_materials: referenceMaterialsArray,
       status: "analyzing",
-    }).catch(err => {
-      // Mock 모드: DB 연결 실패 시 테스트용 데이터 반환
-      if (process.env.NODE_ENV === "development" && err.message.includes("fetch")) {
-        console.warn("[Mock Mode] DB 연결 실패, 테스트 데이터 반환");
-        return {
-          success: true,
-          rows: [{
-            id: "mock-" + Date.now(),
-            product_name: productName,
-            product_info: productInfo,
-            keywords: keywordsArray,
-            status: "analyzing"
-          }]
-        };
-      }
-      throw err;
     });
 
     if (!created.success) {
@@ -202,36 +139,93 @@ router.post("/", async (req, res) => {
       { id: resourceId }
     );
 
-    // ── 4. Step 2: character-generator-agent 호출 (backend-agent) ──
-    // metadata를 그대로 전달 (character-generator-agent.md 입력 스펙과 동일)
-    const step2 = await callAgent(
-      "character-generator-agent",
-      { productName, productInfo, keywords: keywordsArray, metadata },
-      { resourceId, step: "character-generator" }
-    );
+    // ── 4. Step 2: 캐릭터 추천 ──
+    //
+    // ⭐ 재현성 핵심: "AI가 매번 완전히 새로운 캐릭터 3명을 창작"하지 않고,
+    // character_library(기본 캐릭터 풀)에서 이 제품에 가장 잘 맞는 3명을 "선별"한다.
+    // 이렇게 해야 여러 제품을 거쳐도 같은 캐릭터(얼굴/톤/레퍼런스 이미지)가 재사용되어
+    // 브랜드 전체의 캐릭터 일관성이 유지된다. 라이브러리에 없는 완전히 새로운 캐릭터를
+    // 원할 때는 CharacterCreator의 "+ 새 캐릭터 만들기"에서 별도로 생성한다.
+    const libraryResult = await callDatabase("character_library", "read", null, {});
+    const library = libraryResult.success ? libraryResult.rows : [];
 
-    if (!step2.success) {
-      // 캐릭터 추천 실패해도 분석 결과는 이미 있으니 완전 실패로 처리하지 않고,
-      // status는 "analyzed"로 유지 (캐릭터는 나중에 AdminMode에서 재시도 가능)
-      return res.status(207).json({
-        success: true,
-        partial: true,
-        message:
-          "제품 분석은 완료됐지만 캐릭터 추천에는 실패했습니다. 잠시 후 다시 시도해주세요.",
-        resourceId,
-        metadata,
-        characters: [],
-        detail: step2,
-      });
+    let recommendedLibraryChars;
+
+    if (library.length === 0) {
+      // 라이브러리가 비어있는 극단적인 경우에만 폴백으로 새 캐릭터 생성
+      const step2 = await callAgent(
+        "character-generator-agent",
+        { productName, productInfo, keywords: keywordsArray, metadata },
+        { resourceId, step: "character-generator" }
+      );
+      if (!step2.success) {
+        return res.status(207).json({
+          success: true,
+          partial: true,
+          message: "제품 분석은 완료됐지만 캐릭터 추천에는 실패했습니다. 잠시 후 다시 시도해주세요.",
+          resourceId,
+          metadata,
+          characters: [],
+          detail: step2,
+        });
+      }
+      recommendedLibraryChars = step2.data.characters.map((c) => ({
+        character_name: c.name,
+        character_profile: c.description,
+        reason: c.reason,
+        score: c.score,
+      }));
+    } else {
+      const step2 = await callAgent(
+        "character-recommender-agent",
+        {
+          productName,
+          productInfo,
+          keywords: keywordsArray,
+          metadata,
+          libraryCharacters: library.map((c) => ({
+            id: c.id,
+            name: c.character_name,
+            role: c.role,
+            tone_trait: c.tone_trait,
+          })),
+        },
+        { resourceId, step: "character-recommender" }
+      );
+
+      const recommendations = step2.success ? step2.data.recommendations : null;
+
+      if (!recommendations || recommendations.length === 0) {
+        // 추천 실패 시 라이브러리 앞에서 3개를 그대로 사용 (완전 실패시키지 않음)
+        recommendedLibraryChars = library.slice(0, 3).map((c, idx) => ({
+          ...c,
+          reason: "기본 추천 (AI 추천 실패 폴백)",
+          score: 80 - idx * 5,
+        }));
+      } else {
+        recommendedLibraryChars = recommendations
+          .map((rec) => {
+            const lib = library.find((c) => c.id === rec.id || c.character_name === rec.name);
+            if (!lib) return null;
+            return { ...lib, reason: rec.reason, score: rec.score };
+          })
+          .filter(Boolean);
+      }
     }
 
-    const characters = step2.data.characters; // [{name, description, reason, score}, ...]
-
-    // ── 5. characters 3개 저장 (1순위를 selected: true로) ──
-    const characterRows = characters.map((c, idx) => ({
+    // ── 5. 추천된 라이브러리 캐릭터들을 이 자료의 characters로 복사 저장 ──
+    // 프로필/레퍼런스 이미지를 그대로 복사 -> 재사용시 AI 재호출 없이 바로 일관된 결과
+    const characterRows = recommendedLibraryChars.map((c, idx) => ({
       resource_id: resourceId,
-      character_name: c.name,
-      character_profile: c.description,
+      character_name: c.character_name,
+      is_base_character: !!c.id, // 라이브러리 출신이면 true
+      character_profile: c.character_profile || c.character_name,
+      voice_tone: c.voice_tone || null,
+      personality_traits: c.personality_traits || null,
+      visual_description: c.visual_description || null,
+      reference_image_url: c.reference_image_url || null,
+      generation_count: c.generation_count || 0,
+      library_character_id: c.id || null,
       reason: c.reason,
       score: c.score,
       selected: idx === 0,
@@ -249,7 +243,7 @@ router.post("/", async (req, res) => {
         message: "캐릭터 저장에 실패했습니다.",
         resourceId,
         metadata,
-        characters, // DB 저장은 실패했지만 분석 결과는 프론트에 보여줄 수 있게 반환
+        characters: recommendedLibraryChars, // DB 저장은 실패했지만 분석 결과는 프론트에 보여줄 수 있게 반환
         detail: savedCharacters,
       });
     }
@@ -260,6 +254,7 @@ router.post("/", async (req, res) => {
       resourceId,
       metadata,
       characters: savedCharacters.rows, // DB에 저장된 형태로 반환 (id 포함)
+      referenceMaterials: referenceMaterialsArray, // 업로드된 참고자료 (있으면 파일명만 프론트에서 확인용으로 사용)
     });
   } catch (error) {
     // 예상치 못한 에러 → resources를 failed로 표시 (resourceId가 있을 때만)
