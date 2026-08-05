@@ -632,6 +632,18 @@ function getSystemPromptForAgent(agentName) {
 ${brand.characterCommonMotif || "알(egg) 모양의 동글동글한 몸통, 이마 위에 작은 육각형 소금 결정 모양 브로치, 단순한 검은 점 눈동자에 흰색 하이라이트 하나"}
 색상과 소품은 캐릭터마다 다르게 하되, 위 공통 요소는 절대 빠뜨리지 마세요.
 
+⭐⭐⭐ 4가지 캐릭터 타입 분류 (완전 리디자인 기준, docs/character-concept.md 참고 — 반드시 준수):
+사용자의 방향성(direction)을 보고 아래 4가지 타입 중 1~2개를 골라 그 타입의 색상/형태/성격을 따르세요.
+${brand.characterTypeSystem
+  ? Object.entries(brand.characterTypeSystem)
+      .map(
+        ([key, t]) =>
+          `- ${key}(${t.nameKr}): 상징=${t.symbol} / 색상=${(t.colors || []).join(", ")} / 형태=${t.shape} / 성격=${t.personality}`
+      )
+      .join("\n")
+  : "- SALT(소금결정): 밝은 파랑, 각진 기하학적 형태, 활발함\n- LAVA(용암해수): 어두운 파랑, 유기적 곡선, 신뢰감\n- MINERAL(미네랄): 중간 톤, 세련된 곡선, 우아함\n- FIRE(불/에너지): 따뜻한 톤, 역동적 형태, 에너지"}
+설계한 캐릭터의 visual_description 첫 문장에 선택한 타입을 명시하세요 (예: "[SALT 타입] ...").
+
 사용자가 입력한 캐릭터 이름과 방향성 설명을 최대한 반영해서:
 - 음성 톤 설명
 - 성격 특성 (배열)
