@@ -53,7 +53,8 @@ function getDefaultConfig() {
       nameKorean: "제주도 라바 씨솔트",
       nameEnglish: "JEJU LAVA SEA SALT",
       description: "제주 청정 해역에서 채취한 천연 소금",
-      categories: ["식품", "뷰티", "웰스케어"],
+      // 사업 우선순위: 뷰티 > 헬스케어(웰스케어) > 식품 순으로 정렬 (프론트에서 이 순서를 우선순위 뱃지 기준으로 사용)
+      categories: ["뷰티", "웰스케어", "식품"],
       targetAges: ["20~30대", "40~60대", "60대+"],
       targetAudience: ["개인", "가족", "단체", "관광객", "기업"],
       focus: ["신뢰", "기술", "건강", "감정", "자연", "감각", "연관"],

@@ -30,11 +30,31 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
     characters.find((c) => c.selected)?.id || characters[0]?.id
   );
   const [videoType, setVideoType] = useState(videoTypes[1] || '제품스토리');
+  const DURATION_OPTIONS = [
+    { value: 15, label: '15초', hint: 'TikTok/릴스 임팩트형' },
+    { value: 30, label: '30초', hint: '숏폼 표준' },
+    { value: 60, label: '60초', hint: '유튜브 쇼츠' },
+    { value: 120, label: '120초', hint: '풀 스토리텔링' },
+  ];
+  const [duration, setDuration] = useState(30);
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  // 성공/실패 배너 자동 소멸 (전 화면 통일 규칙: 성공 2.5초, 에러 4초)
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 2500);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   // characters prop이 비어 있으면 resourceId로 직접 조회 (App.jsx가 캐릭터를 안 넘겨줘도 동작)
   useEffect(() => {
@@ -77,7 +97,6 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       });
 
       setSuccessMessage('캐릭터가 선택되었습니다.');
-      setTimeout(() => setSuccessMessage(null), 2000);
       // 다음 단계로의 진행은 "다음 단계로" 버튼에서만 트리거 (카드 클릭만으로 자동 진행하지 않음)
     } catch (err) {
       // mock 자료(id가 서버 DB에 없는 경우) 등 저장 실패해도 화면상 선택은 유지하고 진행 가능하게 둔다
@@ -103,7 +122,6 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
       setEditingId(null);
       setSuccessMessage('캐릭터가 저장되었습니다.');
-      setTimeout(() => setSuccessMessage(null), 2000);
     } catch (err) {
       console.error('캐릭터 저장 실패:', err);
       setError('저장에 실패했습니다.');
@@ -152,12 +170,24 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
         {localCharacters.map((char, idx) => (
           <div
             key={char.id}
-            className={`border-2 rounded-lg p-5 transition cursor-pointer ${
+            role="button"
+            tabIndex={0}
+            aria-pressed={selectedId === char.id}
+            aria-label={`${idx + 1}순위 캐릭터 ${char.character_name}${
+              selectedId === char.id ? ' (선택됨)' : ''
+            }`}
+            className={`border-2 rounded-lg p-5 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 ${
               selectedId === char.id
-                ? 'border-blue-600 bg-blue-50'
+                ? 'border-brand-blue bg-brand-wave'
                 : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
             onClick={() => handleSelectCharacter(char.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleSelectCharacter(char.id);
+              }
+            }}
           >
             {/* 순위 + 선택 표시 */}
             <div className="flex justify-between items-start mb-3">
@@ -165,7 +195,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                 🏆 {idx + 1}순위
               </div>
               {selectedId === char.id && (
-                <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                <span className="bg-brand-blue text-white text-xs px-2 py-1 rounded-full">
                   ✓ 선택됨
                 </span>
               )}
@@ -269,7 +299,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                         e.stopPropagation();
                         setEditingId(char.id);
                       }}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
+                      className="text-brand-blue hover:text-brand-ocean text-sm"
                     >
                       ✏️ 편집
                     </button>
@@ -327,7 +357,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
       {/* 선택된 캐릭터 정보 (큰 화면) */}
       {selectedId && (
-        <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
+        <div className="bg-brand-wave border-2 border-brand-blue/30 rounded-lg p-6 mb-6">
           {(() => {
             const selected = localCharacters.find((c) => c.id === selectedId);
             return selected ? (
@@ -367,7 +397,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                 key={type}
                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition ${
                   videoType === type
-                    ? 'border-blue-600 bg-blue-50 text-blue-700'
+                    ? 'border-brand-blue bg-brand-wave text-brand-blue-dark'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
@@ -385,17 +415,48 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
         </div>
       )}
 
+      {/* 숏폼 길이 선택 */}
+      {selectedId && (
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <h4 className="font-semibold mb-3">⏱️ 영상 길이 선택</h4>
+          <div className="flex flex-wrap gap-3">
+            {DURATION_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex flex-col items-start gap-0.5 px-4 py-2 border rounded-lg cursor-pointer transition ${
+                  duration === opt.value
+                    ? 'border-brand-blue bg-brand-wave text-brand-blue-dark'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="duration"
+                    checked={duration === opt.value}
+                    onChange={() => setDuration(opt.value)}
+                    className="w-4 h-4"
+                  />
+                  <span className="font-semibold">{opt.label}</span>
+                </span>
+                <span className="text-xs text-gray-500 ml-6">{opt.hint}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 다음 단계 안내 */}
       {selectedId && (
         <div className="bg-green-50 border border-green-300 rounded-lg p-4 text-center">
           <p className="text-green-800">
             ✨ <strong>{localCharacters.find((c) => c.id === selectedId)?.character_name}</strong>로,
-            <strong> {videoType}</strong> 형식으로 계속 진행할 준비가 되었습니다.
+            <strong> {videoType}</strong> · <strong>{duration}초</strong> 형식으로 계속 진행할 준비가 되었습니다.
           </p>
           <button
             onClick={() => {
               if (onSelect) {
-                onSelect(localCharacters.find((c) => c.id === selectedId), videoType);
+                onSelect(localCharacters.find((c) => c.id === selectedId), videoType, duration);
               }
             }}
             className="mt-3 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"

@@ -17,12 +17,47 @@ const STEP_LABELS = {
   generation: 'AI 콘텐츠 생성',
 };
 
+const STEP_ORDER = ['filter', 'metadata', 'character', 'generation'];
+
+// 글로벌 스텝 인디케이터: 현재 진행 단계를 1-2-3-4로 시각화 (관리자 모드에서는 숨김)
+function StepIndicator({ currentStep }) {
+  const currentIdx = STEP_ORDER.indexOf(currentStep);
+
+  return (
+    <div className="step-indicator" role="navigation" aria-label="진행 단계">
+      {STEP_ORDER.map((step, idx) => {
+        const isDone = idx < currentIdx;
+        const isActive = idx === currentIdx;
+        return (
+          <div key={step} className="step-indicator-item">
+            <div
+              className={`step-indicator-circle ${
+                isDone ? 'step-done' : isActive ? 'step-active' : 'step-pending'
+              }`}
+              aria-current={isActive ? 'step' : undefined}
+            >
+              {isDone ? '✓' : idx + 1}
+            </div>
+            <span className={`step-indicator-label ${isActive ? 'step-active' : ''}`}>
+              {STEP_LABELS[step]}
+            </span>
+            {idx < STEP_ORDER.length - 1 && (
+              <div className={`step-indicator-line ${isDone ? 'step-done' : ''}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MainFlow({ currentStep, setCurrentStep }) {
   const [resourceId, setResourceId] = useState(null);
   const [metadata, setMetadata] = useState(null);
   const [initialMetadata, setInitialMetadata] = useState(null);
   const [characters, setCharacters] = useState(null);
   const [videoType, setVideoType] = useState('제품스토리');
+  const [duration, setDuration] = useState(30);
 
   const handleResourceCreated = (newResourceId, createdMetadata, createdCharacters) => {
     setResourceId(newResourceId);
@@ -36,8 +71,9 @@ function MainFlow({ currentStep, setCurrentStep }) {
     setCurrentStep('character');
   };
 
-  const handleCharacterSelected = (character, selectedVideoType) => {
+  const handleCharacterSelected = (character, selectedVideoType, selectedDuration) => {
     setVideoType(selectedVideoType);
+    setDuration(selectedDuration || 30);
     setCurrentStep('generation');
   };
 
@@ -47,6 +83,7 @@ function MainFlow({ currentStep, setCurrentStep }) {
     setResourceId(null);
     setMetadata(null);
     setVideoType('제품스토리');
+    setDuration(30);
   };
 
   return (
@@ -75,6 +112,7 @@ function MainFlow({ currentStep, setCurrentStep }) {
           onSuccess={handleGenerationComplete}
           requestType="intro"
           videoType={videoType}
+          duration={duration}
         />
       )}
     </main>
@@ -141,6 +179,7 @@ function App() {
             </p>
           </div>
         </div>
+        {!isAdmin && <StepIndicator currentStep={currentStep} />}
       </header>
 
       <Routes>

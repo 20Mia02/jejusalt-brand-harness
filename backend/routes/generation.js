@@ -58,7 +58,7 @@ router.post("/", async (req, res) => {
  */
 router.post("/:resourceId/start", async (req, res) => {
   const { resourceId } = req.params;
-  const { requestType, videoType } = req.body;
+  const { requestType, videoType, duration } = req.body;
 
   // ── 0. 입력 검증 ────────────────────────────────
   if (!resourceId || !requestType) {
@@ -74,6 +74,12 @@ router.post("/:resourceId/start", async (req, res) => {
       message: 'requestType은 "intro", "detail", 또는 "both"이어야 합니다',
     });
   }
+
+  // 숏폼 길이 옵션 (기본 120초) — 15/30/60/120초만 허용
+  const ALLOWED_DURATIONS = [15, 30, 60, 120];
+  const targetDuration = ALLOWED_DURATIONS.includes(Number(duration))
+    ? Number(duration)
+    : 120;
 
   try {
     // ── 1. 필요한 정보 조회 ──────────────────────────
@@ -147,6 +153,7 @@ router.post("/:resourceId/start", async (req, res) => {
         brief: completeBrief,
         final_characters: [selectedCharacter],
         scenario_context: requestType,
+        target_duration_seconds: targetDuration,
       },
       { resourceId, step: "shortform-scenario-writer" }
     );
@@ -162,10 +169,10 @@ router.post("/:resourceId/start", async (req, res) => {
     const scenario = scenarioResult.data.scenario;
     const higgsfieldSpecs = scenarioResult.data.higgsfield_specifications;
 
-    // 시나리오가 정확히 120초인지 확인
-    if (scenarioResult.data.timing_verification?.total_duration !== 120) {
+    // 시나리오가 요청한 길이(targetDuration)와 일치하는지 확인
+    if (scenarioResult.data.timing_verification?.total_duration !== targetDuration) {
       console.warn(
-        `⚠️ 시나리오가 ${scenarioResult.data.timing_verification?.total_duration}초입니다`
+        `⚠️ 시나리오가 ${targetDuration}초 요청에 ${scenarioResult.data.timing_verification?.total_duration}초로 응답했습니다`
       );
     }
 
@@ -179,10 +186,10 @@ router.post("/:resourceId/start", async (req, res) => {
       scenario_title: scenario.title,
       story_content: scenario.story_content || scenario.content || "",
       scenario_json: scenario.acts || scenario,
-      total_duration_seconds: scenarioResult.data.timing_verification?.total_duration || 120,
+      total_duration_seconds: scenarioResult.data.timing_verification?.total_duration || targetDuration,
       dialogue_seconds: scenarioResult.data.timing_verification?.dialogue_seconds || null,
       narration_seconds: scenarioResult.data.timing_verification?.narration_seconds || null,
-      timing_valid: scenarioResult.data.timing_verification?.total_duration === 120,
+      timing_valid: scenarioResult.data.timing_verification?.total_duration === targetDuration,
     });
 
     if (!scenarioDBResult.success) {
@@ -258,7 +265,25 @@ router.post("/:resourceId/start", async (req, res) => {
       agentName = "product-intro-writer-agent";
     }
 
-    console.log(`[Step 7] ${agentName} 호출... (videoType: ${videoType || "제품스토리"})`);
+    // ⭐ 브랜드 보이스 학습 캐시: 과거에 승인(APPROVED)된 콘텐츠를 few-shot 예시로 프롬프트에 주입해
+    //    매번 다른 담당자가 생성해도 톤이 일관되게 유지되도록 함
+    let approvedExamples = [];
+    try {
+      const pastApproved = await callDatabase("contents", "read", null, {
+        content_type: requestType === "detail" ? "detail" : "intro",
+        validation_status: "APPROVED",
+      });
+      if (pastApproved.success) {
+        approvedExamples = pastApproved.rows
+          .filter((c) => c.generated_content)
+          .slice(0, 3)
+          .map((c) => c.generated_content);
+      }
+    } catch (e) {
+      console.warn("[브랜드 보이스 캐시] 과거 승인 콘텐츠 조회 실패 (무시하고 계속):", e.message);
+    }
+
+    console.log(`[Step 7] ${agentName} 호출... (videoType: ${videoType || "제품스토리"}, 참고 예시: ${approvedExamples.length}건)`);
     const contentResult = await callAgent(
       agentName,
       {
@@ -267,8 +292,11 @@ router.post("/:resourceId/start", async (req, res) => {
         productName: selectedProductName,
         productInfo: resource.product_info,
         keywords: resource.keywords || [],
+        trendKeywords: metadata.trendKeywords || [],
+        customStyle: metadata.customStyle || null,
         scenario,
         videoType: videoType || "제품스토리",
+        approvedExamples,
       },
       { resourceId, step: agentName }
     );
@@ -348,7 +376,7 @@ router.post("/:resourceId/start", async (req, res) => {
         voiceTone: selectedCharacter.voice_tone || "기본",
         visualDescription: selectedCharacter.visual_description || "",
         referenceImageUrl: selectedCharacter.reference_image_url || null, // ⭐ 재현성: 레퍼런스 이미지 전달
-        duration: 120,
+        duration: targetDuration,
       },
       resourceId,
       contentId
@@ -369,13 +397,17 @@ router.post("/:resourceId/start", async (req, res) => {
     // ── 7-1. 최종 상태 업데이트 ──
     // ✅ CLI의 --wait 플래그로 완료까지 기다렸으므로 pollHiggsfield 불필요
     if (higgsfieldResult.success && videosRowId) {
-      await callDatabase("videos", "update", {
-        id: videosRowId,
-        generation_status: "completed",
-        generation_progress: 100,
-        video_url: videoUrl,
-        character_reference_image_url: selectedCharacter.reference_image_url || null, // ⭐ 재현성 추적
-      }).catch((e) => console.error("[영상 상태 업데이트 실패]", e));
+      await callDatabase(
+        "videos",
+        "update",
+        {
+          generation_status: "completed",
+          generation_progress: 100,
+          video_url: videoUrl,
+          character_reference_image_url: selectedCharacter.reference_image_url || null, // ⭐ 재현성 추적
+        },
+        { id: videosRowId }
+      ).catch((e) => console.error("[영상 상태 업데이트 실패]", e));
 
       // ⭐ 캐릭터의 reference_image_url과 generation_count 업데이트 (첫 생성 시에만 저장)
       if (!selectedCharacter.reference_image_url && videoUrl) {
@@ -401,6 +433,7 @@ router.post("/:resourceId/start", async (req, res) => {
       contentId,
       validationStatus,
       validationScore,
+      duration: targetDuration,
       videoUrl: higgsfieldResult.success ? higgsfieldResult.data.video_url : null,
       videoStatus: higgsfieldResult.success ? "completed" : "failed",
       higgsfieldError: higgsfieldError,

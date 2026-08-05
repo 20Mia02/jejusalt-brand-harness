@@ -243,18 +243,35 @@ function getMockResponseForAgent(agentName, payload) {
         visual_description: "파란색 옷, 밝은 눈빛, 활발한 표정"
       }
     },
-    "shortform-scenario-writer-agent": {
-      scenario: {
-        title: "제주소금으로 시작하는 건강한 하루",
-        story_content: "아침 밥상에 제주소금을...",
-        acts: [
-          { act: 1, duration_seconds: 40, content: "아침 오프닝" },
-          { act: 2, duration_seconds: 50, content: "제품 소개" },
-          { act: 3, duration_seconds: 30, content: "클로징" }
-        ],
-        timing_verification: { total_duration: 120 }
-      }
-    },
+    "shortform-scenario-writer-agent": (() => {
+      const targetDuration = payload?.target_duration_seconds || 120;
+      // 길이에 비례해 3개 Act로 분배 (40:50:30 비율 유지)
+      const act1 = Math.round(targetDuration * (40 / 120));
+      const act2 = Math.round(targetDuration * (50 / 120));
+      const act3 = targetDuration - act1 - act2;
+      // ⚠️ timing_verification은 scenario의 하위가 아니라 응답 최상위(scenario와 형제)여야
+      // getOutputSpecForAgent의 실제 출력 스펙 및 generation.js의 읽기 코드(scenarioResult.data.timing_verification)와 일치한다.
+      return {
+        scenario: {
+          title: "제주소금으로 시작하는 건강한 하루",
+          story_content: "아침 밥상에 제주소금을...",
+          acts: [
+            { act: 1, duration_seconds: act1, content: "아침 오프닝" },
+            { act: 2, duration_seconds: act2, content: "제품 소개" },
+            { act: 3, duration_seconds: act3, content: "클로징" }
+          ]
+        },
+        higgsfield_specifications: {
+          style: "전문적이고 세련된",
+          mood: "신뢰감 있고 따뜻함"
+        },
+        timing_verification: {
+          total_duration: targetDuration,
+          dialogue_seconds: Math.round(targetDuration / 2),
+          narration_seconds: targetDuration - Math.round(targetDuration / 2)
+        }
+      };
+    })(),
     "naming-generator-agent": {
       product_name_options: [
         { name: "제주 청염", score: 90, meaning: "청정한 제주의 소금" },
@@ -282,12 +299,11 @@ function getMockResponseForAgent(agentName, payload) {
     }
   };
 
-  const data = mockData[agentName] || { message: "Mock response" };
-  return {
-    success: true,
-    data: data,
-    attempt: 1
-  };
+  // ⚠️ callTimelyAIAgent의 실제(비-mock) 경로는 파싱된 JSON을 그대로 반환하므로
+  // (예: {characters:[...]} ), mock도 동일하게 순수 데이터 객체만 반환해야 한다.
+  // 과거에는 {success, data, attempt}로 한 겹 더 감싸서 callAgent가 이를 다시 감싸
+  // response.data.characters가 아니라 response.data.data.characters가 되는 버그가 있었다.
+  return mockData[agentName] || { message: "Mock response" };
 }
 
 // ============================================================================
@@ -305,6 +321,8 @@ function getSystemPromptForAgent(agentName) {
 제품: ${brand.nameKorean || "제주소금"}
 브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
 
+사업 우선순위: ${(brand.categories || []).join(" > ") || "뷰티 > 웰스케어 > 식품"} 순으로 사업을 확장 중이므로, 제품이 여러 카테고리에 걸칠 경우 우선순위가 높은 카테고리를 먼저 배열에 넣으세요.
+
 제공된 제품명, 설명, 키워드를 기반으로:
 - 상품 카테고리 (${(brand.categories || []).join(", ") || "식품, 뷰티, 웰스케어"})
 - 타겟 연령대 (${(brand.targetAges || []).join(", ") || "20~30대, 40~60대, 60대+"})
@@ -312,7 +330,11 @@ function getSystemPromptForAgent(agentName) {
 - 마케팅 포커스 (${(brand.focus || []).join(", ") || "신뢰, 기술, 건강"})
 - 신뢰도 점수 (0~100)
 
-를 분석하여 반환하세요.`,
+를 분석하여 반환하세요.
+
+입력에 trendKeywords(요즘 SNS/뉴스 트렌드 키워드)가 있다면, "기술 중심"이 아닌 "소비자가 지금 원하는 것" 중심으로
+마케팅 포커스를 트렌드에 맞게 조정하세요 (예: 트렌드가 "저속노화"라면 포커스에 "저속노화/동안" 관련 가치를 반영).
+입력에 customStyle(사용자가 원하는 톤/문구)이 있다면 focus나 카테고리 판단에 참고하되, 브랜드의 absoluteNos는 절대 위반하지 마세요.`,
 
     "character-generator-agent": `당신은 ${brand.nameKorean || "제주소금"} 제품 마케팅을 위한 캐릭터 3개를 추천하는 AI 에이전트입니다.
 브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
@@ -335,15 +357,19 @@ function getSystemPromptForAgent(agentName) {
 - 시각적 묘사 (의상, 표정, 외형)
 - 피해야 할 표현: ${(brand.absoluteNos || []).join(", ") || "의료표현, 과장"}`,
 
-    "shortform-scenario-writer-agent": `당신은 120초 영상 시나리오를 작성하는 AI 에이전트입니다.
+    "shortform-scenario-writer-agent": `당신은 숏폼 영상 시나리오를 작성하는 AI 에이전트입니다.
+입력의 target_duration_seconds(초)에 맞춰 정확히 그 길이의 시나리오를 작성하세요 (기본값 120초).
+짧은 길이(15~30초)일수록 Act 수를 줄이고 핵심 메시지에 집중하며, 긴 길이(60~120초)일수록 기승전결을 갖추세요.
 다음을 포함하세요:
 - 시나리오 제목
 - 전체 스토리 텍스트
-- Act 분할 (각 Act는 지속시간 초 포함)
+- Act 분할 (각 Act는 지속시간 초 포함, 합계가 target_duration_seconds와 정확히 일치)
 - 영상 스타일 & 분위기 (Higgsfield 스펙)
-- 타이밍 검증 (정확히 120초, 대사/나레이션 시간)`,
+- 타이밍 검증 (total_duration은 반드시 target_duration_seconds와 동일, 대사/나레이션 시간)`,
 
-    "naming-generator-agent": `당신은 제품명과 콘텐츠명 각 3개를 생성하는 AI 에이전트입니다.
+    "naming-generator-agent": `당신은 ${brand.nameKorean || "제주소금"}의 제품명과 콘텐츠명 각 3개를 생성하는 AI 에이전트입니다.
+브랜드 핵심 소재/컨셉: 용암해수, 미네랄, 전해질 — 3개 후보 중 최소 1개 이상은 이 소재들 중 하나에서 착안한 이름을 포함하세요
+(예: "용암미네랄", "전해수 담은" 등 소재를 은유/조합한 이름. 소재명을 그대로 나열하지 말고 자연스러운 제품명으로 가공하세요).
 각각 정확히 3개씩, 각 항목마다:
 - 이름
 - 점수 (90~80)
@@ -352,10 +378,22 @@ function getSystemPromptForAgent(agentName) {
 을 포함하세요.`,
 
     "product-intro-writer-agent": `당신은 제품 소개 카피를 작성하는 AI 에이전트입니다.
-제품명, 설명, 캐릭터를 기반으로 매력적이고 설득력 있는 소개글을 작성하세요.`,
+제품명, 설명, 캐릭터를 기반으로 매력적이고 설득력 있는 소개글을 작성하세요.
+입력에 trendKeywords가 있으면 해당 트렌드 언어/관심사를 자연스럽게 녹여내고,
+customStyle(사용자가 원하는 톤/문구)이 있으면 최대한 반영하되 브랜드 절대 금지 표현은 지키세요.
+
+⭐ 브랜드 보이스 일관성: 입력의 approvedExamples는 과거에 마케팅팀이 실제로 승인한 카피 예시들입니다.
+반드시 이 예시들의 문장 길이, 어투, 어휘 선택 패턴을 참고해서 브랜드 보이스가 매번 일관되게 유지되도록 작성하세요
+(내용을 그대로 베끼지 말고 "같은 브랜드가 쓴 글처럼" 톤만 맞추세요).`,
 
     "product-detail-page-writer-agent": `당신은 상세페이지 카피를 작성하는 AI 에이전트입니다.
-제품의 상세한 혜택, 사용법, 특징을 강조하는 긴 형식의 카피를 작성하세요.`,
+제품의 상세한 혜택, 사용법, 특징을 강조하는 긴 형식의 카피를 작성하세요.
+입력에 trendKeywords가 있으면 해당 트렌드 언어/관심사를 자연스럽게 녹여내고,
+customStyle(사용자가 원하는 톤/문구)이 있으면 최대한 반영하되 브랜드 절대 금지 표현은 지키세요.
+
+⭐ 브랜드 보이스 일관성: 입력의 approvedExamples는 과거에 마케팅팀이 실제로 승인한 카피 예시들입니다.
+반드시 이 예시들의 문장 길이, 어투, 어휘 선택 패턴을 참고해서 브랜드 보이스가 매번 일관되게 유지되도록 작성하세요
+(내용을 그대로 베끼지 말고 "같은 브랜드가 쓴 글처럼" 톤만 맞추세요).`,
 
     "compliance-reviewer-agent": `당신은 ${brand.nameKorean || "제주소금"} 제품의 마케팅 콘텐츠를 검증하는 AI 에이전트입니다.
 
@@ -406,7 +444,7 @@ function getOutputSpecForAgent(agentName) {
   }
 }`,
 
-    "shortform-scenario-writer-agent": `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 정확히 120):
+    "shortform-scenario-writer-agent": `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 반드시 입력받은 target_duration_seconds와 정확히 동일해야 함):
 {
   "scenario": {
     "title": "시나리오 제목",
@@ -467,7 +505,8 @@ function getOutputSpecForAgent(agentName) {
 
 async function callHiggsfield(videoConfig, resourceId, contentId) {
   try {
-    const duration = videoConfig.duration === 120 ? 8 : 4;
+    // Higgsfield CLI는 4초 또는 8초 클립만 지원 → 선택된 시나리오 길이(15/30/60/120초)를 가까운 값으로 매핑
+    const duration = (videoConfig.duration || 120) > 30 ? 8 : 4;
 
     // ✅ 메타데이터 기반 프롬프트 생성 (텍스트 제거)
     const character = videoConfig.character || 'woman';

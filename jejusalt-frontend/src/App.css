@@ -218,6 +218,95 @@ body {
   }
 }
 
+/* ===== 글로벌 스텝 인디케이터 ===== */
+.step-indicator {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  max-width: 700px;
+  width: 100%;
+  margin: 32px auto 0;
+  padding: 0 24px;
+}
+
+.step-indicator-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.step-indicator-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+  z-index: 1;
+}
+
+.step-indicator-circle.step-pending {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.step-indicator-circle.step-active {
+  background-color: var(--color-primary-blue);
+  color: #000;
+  border: 2px solid var(--color-primary-blue);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.25);
+}
+
+.step-indicator-circle.step-done {
+  background-color: var(--color-hallasan-green);
+  color: #fff;
+  border: 2px solid var(--color-hallasan-green);
+}
+
+.step-indicator-label {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.step-indicator-label.step-active {
+  color: #fff;
+  font-weight: 700;
+}
+
+.step-indicator-line {
+  position: absolute;
+  top: 16px;
+  left: calc(50% + 20px);
+  right: calc(-50% + 20px);
+  height: 2px;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: background-color 0.3s ease;
+}
+
+.step-indicator-line.step-done {
+  background-color: var(--color-hallasan-green);
+}
+
+@media (max-width: 640px) {
+  .step-indicator-label {
+    display: none;
+  }
+}
+
 @media (max-width: 1024px) {
   .app-header-content {
     gap: 40px;

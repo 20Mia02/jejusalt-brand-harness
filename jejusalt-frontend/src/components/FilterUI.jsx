@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
+// 사업 우선순위 카테고리 (뷰티 > 헬스케어) — UI에서 ⭐ 우선순위 뱃지로 강조
+const PRIORITY_CATEGORIES = ["뷰티", "웰스케어"];
+
 export default function FilterUI({ onResourceCreated }) {
   const [mode, setMode] = useState("input"); // 'input' 또는 'filter'
   const [metadata, setMetadata] = useState(null);
@@ -15,11 +18,26 @@ export default function FilterUI({ onResourceCreated }) {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
+  // 성공/실패 배너 자동 소멸 (전 화면 통일 규칙: 성공 2.5초, 에러 4초)
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 2500);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
   // 자료 입력 폼 상태
   const [inputForm, setInputForm] = useState({
     productName: "",
     productInfo: "",
     keywords: "",
+    trendKeywords: "",
+    customStyle: "",
   });
 
   useEffect(() => {
@@ -30,7 +48,7 @@ export default function FilterUI({ onResourceCreated }) {
     try {
       // config에서 메타데이터 추출
       let metadata = {
-        categories: ["식품", "뷰티", "웰스케어"],
+        categories: ["뷰티", "웰스케어", "식품"],
         ageGroups: ["20~30대", "40~60대", "60대+"],
         targets: ["개인", "가족", "단체", "관광객", "기업"],
         focus: ["신뢰", "기술", "건강", "감정", "자연", "감각", "연관"],
@@ -86,6 +104,10 @@ export default function FilterUI({ onResourceCreated }) {
         keywords: inputForm.keywords
           ? inputForm.keywords.split(",").map((k) => k.trim())
           : [],
+        trendKeywords: inputForm.trendKeywords
+          ? inputForm.trendKeywords.split(",").map((k) => k.trim()).filter(Boolean)
+          : [],
+        customStyle: inputForm.customStyle.trim() || null,
       });
 
       if (response.data.success) {
@@ -177,7 +199,7 @@ export default function FilterUI({ onResourceCreated }) {
           }}
           className={`px-6 py-3 font-semibold border-b-2 transition ${
             mode === "input"
-              ? "border-blue-600 text-blue-600"
+              ? "border-brand-blue text-brand-blue"
               : "border-transparent text-gray-600 hover:text-gray-900"
           }`}
         >
@@ -191,7 +213,7 @@ export default function FilterUI({ onResourceCreated }) {
           }}
           className={`px-6 py-3 font-semibold border-b-2 transition ${
             mode === "filter"
-              ? "border-blue-600 text-blue-600"
+              ? "border-brand-blue text-brand-blue"
               : "border-transparent text-gray-600 hover:text-gray-900"
           }`}
         >
@@ -228,7 +250,7 @@ export default function FilterUI({ onResourceCreated }) {
                 value={inputForm.productName}
                 onChange={handleInputChange}
                 placeholder="예: 제주소금, 프리미엄 천연 해염"
-                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue"
               />
               <p className="text-xs text-gray-500 mt-1">최소 3자 이상</p>
             </div>
@@ -243,7 +265,7 @@ export default function FilterUI({ onResourceCreated }) {
                 value={inputForm.productInfo}
                 onChange={handleInputChange}
                 placeholder="예: 제주 청정 해역에서 채취한 천연 소금입니다. 미네랄이 풍부하고..."
-                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500 h-32"
+                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue h-32"
               />
               <p className="text-xs text-gray-500 mt-1">최소 30자 이상</p>
             </div>
@@ -259,16 +281,51 @@ export default function FilterUI({ onResourceCreated }) {
                 value={inputForm.keywords}
                 onChange={handleInputChange}
                 placeholder="예: 건강, 웰빙, 프리미엄, 자연 (쉼표로 구분)"
-                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue"
               />
               <p className="text-xs text-gray-500 mt-1">쉼표로 구분해서 입력하세요</p>
+            </div>
+
+            {/* 트렌드 키워드 (선택) */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                🔥 요즘 트렌드 키워드 (선택사항)
+              </label>
+              <input
+                type="text"
+                name="trendKeywords"
+                value={inputForm.trendKeywords}
+                onChange={handleInputChange}
+                placeholder="예: 저속노화, 물광피부, 전해질 밸런스 (쉼표로 구분)"
+                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                최근 SNS/뉴스에서 화제인 키워드를 입력하면 AI가 트렌드를 반영한 콘텐츠 주제를 제안합니다.
+              </p>
+            </div>
+
+            {/* 소비자 커스터마이징 (선택) */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                ✍️ 원하는 스타일/문구 (선택사항)
+              </label>
+              <textarea
+                name="customStyle"
+                value={inputForm.customStyle}
+                onChange={handleInputChange}
+                placeholder="예: 20대가 좋아할 만한 발랄한 톤으로, '물광' 이라는 단어를 꼭 넣어주세요"
+                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue h-20"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                원하는 톤, 꼭 들어갔으면 하는 문구 등을 직접 입력하면 AI 생성에 반영됩니다.
+              </p>
             </div>
 
             {/* 제출 버튼 */}
             <button
               onClick={handleSubmitResource}
               disabled={loading}
-              className="w-full mt-6 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:shadow-lg disabled:opacity-50 transition"
+              className="w-full mt-6 px-6 py-3 bg-gradient-to-r from-brand-blue to-brand-blue-dark text-white font-bold rounded-lg hover:shadow-lg disabled:opacity-50 transition"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -301,9 +358,9 @@ export default function FilterUI({ onResourceCreated }) {
           </div>
 
           {/* 가이드 */}
-          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">📋 작성 가이드</h3>
-            <ul className="text-sm text-blue-800 space-y-1">
+          <div className="mt-8 bg-brand-wave border border-brand-blue/30 rounded-lg p-4">
+            <h3 className="font-semibold text-brand-ocean mb-2">📋 작성 가이드</h3>
+            <ul className="text-sm text-brand-ocean space-y-1">
               <li>✓ 제품명: 간결하게 (3자 이상)</li>
               <li>✓ 제품 정보: 특징과 효능을 자세히 (30자 이상)</li>
               <li>✓ 키워드: 5~10개 추천 (쉼표로 구분)</li>
@@ -333,6 +390,14 @@ export default function FilterUI({ onResourceCreated }) {
                         className="w-4 h-4"
                       />
                       <span>{cat}</span>
+                      {PRIORITY_CATEGORIES.includes(cat) && (
+                        <span
+                          title="사업 우선순위 카테고리"
+                          className="text-xs bg-brand-wave text-brand-ocean px-1.5 py-0.5 rounded-full"
+                        >
+                          ⭐ 우선순위
+                        </span>
+                      )}
                     </label>
                   ))}
                 </div>
@@ -397,7 +462,7 @@ export default function FilterUI({ onResourceCreated }) {
                 <button
                   onClick={handleSearch}
                   disabled={loading}
-                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 font-semibold"
+                  className="flex-1 px-6 py-3 bg-brand-blue text-white rounded hover:bg-brand-blue-dark disabled:opacity-50 font-semibold"
                 >
                   {loading ? "검색 중..." : "🔍 검색"}
                 </button>
@@ -414,7 +479,7 @@ export default function FilterUI({ onResourceCreated }) {
             {/* 검색 안내 메시지 */}
             {filteredResources.length === 0 &&
               !Object.values(filters).some((f) => f.length > 0) && (
-                <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mt-6 text-center">
+                <div className="bg-brand-wave border border-brand-blue/30 text-brand-blue-dark px-4 py-3 rounded mt-6 text-center">
                   💡 필터를 선택하고 "검색" 버튼을 클릭하면 자료를 찾을 수 있습니다.
                 </div>
               )}
@@ -432,7 +497,7 @@ export default function FilterUI({ onResourceCreated }) {
                     key={resource.id}
                     className="border rounded-lg p-4 hover:shadow-lg transition"
                   >
-                    <h3 className="text-lg font-semibold text-blue-600">
+                    <h3 className="text-lg font-semibold text-brand-blue">
                       {resource.product_name}
                     </h3>
                     <p className="text-sm text-gray-600 mt-1">
@@ -443,7 +508,7 @@ export default function FilterUI({ onResourceCreated }) {
                         {resource.metadata.categories?.map((cat) => (
                           <span
                             key={cat}
-                            className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
+                            className="bg-brand-wave text-brand-ocean text-xs px-2 py-1 rounded"
                           >
                             {cat}
                           </span>

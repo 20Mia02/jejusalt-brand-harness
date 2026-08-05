@@ -28,7 +28,7 @@ const { callDatabase } = require("../agents/database-agent"); // database-agent.
 // POST /api/resources — 자료 업로드 + 분석 (Step 1~2)
 // ─────────────────────────────────────────────
 router.post("/", async (req, res) => {
-  const { productName, productInfo, keywords } = req.body;
+  const { productName, productInfo, keywords, trendKeywords, customStyle } = req.body;
 
   // ── 0. 입력 유효성 검증 ──────────────────────────
   if (!productName || !productInfo) {
@@ -113,6 +113,14 @@ router.post("/", async (req, res) => {
           .filter((k) => k.length > 0)
     : [];
 
+  // 트렌드 키워드/커스텀 스타일 (선택 입력) — 별도 컬럼 없이 metadata JSONB에 함께 저장
+  const trendKeywordsArray = Array.isArray(trendKeywords)
+    ? trendKeywords
+    : trendKeywords
+    ? String(trendKeywords).split(",").map((k) => k.trim()).filter(Boolean)
+    : [];
+  const customStyleText = customStyle ? String(customStyle).trim() : null;
+
   let resourceId;
 
   try {
@@ -152,7 +160,13 @@ router.post("/", async (req, res) => {
     // ── 2. Step 1: resource-analyzer-agent 호출 (backend-agent) ──
     const step1 = await callAgent(
       "resource-analyzer-agent",
-      { productName, productInfo, keywords: keywordsArray },
+      {
+        productName,
+        productInfo,
+        keywords: keywordsArray,
+        trendKeywords: trendKeywordsArray,
+        customStyle: customStyleText,
+      },
       { resourceId, step: "resource-analyzer" }
     );
 
@@ -173,7 +187,12 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const metadata = step1.data.metadata;
+    // 트렌드 키워드/커스텀 스타일은 AI 메타데이터에 그대로 병합해 저장 (스키마 변경 없이 JSONB 확장)
+    const metadata = {
+      ...step1.data.metadata,
+      trendKeywords: trendKeywordsArray,
+      customStyle: customStyleText,
+    };
 
     // ── 3. resources 메타데이터 업데이트 ─────────────
     await callDatabase(
@@ -339,6 +358,54 @@ router.get("/:id", async (req, res) => {
     resource: resourceResult.rows[0],
     characters: charactersResult.success ? charactersResult.rows : [],
   });
+});
+
+// ─────────────────────────────────────────────
+// GET /api/resources/:id/comments — 코멘트 스레드 조회 (오래된순)
+// POST /api/resources/:id/comments — 코멘트 작성
+// ─────────────────────────────────────────────
+router.get("/:id/comments", async (req, res) => {
+  const { id } = req.params;
+
+  const result = await callDatabase("comments", "read", null, { resource_id: id });
+  if (!result.success) {
+    return res.status(500).json({
+      success: false,
+      message: "코멘트 조회에 실패했습니다.",
+      detail: result,
+    });
+  }
+
+  // callDatabase는 최신순(desc)으로 반환하므로 스레드는 오래된순으로 뒤집어서 보여준다
+  return res.json({ success: true, comments: [...result.rows].reverse() });
+});
+
+router.post("/:id/comments", async (req, res) => {
+  const { id } = req.params;
+  const { author, message } = req.body;
+
+  if (!message || !message.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "코멘트 내용을 입력해주세요.",
+    });
+  }
+
+  const result = await callDatabase("comments", "create", {
+    resource_id: id,
+    author: author?.trim() || "담당자",
+    message: message.trim(),
+  });
+
+  if (!result.success) {
+    return res.status(500).json({
+      success: false,
+      message: "코멘트 저장에 실패했습니다. comments 테이블이 아직 없다면 docs/migration-comments.sql을 먼저 적용해주세요.",
+      detail: result,
+    });
+  }
+
+  return res.status(201).json({ success: true, comment: result.rows[0] });
 });
 
 module.exports = router;

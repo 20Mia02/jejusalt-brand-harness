@@ -24,7 +24,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro', videoType }) {
+export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro', videoType, duration = 120 }) {
   // 상태 관리
   const [generating, setGenerating] = useState(false);
   const [generationData, setGenerationData] = useState(null);
@@ -38,6 +38,19 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const [videoErrorDetail, setVideoErrorDetail] = useState(null);
   const [failedStep, setFailedStep] = useState(null);
   const pollingInterval = useRef(null);
+
+  // 성공/실패 배너 자동 소멸 (전 화면 통일 규칙: 성공 2.5초, 에러 4초)
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 2500);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   /**
    * "AI 생성" 버튼 클릭
@@ -68,6 +81,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       const res = await axios.post(`/api/generate/${resourceId}/start`, {
         requestType,
         videoType,
+        duration,
       });
 
       stopStatusPolling();
@@ -178,7 +192,10 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white shadow rounded-lg">
       {/* 제목 */}
-      <h2 className="text-2xl font-bold mb-6">🎬 AI 콘텐츠 생성</h2>
+      <h2 className="text-2xl font-bold mb-1">🎬 AI 콘텐츠 생성</h2>
+      <p className="text-sm text-gray-500 mb-6">
+        {videoType || '제품스토리'} · {duration}초 숏폼으로 생성됩니다
+      </p>
 
       {/* 에러/성공 메시지 */}
       {error && (
@@ -211,14 +228,14 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
           {/* 현재 단계 */}
           <div className="text-center">
             <div className="text-lg font-semibold mb-2">{currentStep}</div>
-            <div className="text-3xl font-bold text-blue-600">{progress}%</div>
+            <div className="text-3xl font-bold text-brand-blue">{progress}%</div>
           </div>
 
           {/* 진행률 바 */}
           <div className="space-y-2">
             <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-blue-500 to-blue-600 h-full transition-all duration-300 ease-out"
+                className="bg-gradient-to-r from-brand-blue to-brand-blue h-full transition-all duration-300 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -295,7 +312,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
               </div>
               <button
                 onClick={handleGenerate}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="w-full px-4 py-2 bg-brand-blue text-white rounded hover:bg-brand-blue-dark"
               >
                 🔄 영상 다시 생성
               </button>
@@ -344,9 +361,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                     onClick={() => {
                       navigator.clipboard.writeText(videoUrl);
                       setSuccessMessage('URL이 복사되었습니다.');
-                      setTimeout(() => setSuccessMessage(null), 2000);
                     }}
-                    className="text-blue-600 hover:text-blue-800 text-sm"
+                    className="text-brand-blue hover:text-brand-ocean text-sm"
                   >
                     📋 복사
                   </button>
@@ -363,7 +379,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                   setProgress(0);
                   setCurrentStep(null);
                 }}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="w-full px-4 py-2 bg-brand-blue text-white rounded hover:bg-brand-blue-dark"
               >
                 🔄 다시 생성
               </button>
@@ -371,7 +387,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
           ) : (
             <>
               {/* 생성 전: 정보 표시 */}
-              <div className="bg-blue-50 p-4 rounded mb-4 text-sm">
+              <div className="bg-brand-wave p-4 rounded mb-4 text-sm">
                 <div className="font-semibold mb-2">📌 이제 시작할 생성 과정</div>
                 <ul className="list-disc list-inside space-y-1 text-gray-700">
                   <li>Step 4: 캐릭터 추천</li>
@@ -388,7 +404,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
               <button
                 onClick={handleGenerate}
                 disabled={!resourceId}
-                className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="w-full px-6 py-3 bg-gradient-to-r from-brand-blue to-brand-blue-dark text-white font-bold rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                 🚀 AI 콘텐츠 생성 시작
               </button>

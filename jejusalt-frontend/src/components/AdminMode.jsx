@@ -23,8 +23,27 @@ export default function AdminMode() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  // 성공/실패 배너 자동 소멸 (전 화면 통일 규칙: 성공 2.5초, 에러 4초)
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 2500);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [error]);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [generationLogs, setGenerationLogs] = useState([]);
+
+  // 🆕 코멘트 스레드 State
+  const [comments, setComments] = useState([]);
+  const [newCommentAuthor, setNewCommentAuthor] = useState('담당자');
+  const [newCommentMessage, setNewCommentMessage] = useState('');
+  const [commentLoading, setCommentLoading] = useState(false);
 
   // 마운트 시 자료 목록 로드
   useEffect(() => {
@@ -82,6 +101,9 @@ export default function AdminMode() {
       } catch (logsErr) {
         setGenerationLogs([]);
       }
+
+      // 🆕 코멘트 스레드 조회
+      await loadComments(resource.id);
     } catch (err) {
       console.error('정보 로드 실패:', err);
       setError('정보를 불러올 수 없습니다.');
@@ -104,7 +126,6 @@ export default function AdminMode() {
         metadata: selectedResource.metadata,
       });
       setSuccessMessage('자료가 저장되었습니다.');
-      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       console.error('자료 저장 실패:', err);
       setError('저장에 실패했습니다.');
@@ -130,7 +151,6 @@ export default function AdminMode() {
         )
       );
       setSuccessMessage('캐릭터가 저장되었습니다.');
-      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       console.error('캐릭터 저장 실패:', err);
       setError('저장에 실패했습니다.');
@@ -149,7 +169,6 @@ export default function AdminMode() {
       setCharacters((prev) => prev.filter((c) => c.id !== characterId));
       setDeleteConfirm(null);
       setSuccessMessage('캐릭터가 삭제되었습니다.');
-      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       console.error('캐릭터 삭제 실패:', err);
       setError('삭제에 실패했습니다.');
@@ -175,12 +194,51 @@ export default function AdminMode() {
       });
 
       setSuccessMessage('네이밍이 저장되었습니다.');
-      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       console.error('네이밍 저장 실패:', err);
       setError('저장에 실패했습니다.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * 🆕 코멘트 스레드 조회
+   */
+  const loadComments = async (resourceId) => {
+    try {
+      const res = await axios.get(`/api/resources/${resourceId}/comments`);
+      setComments(res.data.comments || []);
+    } catch (err) {
+      // comments 테이블이 아직 마이그레이션되지 않았을 수 있으므로 조용히 빈 목록 처리
+      console.warn('코멘트 조회 실패 (마이그레이션 미적용일 수 있음):', err.message);
+      setComments([]);
+    }
+  };
+
+  /**
+   * 🆕 코멘트 작성
+   */
+  const handleAddComment = async () => {
+    if (!selectedResource || !newCommentMessage.trim()) return;
+
+    try {
+      setCommentLoading(true);
+      await axios.post(`/api/resources/${selectedResource.id}/comments`, {
+        author: newCommentAuthor.trim() || '담당자',
+        message: newCommentMessage.trim(),
+      });
+      setNewCommentMessage('');
+      await loadComments(selectedResource.id);
+      setSuccessMessage('코멘트가 등록되었습니다.');
+    } catch (err) {
+      console.error('코멘트 작성 실패:', err);
+      setError(
+        err.response?.data?.message ||
+          '코멘트 저장에 실패했습니다. comments 테이블 마이그레이션이 필요할 수 있습니다.'
+      );
+    } finally {
+      setCommentLoading(false);
     }
   };
 
@@ -205,13 +263,24 @@ export default function AdminMode() {
         </div>
       )}
 
-      {/* 2열 레이아웃: 자료 목록 + 상세 편집 */}
-      <div className="grid grid-cols-3 gap-6">
+      {/* 2열 레이아웃: 자료 목록 + 상세 편집 (모바일: 1열 스택) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 좌측: 자료 목록 */}
-        <div className="col-span-1 bg-white shadow rounded-lg p-4">
+        <div className="md:col-span-1 bg-white shadow rounded-lg p-4">
           <h2 className="text-xl font-bold mb-4">자료 목록</h2>
           {loading ? (
-            <div className="text-center py-8">로드 중...</div>
+            <div className="text-center py-8 flex items-center justify-center gap-2 text-gray-500">
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              로드 중...
+            </div>
+          ) : resources.length === 0 ? (
+            <div className="text-center py-8 text-sm text-gray-500">
+              아직 등록된 자료가 없습니다.<br />
+              "자료 입력" 화면에서 새 자료를 추가해보세요.
+            </div>
           ) : (
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {resources.map((resource) => (
@@ -220,7 +289,7 @@ export default function AdminMode() {
                   onClick={() => handleSelectResource(resource)}
                   className={`w-full text-left p-3 rounded transition ${
                     selectedResource?.id === resource.id
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-brand-blue text-white'
                       : 'bg-gray-100 hover:bg-gray-200'
                   }`}
                 >
@@ -234,8 +303,8 @@ export default function AdminMode() {
           )}
         </div>
 
-        {/* 우측: 상세 편집 (2열) */}
-        <div className="col-span-2 space-y-6">
+        {/* 우측: 상세 편집 (2열, 모바일에서는 전체 폭) */}
+        <div className="md:col-span-2 space-y-6">
           {selectedResource ? (
             <>
               {/* 섹션 1: 자료 정보 수정 */}
@@ -294,7 +363,7 @@ export default function AdminMode() {
                   <button
                     onClick={handleUpdateResource}
                     disabled={loading}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                    className="w-full px-4 py-2 bg-brand-blue text-white rounded hover:bg-brand-blue-dark disabled:opacity-50"
                   >
                     💾 자료 저장
                   </button>
@@ -314,7 +383,7 @@ export default function AdminMode() {
                     characters.map((char, idx) => (
                       <div
                         key={char.id}
-                        className="border-l-4 border-blue-600 pl-4 py-3 bg-gray-50 rounded"
+                        className="border-l-4 border-brand-blue pl-4 py-3 bg-gray-50 rounded"
                       >
                         {/* 캐릭터 이름 + 선택 상태 */}
                         <div className="flex justify-between items-start mb-3">
@@ -400,8 +469,8 @@ export default function AdminMode() {
                         </div>
 
                         {/* ⭐ 레퍼런스 이미지 & 생성 횟수 (재현성 추적) */}
-                        <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
-                          <div className="text-xs font-semibold text-blue-900 mb-2">
+                        <div className="mt-3 p-3 bg-brand-wave rounded border border-brand-blue/30">
+                          <div className="text-xs font-semibold text-brand-ocean mb-2">
                             🖼️ 레퍼런스 이미지 (재현성)
                           </div>
                           {char.reference_image_url && (
@@ -450,7 +519,7 @@ export default function AdminMode() {
                         {[0, 1, 2].map((i) => (
                           <label
                             key={`product_${i}`}
-                            className="flex items-start gap-3 p-3 border rounded hover:bg-blue-50 cursor-pointer"
+                            className="flex items-start gap-3 p-3 border rounded hover:bg-brand-wave cursor-pointer"
                           >
                             <input
                               type="radio"
@@ -480,7 +549,7 @@ export default function AdminMode() {
                         {[0, 1, 2].map((i) => (
                           <label
                             key={`content_${i}`}
-                            className="flex items-start gap-3 p-3 border rounded hover:bg-blue-50 cursor-pointer"
+                            className="flex items-start gap-3 p-3 border rounded hover:bg-brand-wave cursor-pointer"
                           >
                             <input
                               type="radio"
@@ -517,15 +586,67 @@ export default function AdminMode() {
 
               {/* 네이밍이 아직 없는 경우 */}
               {!naming && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                  <p className="text-blue-800">
+                <div className="bg-brand-wave border border-brand-blue/30 rounded-lg p-4 text-center">
+                  <p className="text-brand-ocean">
                     📝 아직 네이밍이 생성되지 않았습니다.
                   </p>
-                  <p className="text-sm text-blue-600 mt-1">
+                  <p className="text-sm text-brand-blue mt-1">
                     먼저 "AI 생성" 버튼을 클릭해서 Step 6(네이밍 생성)까지 완료하세요.
                   </p>
                 </div>
               )}
+
+              {/* 섹션 4: 코멘트 스레드 (팀 협업) */}
+              <div className="bg-white shadow rounded-lg p-6">
+                <h3 className="text-lg font-bold mb-4">💬 코멘트 스레드</h3>
+
+                {/* 코멘트 목록 */}
+                <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
+                  {comments.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-6">
+                      아직 코멘트가 없습니다. 첫 코멘트를 남겨보세요.
+                    </p>
+                  ) : (
+                    comments.map((c) => (
+                      <div key={c.id} className="border rounded-lg p-3 bg-gray-50">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-sm text-brand-ocean">
+                            {c.author}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(c.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{c.message}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* 코멘트 작성 폼 */}
+                <div className="space-y-2 border-t pt-4">
+                  <input
+                    type="text"
+                    value={newCommentAuthor}
+                    onChange={(e) => setNewCommentAuthor(e.target.value)}
+                    placeholder="작성자 이름"
+                    className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-brand-blue"
+                  />
+                  <textarea
+                    value={newCommentMessage}
+                    onChange={(e) => setNewCommentMessage(e.target.value)}
+                    placeholder="이 자료에 대한 검토 의견을 남겨주세요..."
+                    className="w-full px-3 py-2 border rounded text-sm h-20 focus:ring-2 focus:ring-brand-blue"
+                  />
+                  <button
+                    onClick={handleAddComment}
+                    disabled={commentLoading || !newCommentMessage.trim()}
+                    className="w-full px-4 py-2 bg-brand-blue text-white rounded hover:bg-brand-blue-dark disabled:opacity-50 text-sm font-semibold"
+                  >
+                    {commentLoading ? '등록 중...' : '💬 코멘트 등록'}
+                  </button>
+                </div>
+              </div>
             </>
           ) : (
             <div className="bg-white shadow rounded-lg p-12 text-center text-gray-500">

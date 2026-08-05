@@ -14,8 +14,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
+// 사업 우선순위 카테고리 (뷰티 > 헬스케어) — UI에서 ⭐ 우선순위 뱃지로 강조
+const PRIORITY_CATEGORIES = ['뷰티', '웰스케어'];
+
 const ALL_OPTIONS = {
-  categories: ['식품', '뷰티', '웰스케어', '의류', '가전', '디지털'],
+  categories: ['뷰티', '웰스케어', '식품', '의류', '가전', '디지털'],
   ageGroups: ['10대', '20대', '30대', '40대', '50대', '60대+'],
   targets: ['개인', '가족', '직장인', '학생', '관광객', '기업'],
   focus: ['신뢰', '기술', '건강', '감정', '자연', '감각', '연관', '가성비', '프리미엠'],
@@ -27,6 +30,13 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
   const [tempMetadata, setTempMetadata] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // 에러 배너 자동 소멸 (다른 화면들과 통일된 4초 규칙)
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   // initialMetadata가 이미 있으면(자료 생성 직후) 재조회하지 않고 바로 사용.
   // 없을 때만(예: 새로고침 등으로 이 화면에 직접 진입한 경우) API로 조회한다.
@@ -120,7 +130,7 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
       <div className="max-w-4xl mx-auto p-6 bg-white shadow rounded-lg">
         <div className="text-center py-12">
           <div className="inline-block">
-            <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-8 w-8 text-brand-blue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
@@ -157,17 +167,17 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
         <div className="space-y-6">
           {/* 신뢰도 표시 */}
           {metadata.confidence && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-brand-wave border border-brand-blue/30 rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-blue-900">AI 분석 신뢰도</span>
+                <span className="font-semibold text-brand-ocean">AI 분석 신뢰도</span>
                 <div className="flex items-center gap-2">
                   <div className="w-32 bg-gray-300 rounded-full h-2">
                     <div
-                      className="bg-blue-600 h-2 rounded-full"
+                      className="bg-brand-blue h-2 rounded-full"
                       style={{ width: `${metadata.confidence}%` }}
                     />
                   </div>
-                  <span className="font-bold text-blue-900">{metadata.confidence}%</span>
+                  <span className="font-bold text-brand-ocean">{metadata.confidence}%</span>
                 </div>
               </div>
             </div>
@@ -182,8 +192,9 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
                 {(metadata.categories || []).map((cat) => (
                   <span
                     key={cat}
-                    className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
+                    className="bg-brand-wave text-brand-ocean text-sm px-3 py-1 rounded-full"
                   >
+                    {PRIORITY_CATEGORIES.includes(cat) && '⭐ '}
                     {cat}
                   </span>
                 ))}
@@ -260,7 +271,7 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
             <button
               onClick={handleStartEditing}
               disabled={loading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-semibold"
+              className="px-6 py-3 bg-brand-blue text-white rounded-lg hover:bg-brand-blue-dark disabled:opacity-50 font-semibold"
             >
               ✏️ 수정하겠습니다
             </button>
@@ -288,6 +299,11 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
                     className="w-4 h-4"
                   />
                   <span>{cat}</span>
+                  {PRIORITY_CATEGORIES.includes(cat) && (
+                    <span className="text-xs bg-brand-wave text-brand-ocean px-1.5 py-0.5 rounded-full">
+                      ⭐ 우선순위
+                    </span>
+                  )}
                 </label>
               ))}
             </div>

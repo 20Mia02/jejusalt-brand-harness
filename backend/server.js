@@ -80,7 +80,7 @@ app.get("/health", (req, res) => {
     timestamp: new Date(),
     env: {
       supabase: !!process.env.SUPABASE_URL,
-      higgsfield: !!process.env.HIGGSFIELD_API_KEY_SECRET,
+      higgsfield: !!process.env.HIGGSFIELD_API_KEY,
       timelyai: !!process.env.TIMELY_AI_API_KEY,
     },
   });
