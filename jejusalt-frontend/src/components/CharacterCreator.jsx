@@ -60,28 +60,28 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
    * 캐릭터 선택 (selected = true)
    */
   const handleSelectCharacter = async (characterId) => {
+    // 로컬 상태는 먼저 낙관적으로 업데이트 (API 실패해도 화면 선택은 유지되도록)
+    const updated = localCharacters.map((c) => ({
+      ...c,
+      selected: c.id === characterId,
+    }));
+    setLocalCharacters(updated);
+    setSelectedId(characterId);
+
     try {
       setLoading(true);
-      
+
       // PUT /api/admin/characters/:id → selected: true
       await axios.put(`/api/admin/characters/${characterId}`, {
         selected: true,
       });
 
-      // 로컬 상태 업데이트
-      const updated = localCharacters.map((c) => ({
-        ...c,
-        selected: c.id === characterId,
-      }));
-      setLocalCharacters(updated);
-      setSelectedId(characterId);
-
       setSuccessMessage('캐릭터가 선택되었습니다.');
       setTimeout(() => setSuccessMessage(null), 2000);
       // 다음 단계로의 진행은 "다음 단계로" 버튼에서만 트리거 (카드 클릭만으로 자동 진행하지 않음)
     } catch (err) {
-      console.error('캐릭터 선택 실패:', err);
-      setError('선택에 실패했습니다.');
+      // mock 자료(id가 서버 DB에 없는 경우) 등 저장 실패해도 화면상 선택은 유지하고 진행 가능하게 둔다
+      console.warn('캐릭터 선택 서버 저장 실패 (로컬 선택은 유지됨):', err.message);
     } finally {
       setLoading(false);
     }
@@ -362,7 +362,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h4 className="font-semibold mb-3">🎬 영상유형 선택</h4>
           <div className="flex flex-wrap gap-3">
-            {VIDEO_TYPES.map((type) => (
+            {videoTypes.map((type) => (
               <label
                 key={type}
                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition ${

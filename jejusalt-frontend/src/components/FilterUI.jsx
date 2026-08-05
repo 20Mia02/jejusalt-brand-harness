@@ -90,12 +90,17 @@ export default function FilterUI({ onResourceCreated }) {
 
       if (response.data.success) {
         setSuccessMessage("자료가 입력되었습니다. 메타데이터를 검토해주세요.");
-        // 1.5초 후 메타데이터 검토 단계로 이동
+        // 메타데이터 검토 단계로 즉시 이동 (POST 응답의 metadata/characters를 그대로 전달 →
+        // 재조회 없이 바로 사용, mock 모드에서도 안전하게 동작)
         setTimeout(() => {
           if (onResourceCreated) {
-            onResourceCreated(response.data.resourceId);
+            onResourceCreated(
+              response.data.resourceId,
+              response.data.metadata,
+              response.data.characters
+            );
           }
-        }, 1500);
+        }, 500);
       }
     } catch (err) {
       console.error("자료 입력 실패:", err);

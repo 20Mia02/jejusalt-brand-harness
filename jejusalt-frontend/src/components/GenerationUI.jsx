@@ -31,10 +31,12 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(null);
   const [error, setError] = useState(null);
+  const [errorDetails, setErrorDetails] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoErrorDetail, setVideoErrorDetail] = useState(null);
+  const [failedStep, setFailedStep] = useState(null);
   const pollingInterval = useRef(null);
 
   /**
@@ -111,12 +113,48 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     pollingInterval.current = setInterval(async () => {
       try {
         const res = await axios.get(`/api/generate/${resourceId}/status`);
-        const { progress: progressPercent, completedSteps, totalSteps } = res.data;
+        const {
+          progress: progressPercent,
+          completedSteps,
+          totalSteps,
+          currentStep: stepName,
+          failureDetails,
+          failureMessage,
+          retiringDetails
+        } = res.data;
 
         setProgress((prev) => Math.max(prev, progressPercent || 0, 5));
-        setCurrentStep(`AI 생성 중... (${completedSteps || 0}/${totalSteps || 10} 단계)`);
-      } catch {
-        // 아직 generation_logs가 없거나(404) 일시적인 네트워크 오류 → 조용히 무시하고 계속 시도
+
+        // 상세한 단계 정보 표시
+        if (stepName) {
+          setCurrentStep(`${stepName} 진행 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`);
+        } else {
+          setCurrentStep(`AI 생성 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`);
+        }
+
+        // 실패 정보 수집
+        if (failureDetails && failureDetails.length > 0) {
+          const failStep = failureDetails[0];
+          setFailedStep(failStep.step);
+          setErrorDetails({
+            step: failStep.step,
+            error_message: failStep.error_message,
+            error_code: failStep.error_code,
+            attempt: failStep.attempt,
+          });
+          // 실패 시 에러 메시지도 업데이트
+          setError(`⚠️ ${failStep.step}에서 실패: ${failureMessage || failStep.error_message}`);
+        }
+
+        // 재시도 중인 단계 정보
+        if (retiringDetails && retiringDetails.length > 0) {
+          console.log('재시도 중:', retiringDetails);
+        }
+      } catch (err) {
+        // 404 또는 네트워크 오류: 아직 생성이 시작 안 된 상태 → 무시
+        if (err.response?.status !== 404) {
+          console.warn('상태 폴링 오류:', err.message);
+        }
       }
     }, 3000);
   };
@@ -145,7 +183,20 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       {/* 에러/성공 메시지 */}
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+          <div className="font-semibold">{error}</div>
+          {errorDetails && (
+            <div className="text-sm mt-2 space-y-1">
+              <div className="text-red-600">
+                <strong>Step:</strong> {errorDetails.step}
+              </div>
+              <div className="text-red-600">
+                <strong>에러 코드:</strong> {errorDetails.error_code || 'UNKNOWN'}
+              </div>
+              <div className="text-red-600">
+                <strong>재시도 횟수:</strong> {errorDetails.attempt || 0}회
+              </div>
+            </div>
+          )}
         </div>
       )}
       {successMessage && (
@@ -180,15 +231,30 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
 
           {/* 단계별 체크리스트 */}
           <div className="bg-gray-50 p-4 rounded space-y-2 text-sm">
-            <StepItem label="Step 3: 메타데이터 검토" done={true} />
-            <StepItem label="Step 4: 캐릭터 추천" done={progress > 10} />
-            <StepItem label="Step 5: 캐릭터 상세 설계" done={progress > 20} />
-            <StepItem label="Step 6: 120초 시나리오 작성" done={progress > 30} />
-            <StepItem label="Step 7: 제품명/콘텐츠명 생성" done={progress > 40} />
-            <StepItem label="Step 8: 마케팅 카피 작성" done={progress > 50} />
-            <StepItem label="Step 9: 컴플라이언스 검증" done={progress > 60} />
-            <StepItem label="Step 10: Higgsfield 영상 생성" done={progress > 70} />
+            <StepItem label="Step 1-3: 자료 분석 & 메타데이터" done={true} />
+            <StepItem label="Step 4: 캐릭터 설계" done={progress > 15} />
+            <StepItem label="Step 5: 시나리오 작성" done={progress > 25} />
+            <StepItem label="Step 6: 제품명 생성" done={progress > 35} />
+            <StepItem label="Step 7: 카피 작성" done={progress > 45} />
+            <StepItem label="Step 8: 컴플라이언스" done={progress > 55} />
+            <StepItem label="Step 9: 영상 생성" done={progress > 70} />
           </div>
+
+          {/* 실패 정보 표시 */}
+          {failedStep && errorDetails && (
+            <div className="bg-orange-50 border border-orange-300 p-4 rounded">
+              <div className="font-semibold text-orange-700 mb-2">⚠️ 현재 단계 재시도 중</div>
+              <div className="text-sm text-orange-800 space-y-1">
+                <div><strong>단계:</strong> {errorDetails.step}</div>
+                <div><strong>에러:</strong> {errorDetails.error_message}</div>
+                <div><strong>코드:</strong> {errorDetails.error_code}</div>
+                <div><strong>시도:</strong> {errorDetails.attempt}회 / 3회</div>
+                <div className="text-xs text-orange-600 mt-2">
+                  자동으로 재시도 중입니다. 잠시만 기다려주세요...
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 취소 버튼 (진행률 폴링만 중단 — 백엔드 생성 자체는 계속 진행됨) */}
           <button

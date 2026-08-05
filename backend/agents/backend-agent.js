@@ -77,16 +77,19 @@ async function callAgent(agentName, payload, context = {}) {
         `[✗] ${agentName} 실패 (시도 ${attempt}): ${error.message}`
       );
 
-      // 마지막 시도면 기록
-      if (attempt >= maxAttempts && resourceId) {
-        await callDatabase("generation_logs", "create", {
-          resource_id: resourceId,
-          step: step || agentName,
-          status: "fail",
-          error_message: error.message,
-          attempt,
-        });
-      }
+      // 매 시도마다 실패 기록 (재시도 이력 추적)
+      await callDatabase("generation_logs", "create", {
+        resource_id: resourceId,
+        step: step || agentName,
+        status: attempt >= maxAttempts ? "fail" : "retrying",
+        error_message: error.message,
+        error_code: error.code || "UNKNOWN",
+        error_stack: error.stack || "",
+        attempt,
+        total_attempts: maxAttempts,
+        retry_delay_ms: attempt < maxAttempts ? Math.pow(2, attempt) * 1000 : 0,
+        timestamp: new Date(),
+      }).catch(e => console.error("[로그 저장 실패]", e));
 
       // 지수백오프: 1초, 2초, 4초 대기
       if (attempt < maxAttempts) {
@@ -120,6 +123,12 @@ async function callTimelyAIAgent(agentName, payload) {
   // ========== OpenAI SDK (TimelyAI OpenAI 호환 모드) ✅ ==========
   const apiKey = process.env.TIMELY_AI_API_KEY;
   const baseURL = "https://hello.timelygpt.co.kr/api/v2/chat/bridge/openai";
+
+  // Mock 모드: 테스트용 더미 응답 반환
+  if (apiKey && (apiKey.includes("your_") || apiKey === "dummy" || apiKey === "tgpt_sk_your_api_key_here")) {
+    console.warn(`[Mock Mode] ${agentName} - 테스트 더미 응답 반환`);
+    return getMockResponseForAgent(agentName, payload);
+  }
 
   if (!apiKey) {
     throw new Error("TIMELY_AI_API_KEY 환경변수가 설정되지 않았습니다. .env 파일을 확인하세요.");
@@ -190,36 +199,141 @@ async function callTimelyAIAgent(agentName, payload) {
 }
 
 // ============================================================================
+// [Mock 응답 제공자]
+// ============================================================================
+
+function getMockResponseForAgent(agentName, payload) {
+  const mockData = {
+    "resource-analyzer-agent": {
+      metadata: {
+        categories: ["식품", "뷰티"],
+        ageGroups: ["20~30대", "40~60대"],
+        targets: ["개인", "가족"],
+        focus: ["신뢰", "건강"],
+        confidence: 85
+      }
+    },
+    "character-generator-agent": {
+      characters: [
+        {
+          name: "결이",
+          description: "당찬 소년, 도전적이고 에너지 넘침",
+          reason: "타겟층의 긍정적 이미지 대표",
+          score: 90
+        },
+        {
+          name: "용암이",
+          description: "따뜻한 아버지, 신뢰감과 보호본능",
+          reason: "제품의 신뢰성 강조",
+          score: 85
+        },
+        {
+          name: "해수",
+          description: "자유로운 영혼, 경쾌함과 순수함",
+          reason: "자연스러운 제품 특성",
+          score: 80
+        }
+      ]
+    },
+    "character-designer-agent": {
+      brief: {
+        character: "결이",
+        voice_tone: "밝고 도전적인 톤, 에너지 있는 어린이 목소리",
+        personality_traits: ["도전적", "긍정적", "친근한"],
+        visual_description: "파란색 옷, 밝은 눈빛, 활발한 표정"
+      }
+    },
+    "shortform-scenario-writer-agent": {
+      scenario: {
+        title: "제주소금으로 시작하는 건강한 하루",
+        story_content: "아침 밥상에 제주소금을...",
+        acts: [
+          { act: 1, duration_seconds: 40, content: "아침 오프닝" },
+          { act: 2, duration_seconds: 50, content: "제품 소개" },
+          { act: 3, duration_seconds: 30, content: "클로징" }
+        ],
+        timing_verification: { total_duration: 120 }
+      }
+    },
+    "naming-generator-agent": {
+      product_name_options: [
+        { name: "제주 청염", score: 90, meaning: "청정한 제주의 소금" },
+        { name: "해바람 소금", score: 85, meaning: "바다바람을 담은" },
+        { name: "제주 자연", score: 80, meaning: "자연 그대로" }
+      ],
+      content_name_options: [
+        { name: "제주의 선물", score: 90, meaning: "자연의 축복" },
+        { name: "바다의 정성", score: 85, meaning: "정성 어린" },
+        { name: "소금 이야기", score: 80, meaning: "스토리텔링" }
+      ]
+    },
+    "product-intro-writer-agent": {
+      content: "제주의 청정 해역에서 자연 그대로 채취한 제주소금입니다. 70년의 전통과 기술이 담겨있습니다."
+    },
+    "product-detail-page-writer-agent": {
+      content: "제주소금은 세 가지 특징을 가지고 있습니다: 1. 순수함 2. 건강함 3. 신뢰성"
+    },
+    "compliance-reviewer-agent": {
+      validation: {
+        status: "APPROVED",
+        score: 90,
+        issues: []
+      }
+    }
+  };
+
+  const data = mockData[agentName] || { message: "Mock response" };
+  return {
+    success: true,
+    data: data,
+    attempt: 1
+  };
+}
+
+// ============================================================================
 // [시스템 프롬프트 & 출력 사양]
 // ============================================================================
 
 function getSystemPromptForAgent(agentName) {
+  // config.json에서 브랜드 정보 로드
+  const { getConfig } = require("../utils/config-loader");
+  const config = getConfig();
+  const brand = config.brand || {};
+
   const prompts = {
     "resource-analyzer-agent": `당신은 제품 정보를 분석하는 AI 에이전트입니다.
+제품: ${brand.nameKorean || "제주소금"}
+브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
+
 제공된 제품명, 설명, 키워드를 기반으로:
-- 상품 카테고리 (식품, 뷰티, 패션 등)
-- 타겟 연령대 (10대, 20대, 30대, 40대, 50대+)
-- 타겟 고객층 (가족, 직장인, 학생 등)
-- 마케팅 포커스 (건강, 친환경, 프리미엄 등)
+- 상품 카테고리 (${(brand.categories || []).join(", ") || "식품, 뷰티, 웰스케어"})
+- 타겟 연령대 (${(brand.targetAges || []).join(", ") || "20~30대, 40~60대, 60대+"})
+- 타겟 고객층 (${(brand.targetAudience || []).join(", ") || "개인, 가족, 단체"})
+- 마케팅 포커스 (${(brand.focus || []).join(", ") || "신뢰, 기술, 건강"})
 - 신뢰도 점수 (0~100)
 
 를 분석하여 반환하세요.`,
 
-    "character-generator-agent": `당신은 제품 마케팅을 위한 캐릭터 3개를 추천하는 AI 에이전트입니다.
-각 캐릭터마다:
+    "character-generator-agent": `당신은 ${brand.nameKorean || "제주소금"} 제품 마케팅을 위한 캐릭터 3개를 추천하는 AI 에이전트입니다.
+브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
+각 캐릭터는 다음을 포함해야 합니다:
 - 이름
 - 설명 (외형, 성격, 역할)
 - 추천 이유
 - 점수 (90~80)
 
-를 포함하여 정확히 3개를 생성하세요.`,
+정확히 3개를 생성하세요.`,
 
     "character-designer-agent": `당신은 선택된 캐릭터를 상세 설계하는 AI 에이전트입니다.
+브랜드: ${brand.nameKorean || "제주소금"}
+브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
+
 다음을 포함한 완전한 캐릭터 브리프를 작성하세요:
 - 캐릭터명
-- 음성 톤 설명 (따뜻함, 신뢰감, 에너지 등)
+- 음성 톤 설명 (예: ${brand.voiceTone || "정직함, 신뢰감, 친근함"})
 - 성격 특성 (배열)
-- 시각적 묘사 (의상, 표정, 외형)`,
+- 시각적 묘사 (의상, 표정, 외형)
+- 피해야 할 표현: ${(brand.absoluteNos || []).join(", ") || "의료표현, 과장"}`,
 
     "shortform-scenario-writer-agent": `당신은 120초 영상 시나리오를 작성하는 AI 에이전트입니다.
 다음을 포함하세요:
@@ -243,7 +357,12 @@ function getSystemPromptForAgent(agentName) {
     "product-detail-page-writer-agent": `당신은 상세페이지 카피를 작성하는 AI 에이전트입니다.
 제품의 상세한 혜택, 사용법, 특징을 강조하는 긴 형식의 카피를 작성하세요.`,
 
-    "compliance-reviewer-agent": `당신은 제품 마케팅 콘텐츠를 검증하는 AI 에이전트입니다.
+    "compliance-reviewer-agent": `당신은 ${brand.nameKorean || "제주소금"} 제품의 마케팅 콘텐츠를 검증하는 AI 에이전트입니다.
+
+검증 기준:
+- 피해야 할 표현: ${(brand.absoluteNos || []).join(", ") || "의료표현, 과도한 유행어"}
+- 필수 포함 가치: ${(brand.toneValues || []).join(", ") || "정직함, 신뢰성"}
+
 제공된 카피를 검토하고:
 - 승인 여부 (APPROVED / REJECTED)
 - 신뢰도 점수 (0~100)

@@ -24,6 +24,7 @@ export default function AdminMode() {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [generationLogs, setGenerationLogs] = useState([]);
 
   // 마운트 시 자료 목록 로드
   useEffect(() => {
@@ -58,19 +59,28 @@ export default function AdminMode() {
       const charRes = await axios.get(`/api/resources/${resource.id}`);
       setCharacters(charRes.data.characters || []);
 
-      // 🆕 네이밍 조회 (GET /api/admin/naming/:resourceId)
+      // 🆕 네이밍 조회
       try {
         const namingRes = await axios.get(`/api/admin/naming/${resource.id}`);
         if (namingRes.data.naming) {
           setNaming(namingRes.data.naming);
-          setSelectedProductIdx(0);   // 기본값: 1순위
-          setSelectedContentIdx(0);   // 기본값: 1순위
+          setSelectedProductIdx(0);
+          setSelectedContentIdx(0);
         } else {
           setNaming(null);
         }
       } catch (namingErr) {
-        // 네이밍이 아직 없으면 null
         setNaming(null);
+      }
+
+      // 🆕 생성 이력 조회
+      try {
+        const logsRes = await axios.get(`/api/generate/${resource.id}/logs`);
+        if (logsRes.data.logs) {
+          setGenerationLogs(logsRes.data.logs);
+        }
+      } catch (logsErr) {
+        setGenerationLogs([]);
       }
     } catch (err) {
       console.error('정보 로드 실패:', err);

@@ -20,10 +20,14 @@ const STEP_LABELS = {
 function MainFlow({ currentStep, setCurrentStep }) {
   const [resourceId, setResourceId] = useState(null);
   const [metadata, setMetadata] = useState(null);
+  const [initialMetadata, setInitialMetadata] = useState(null);
+  const [characters, setCharacters] = useState(null);
   const [videoType, setVideoType] = useState('제품스토리');
 
-  const handleResourceCreated = (newResourceId) => {
+  const handleResourceCreated = (newResourceId, createdMetadata, createdCharacters) => {
     setResourceId(newResourceId);
+    setInitialMetadata(createdMetadata || null);
+    setCharacters(createdCharacters || null);
     setCurrentStep('metadata');
   };
 
@@ -53,6 +57,7 @@ function MainFlow({ currentStep, setCurrentStep }) {
       {currentStep === 'metadata' && resourceId && (
         <MetadataReviewUI
           resourceId={resourceId}
+          initialMetadata={initialMetadata}
           onComplete={handleMetadataReviewed}
           onError={() => setCurrentStep('filter')}
         />
@@ -60,6 +65,7 @@ function MainFlow({ currentStep, setCurrentStep }) {
       {currentStep === 'character' && resourceId && (
         <CharacterCreator
           resourceId={resourceId}
+          characters={characters || []}
           onSelect={handleCharacterSelected}
         />
       )}
