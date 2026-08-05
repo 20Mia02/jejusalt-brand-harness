@@ -17,78 +17,19 @@ const STEP_LABELS = {
   generation: 'AI 콘텐츠 생성',
 };
 
-const STEP_ORDER = ['filter', 'metadata', 'character', 'generation'];
-
-// 라이트/다크 테마 토글: localStorage에 'theme'로 저장, 기본값 'dark'
-function ThemeToggle({ theme, setTheme }) {
-  const options = [
-    { value: 'light', icon: '☀️', label: '라이트 모드로 전환' },
-    { value: 'dark', icon: '🌙', label: '다크 모드로 전환' },
-  ];
-
-  return (
-    <div className="theme-toggle" role="group" aria-label="테마 선택">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => setTheme(opt.value)}
-          aria-pressed={theme === opt.value}
-          aria-label={opt.label}
-          title={opt.label}
-          className={`theme-toggle-btn ${theme === opt.value ? 'is-active' : ''}`}
-        >
-          {opt.icon}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// 글로벌 스텝 인디케이터: 현재 진행 단계를 1-2-3-4로 시각화 (관리자 모드에서는 숨김)
-function StepIndicator({ currentStep }) {
-  const currentIdx = STEP_ORDER.indexOf(currentStep);
-
-  return (
-    <div className="step-indicator" role="navigation" aria-label="진행 단계">
-      {STEP_ORDER.map((step, idx) => {
-        const isDone = idx < currentIdx;
-        const isActive = idx === currentIdx;
-        return (
-          <div key={step} className="step-indicator-item">
-            <div
-              className={`step-indicator-circle ${
-                isDone ? 'step-done' : isActive ? 'step-active' : 'step-pending'
-              }`}
-              aria-current={isActive ? 'step' : undefined}
-            >
-              {isDone ? '✓' : idx + 1}
-            </div>
-            <span className={`step-indicator-label ${isActive ? 'step-active' : ''}`}>
-              {STEP_LABELS[step]}
-            </span>
-            {idx < STEP_ORDER.length - 1 && (
-              <div className={`step-indicator-line ${isDone ? 'step-done' : ''}`} />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function MainFlow({ currentStep, setCurrentStep }) {
   const [resourceId, setResourceId] = useState(null);
   const [metadata, setMetadata] = useState(null);
   const [initialMetadata, setInitialMetadata] = useState(null);
   const [characters, setCharacters] = useState(null);
+  const [referenceMaterials, setReferenceMaterials] = useState([]);
   const [videoType, setVideoType] = useState('제품스토리');
-  const [duration, setDuration] = useState(30);
 
-  const handleResourceCreated = (newResourceId, createdMetadata, createdCharacters) => {
+  const handleResourceCreated = (newResourceId, createdMetadata, createdCharacters, createdReferenceMaterials) => {
     setResourceId(newResourceId);
     setInitialMetadata(createdMetadata || null);
     setCharacters(createdCharacters || null);
+    setReferenceMaterials(createdReferenceMaterials || []);
     setCurrentStep('metadata');
   };
 
@@ -97,9 +38,8 @@ function MainFlow({ currentStep, setCurrentStep }) {
     setCurrentStep('character');
   };
 
-  const handleCharacterSelected = (character, selectedVideoType, selectedDuration) => {
+  const handleCharacterSelected = (character, selectedVideoType) => {
     setVideoType(selectedVideoType);
-    setDuration(selectedDuration || 30);
     setCurrentStep('generation');
   };
 
@@ -109,7 +49,6 @@ function MainFlow({ currentStep, setCurrentStep }) {
     setResourceId(null);
     setMetadata(null);
     setVideoType('제품스토리');
-    setDuration(30);
   };
 
   return (
@@ -138,7 +77,7 @@ function MainFlow({ currentStep, setCurrentStep }) {
           onSuccess={handleGenerationComplete}
           requestType="intro"
           videoType={videoType}
-          duration={duration}
+          referenceMaterials={referenceMaterials}
         />
       )}
     </main>
@@ -151,14 +90,6 @@ function App() {
   const [currentStep, setCurrentStep] = useState('filter');
   const [brandName, setBrandName] = useState('제주도 라바 씨솔트');
   const [brandNameEn, setBrandNameEn] = useState('JEJU LAVA SEA SALT');
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
-
-  // 테마 변경 시 <html>에 클래스 반영 + localStorage 저장 (새로고침/다른 페이지 이동에도 유지)
-  useEffect(() => {
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
 
   useEffect(() => {
     // 서버에서 config 로드
@@ -181,16 +112,23 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <ThemeToggle theme={theme} setTheme={setTheme} />
         <div className="app-header-content">
           <div className="logo-section">
-            <div className="logo-badge">
-              <img
-                src="/assets/logo/jeju-salt-logo.png"
-                alt="제주소금 JEJU LAVA SEA SALT 로고"
-                className="logo-image"
-              />
-            </div>
+            <svg
+              className="logo-icon"
+              viewBox="0 0 100 100"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style={{stopColor: "#ffffff", stopOpacity: 1}} />
+                  <stop offset="100%" style={{stopColor: "#00AEEF", stopOpacity: 1}} />
+                </linearGradient>
+              </defs>
+              <circle cx="50" cy="50" r="42" fill="none" stroke="url(#logoGradient)" strokeWidth="3"/>
+              <path d="M 35 60 Q 40 35 45 60" fill="none" stroke="#00AEEF" strokeWidth="3.5" strokeLinecap="round"/>
+              <path d="M 55 60 Q 60 35 65 60" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round"/>
+            </svg>
           </div>
 
           <div className="header-text">
@@ -206,7 +144,6 @@ function App() {
             </p>
           </div>
         </div>
-        {!isAdmin && <StepIndicator currentStep={currentStep} />}
       </header>
 
       <Routes>

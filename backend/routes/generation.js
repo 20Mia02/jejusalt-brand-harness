@@ -19,6 +19,57 @@ const router = express.Router();
 
 const { callAgent, callHiggsfield } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
+const { getGenerationConfig } = require("../utils/config-loader");
+
+// ─────────────────────────────────────────────────────
+// GET /api/generate/:resourceId/recommend-video-type
+//
+// ⭐ 재현성: AI를 다시 호출하지 않고, metadata(focus/categories) 기반의
+// 고정 규칙(rule)으로 영상유형을 추천한다. 같은 metadata → 항상 같은 추천 결과
+// (규칙 기반이므로 100% 재현 가능 — AI 호출 대비 훨씬 안정적인 방식).
+// ─────────────────────────────────────────────────────
+router.get("/:resourceId/recommend-video-type", async (req, res) => {
+  const { resourceId } = req.params;
+
+  const resourceResult = await callDatabase("resources", "read", null, { id: resourceId });
+  if (!resourceResult.success || resourceResult.rows.length === 0) {
+    return res.status(404).json({ success: false, message: "해당 자료를 찾을 수 없습니다" });
+  }
+
+  const metadata = resourceResult.rows[0].metadata || {};
+  const videoTypes = getGenerationConfig().videoTypes || ["캐릭터소개", "제품스토리", "일상밥상"];
+  const focus = (metadata.focus || []).join(" ");
+
+  // 규칙(우선순위 순): focus 키워드 → 영상유형 매핑. 항상 같은 입력엔 같은 결과.
+  const rules = [
+    { keywords: ["신뢰", "기술", "전통"], type: "브랜드스토리" },
+    { keywords: ["건강", "웰스케어"], type: "제품스토리" },
+    { keywords: ["감정", "가족", "일상"], type: "일상밥상" },
+    { keywords: ["감각", "자연"], type: "캐릭터소개" },
+  ];
+
+  let recommended = null;
+  let reason = "";
+  for (const rule of rules) {
+    if (rule.keywords.some((k) => focus.includes(k)) && videoTypes.includes(rule.type)) {
+      recommended = rule.type;
+      reason = `강조점(${rule.keywords.filter((k) => focus.includes(k)).join(", ")})에 기반한 추천`;
+      break;
+    }
+  }
+  if (!recommended) {
+    recommended = videoTypes[0];
+    reason = "기본 추천 (강조점 매칭 규칙 없음)";
+  }
+
+  return res.json({
+    success: true,
+    resourceId,
+    recommended,
+    reason,
+    availableTypes: videoTypes,
+  });
+});
 
 // ─────────────────────────────────────────────────────
 // 호환성: POST /api/generate (resourceId in body)
@@ -58,7 +109,7 @@ router.post("/", async (req, res) => {
  */
 router.post("/:resourceId/start", async (req, res) => {
   const { resourceId } = req.params;
-  const { requestType, videoType, duration } = req.body;
+  const { requestType, videoType, useReferenceMaterials } = req.body;
 
   // ── 0. 입력 검증 ────────────────────────────────
   if (!resourceId || !requestType) {
@@ -74,12 +125,6 @@ router.post("/:resourceId/start", async (req, res) => {
       message: 'requestType은 "intro", "detail", 또는 "both"이어야 합니다',
     });
   }
-
-  // 숏폼 길이 옵션 (기본 120초) — 15/30/60/120초만 허용
-  const ALLOWED_DURATIONS = [15, 30, 60, 120];
-  const targetDuration = ALLOWED_DURATIONS.includes(Number(duration))
-    ? Number(duration)
-    : 120;
 
   try {
     // ── 1. 필요한 정보 조회 ──────────────────────────
@@ -113,39 +158,84 @@ router.post("/:resourceId/start", async (req, res) => {
     const selectedCharacter = charactersResult.rows[0];
 
     // ── 2. Step 4: character-designer-agent 호출 (고수아) ──
-    console.log("[Step 4] character-designer-agent 호출...");
-    const designerResult = await callAgent(
-      "character-designer-agent",
-      {
+    //
+    // ⭐ 재현성 핵심: 이 캐릭터가 이미 상세 프로필(voice_tone + visual_description)을
+    // 가지고 있으면(라이브러리에서 가져왔거나 이전에 이미 설계된 경우) AI를 다시 호출하지 않고
+    // 저장된 프로필을 그대로 재사용한다. 매번 AI를 새로 호출하면 같은 캐릭터라도 응답이
+    // 조금씩 달라질 수 있어(temperature 0.7) "동일 캐릭터 → 동일 결과" 원칙이 깨지기 때문이다.
+    const hasStoredProfile = !!(selectedCharacter.voice_tone && selectedCharacter.visual_description);
+
+    let completeBrief;
+    if (hasStoredProfile) {
+      console.log("[Step 4] 기존 캐릭터 프로필 재사용 (AI 재호출 생략 → 재현성 보장)");
+      completeBrief = {
         character: selectedCharacter.character_name,
-        productName: resource.product_name,
-        productInfo: resource.product_info,
-        metadata,
-      },
-      { resourceId, step: "character-designer" }
-    );
+        voice_tone: selectedCharacter.voice_tone,
+        personality_traits: selectedCharacter.personality_traits,
+        visual_description: selectedCharacter.visual_description,
+      };
+      await callDatabase("generation_logs", "create", {
+        resource_id: resourceId,
+        step: "character-designer",
+        status: "success",
+        error_message: null,
+        attempt: 0, // 0 = AI 미호출, 캐시된 프로필 재사용
+      }).catch(() => {});
+    } else {
+      console.log("[Step 4] character-designer-agent 호출... (신규 프로필 생성)");
+      const designerResult = await callAgent(
+        "character-designer-agent",
+        {
+          character: selectedCharacter.character_name,
+          productName: resource.product_name,
+          productInfo: resource.product_info,
+          metadata,
+        },
+        { resourceId, step: "character-designer" }
+      );
 
-    if (!designerResult.success) {
-      console.warn("[Step 4] character-designer 실패, 기본 정보로 계속");
-    }
+      if (!designerResult.success) {
+        console.warn("[Step 4] character-designer 실패, 기본 정보로 계속");
+      }
 
-    const completeBrief = designerResult.data?.brief || {
-      character: selectedCharacter.character_name,
-      voice_tone: selectedCharacter.voice_tone || "기본",
-    };
+      completeBrief = designerResult.data?.brief || {
+        character: selectedCharacter.character_name,
+        voice_tone: selectedCharacter.voice_tone || "기본",
+      };
 
-    // ⭐ character-designer 결과가 있으면 characters 테이블에 상세 정보 저장 (재현성 정보 포함)
-    if (designerResult.success && designerResult.data?.brief) {
-      await callDatabase("characters", "update", {
-        voice_tone: completeBrief.voice_tone,
-        personality_traits: completeBrief.personality_traits,
-        visual_description: completeBrief.visual_description,
-        preferred_expressions: completeBrief.preferred_expressions,
-        avoid_expressions: completeBrief.avoid_expressions,
-      }, { id: selectedCharacter.id }).catch((e) => console.error("[Step 4] 캐릭터 상세 저장 실패:", e));
+      // ⭐ 새로 생성된 프로필은 characters 테이블에 저장 → 다음 요청부터는 재사용됨
+      if (designerResult.success && designerResult.data?.brief) {
+        await callDatabase("characters", "update", {
+          voice_tone: completeBrief.voice_tone,
+          personality_traits: completeBrief.personality_traits,
+          visual_description: completeBrief.visual_description,
+          preferred_expressions: completeBrief.preferred_expressions,
+          avoid_expressions: completeBrief.avoid_expressions,
+        }, { id: selectedCharacter.id }).catch((e) => console.error("[Step 4] 캐릭터 상세 저장 실패:", e));
+
+        // 라이브러리에서 온 캐릭터라면 라이브러리 원본에도 반영 (다른 자료에서도 동일 프로필 재사용)
+        if (selectedCharacter.library_character_id) {
+          await callDatabase("character_library", "update", {
+            voice_tone: completeBrief.voice_tone,
+            personality_traits: completeBrief.personality_traits,
+            visual_description: completeBrief.visual_description,
+          }, { id: selectedCharacter.library_character_id }).catch(() => {});
+        }
+      }
     }
 
     // ── 3. Step 5: shortform-scenario-writer-agent 호출 (고수아) ──
+    // 참고자료(기업자료_요약.md 등)가 업로드되어 있고, 사용자가 반영을 원하면 함께 전달한다.
+    // useReferenceMaterials가 명시적으로 false가 아닌 한 기본적으로 반영한다.
+    const referenceMaterials =
+      useReferenceMaterials === false ? [] : resource.reference_materials || [];
+
+    if (referenceMaterials.length > 0) {
+      console.log(
+        `[Step 5] 참고자료 ${referenceMaterials.length}건 반영: ${referenceMaterials.map((f) => f.filename).join(", ")}`
+      );
+    }
+
     console.log("[Step 5] shortform-scenario-writer-agent 호출...");
     const scenarioResult = await callAgent(
       "shortform-scenario-writer-agent",
@@ -153,7 +243,7 @@ router.post("/:resourceId/start", async (req, res) => {
         brief: completeBrief,
         final_characters: [selectedCharacter],
         scenario_context: requestType,
-        target_duration_seconds: targetDuration,
+        referenceMaterials,
       },
       { resourceId, step: "shortform-scenario-writer" }
     );
@@ -169,10 +259,10 @@ router.post("/:resourceId/start", async (req, res) => {
     const scenario = scenarioResult.data.scenario;
     const higgsfieldSpecs = scenarioResult.data.higgsfield_specifications;
 
-    // 시나리오가 요청한 길이(targetDuration)와 일치하는지 확인
-    if (scenarioResult.data.timing_verification?.total_duration !== targetDuration) {
+    // 시나리오가 정확히 120초인지 확인
+    if (scenarioResult.data.timing_verification?.total_duration !== 120) {
       console.warn(
-        `⚠️ 시나리오가 ${targetDuration}초 요청에 ${scenarioResult.data.timing_verification?.total_duration}초로 응답했습니다`
+        `⚠️ 시나리오가 ${scenarioResult.data.timing_verification?.total_duration}초입니다`
       );
     }
 
@@ -186,10 +276,10 @@ router.post("/:resourceId/start", async (req, res) => {
       scenario_title: scenario.title,
       story_content: scenario.story_content || scenario.content || "",
       scenario_json: scenario.acts || scenario,
-      total_duration_seconds: scenarioResult.data.timing_verification?.total_duration || targetDuration,
+      total_duration_seconds: scenarioResult.data.timing_verification?.total_duration || 120,
       dialogue_seconds: scenarioResult.data.timing_verification?.dialogue_seconds || null,
       narration_seconds: scenarioResult.data.timing_verification?.narration_seconds || null,
-      timing_valid: scenarioResult.data.timing_verification?.total_duration === targetDuration,
+      timing_valid: scenarioResult.data.timing_verification?.total_duration === 120,
     });
 
     if (!scenarioDBResult.success) {
@@ -265,25 +355,7 @@ router.post("/:resourceId/start", async (req, res) => {
       agentName = "product-intro-writer-agent";
     }
 
-    // ⭐ 브랜드 보이스 학습 캐시: 과거에 승인(APPROVED)된 콘텐츠를 few-shot 예시로 프롬프트에 주입해
-    //    매번 다른 담당자가 생성해도 톤이 일관되게 유지되도록 함
-    let approvedExamples = [];
-    try {
-      const pastApproved = await callDatabase("contents", "read", null, {
-        content_type: requestType === "detail" ? "detail" : "intro",
-        validation_status: "APPROVED",
-      });
-      if (pastApproved.success) {
-        approvedExamples = pastApproved.rows
-          .filter((c) => c.generated_content)
-          .slice(0, 3)
-          .map((c) => c.generated_content);
-      }
-    } catch (e) {
-      console.warn("[브랜드 보이스 캐시] 과거 승인 콘텐츠 조회 실패 (무시하고 계속):", e.message);
-    }
-
-    console.log(`[Step 7] ${agentName} 호출... (videoType: ${videoType || "제품스토리"}, 참고 예시: ${approvedExamples.length}건)`);
+    console.log(`[Step 7] ${agentName} 호출... (videoType: ${videoType || "제품스토리"})`);
     const contentResult = await callAgent(
       agentName,
       {
@@ -292,11 +364,8 @@ router.post("/:resourceId/start", async (req, res) => {
         productName: selectedProductName,
         productInfo: resource.product_info,
         keywords: resource.keywords || [],
-        trendKeywords: metadata.trendKeywords || [],
-        customStyle: metadata.customStyle || null,
         scenario,
         videoType: videoType || "제품스토리",
-        approvedExamples,
       },
       { resourceId, step: agentName }
     );
@@ -376,7 +445,7 @@ router.post("/:resourceId/start", async (req, res) => {
         voiceTone: selectedCharacter.voice_tone || "기본",
         visualDescription: selectedCharacter.visual_description || "",
         referenceImageUrl: selectedCharacter.reference_image_url || null, // ⭐ 재현성: 레퍼런스 이미지 전달
-        duration: targetDuration,
+        duration: 120,
       },
       resourceId,
       contentId
@@ -397,31 +466,35 @@ router.post("/:resourceId/start", async (req, res) => {
     // ── 7-1. 최종 상태 업데이트 ──
     // ✅ CLI의 --wait 플래그로 완료까지 기다렸으므로 pollHiggsfield 불필요
     if (higgsfieldResult.success && videosRowId) {
-      await callDatabase(
-        "videos",
-        "update",
-        {
-          generation_status: "completed",
-          generation_progress: 100,
-          video_url: videoUrl,
-          character_reference_image_url: selectedCharacter.reference_image_url || null, // ⭐ 재현성 추적
-        },
-        { id: videosRowId }
-      ).catch((e) => console.error("[영상 상태 업데이트 실패]", e));
+      await callDatabase("videos", "update", {
+        generation_status: "completed",
+        generation_progress: 100,
+        video_url: videoUrl,
+        character_reference_image_url: selectedCharacter.reference_image_url || null, // ⭐ 재현성 추적
+      }, { id: videosRowId }).catch((e) => console.error("[영상 상태 업데이트 실패]", e));
 
       // ⭐ 캐릭터의 reference_image_url과 generation_count 업데이트 (첫 생성 시에만 저장)
-      if (!selectedCharacter.reference_image_url && videoUrl) {
-        // 첫 영상 생성: 영상 URL을 레퍼런스로 저장 (프레임으로 나중에 사용 가능)
-        await callDatabase("characters", "update", {
-          reference_image_url: videoUrl, // Higgsfield 영상 URL을 레퍼런스로 사용
-          image_generated_at: new Date().toISOString(),
-          generation_count: 1,
-        }, { id: selectedCharacter.id }).catch((e) => console.error("[캐릭터 레퍼런스 저장 실패]", e));
-      } else {
-        // 재생성: generation_count만 증가
-        await callDatabase("characters", "update", {
-          generation_count: (selectedCharacter.generation_count || 0) + 1,
-        }, { id: selectedCharacter.id }).catch((e) => console.error("[캐릭터 카운트 업데이트 실패]", e));
+      const isFirstGeneration = !selectedCharacter.reference_image_url && videoUrl;
+      const characterUpdate = isFirstGeneration
+        ? {
+            reference_image_url: videoUrl, // Higgsfield 영상 URL을 레퍼런스로 사용
+            image_generated_at: new Date().toISOString(),
+            generation_count: 1,
+          }
+        : {
+            generation_count: (selectedCharacter.generation_count || 0) + 1,
+          };
+
+      await callDatabase("characters", "update", characterUpdate, { id: selectedCharacter.id })
+        .catch((e) => console.error("[캐릭터 레퍼런스/카운트 저장 실패]", e));
+
+      // ⭐ 라이브러리에서 온 캐릭터라면, 라이브러리 원본에도 동일하게 반영한다.
+      // 이렇게 해야 "결이"를 다른 자료(resource)에서 다시 선택했을 때도
+      // 처음부터 같은 레퍼런스 이미지로 생성되어 자료 간에도 스타일이 일관되게 유지된다.
+      if (selectedCharacter.library_character_id) {
+        await callDatabase("character_library", "update", characterUpdate, {
+          id: selectedCharacter.library_character_id,
+        }).catch((e) => console.error("[라이브러리 레퍼런스 동기화 실패]", e));
       }
     }
 
@@ -433,7 +506,6 @@ router.post("/:resourceId/start", async (req, res) => {
       contentId,
       validationStatus,
       validationScore,
-      duration: targetDuration,
       videoUrl: higgsfieldResult.success ? higgsfieldResult.data.video_url : null,
       videoStatus: higgsfieldResult.success ? "completed" : "failed",
       higgsfieldError: higgsfieldError,

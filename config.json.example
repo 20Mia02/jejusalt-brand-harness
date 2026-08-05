@@ -19,7 +19,21 @@
       "과도한 유행어",
       "자극적 비교 (가장 좋은, 유일무이 등)",
       "근거 없는 기술 과장"
-    ]
+    ],
+    "characterStyleGuideline": "모든 캐릭터는 귀엽고 매력적인 인형(마스코트) 같은 스타일 - 동글동글한 외형, 부드러운 색감, 친근한 표정을 기본으로 한다. 실존하는 유명 캐릭터를 연상시키는 디자인은 절대 금지",
+    "characterCommonMotif": "알(egg) 모양의 동글동글한 몸통, 이마 위 작은 육각형 소금 결정 브로치(제주소금 시그니처), 단순한 검은 점 눈동자에 흰색 하이라이트 하나, 은은한 볼터치",
+    "characterColorPalette": {
+      "primaryBlue": "#00AEEF",
+      "oceanDeep": "#003D7A",
+      "waveWhite": "#E6F7FF",
+      "saltCream": "#FFFEF9",
+      "saltGray": "#F5F5F5",
+      "lavaBlack": "#1A1A1A",
+      "volcanicGray": "#5A5A5A",
+      "hallasanGreen": "#2D7A3E",
+      "earthBrown": "#8B6F47",
+      "sandyBeige": "#E8D4B8"
+    }
   },
   "characters": [
     {
@@ -84,7 +98,12 @@
     "videoTypes": [
       "캐릭터소개",
       "제품스토리",
-      "일상밥상"
+      "일상밥상",
+      "브랜드스토리",
+      "사용법",
+      "고객후기",
+      "이벤트/프로모션",
+      "비하인드"
     ],
     "retryAttempts": 3,
     "retryBackoffMs": 1000

@@ -16,17 +16,134 @@
 
 const { createClient } = require("@supabase/supabase-js");
 
-// Supabase 클라이언트 초기화 (service_role 키 사용 — 서버 전용)
-if (!process.env.SUPABASE_SERVICE_KEY) {
+// ============================================================================
+// Mock 모드: Supabase 미설정(placeholder) 시 인메모리 DB로 전체 파이프라인 동작 보장
+// ============================================================================
+// 실제 발표/개발 환경에서 Supabase 키를 아직 안 넣었어도 Step 1~9 전체 흐름이
+// 끊기지 않고 시연 가능하도록, 모든 테이블 CRUD를 서버 메모리에서 동일한 인터페이스로 처리한다.
+// SUPABASE_URL이 유효한 값으로 설정되면 자동으로 실제 Supabase를 사용한다.
+const isMockMode =
+  !process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes("your-project");
+
+if (isMockMode) {
+  console.warn(
+    "⚠️ SUPABASE_URL이 설정되지 않아 Mock DB(인메모리) 모드로 동작합니다. 서버 재시작 시 데이터가 초기화됩니다."
+  );
+} else if (!process.env.SUPABASE_SERVICE_KEY) {
   console.warn(
     "⚠️ SUPABASE_SERVICE_KEY가 .env에 없습니다. RLS가 켜져 있으면 쓰기 작업이 실패할 수 있습니다."
   );
 }
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY // 폴백(임시): SERVICE_KEY 없으면 ANON_KEY로 동작은 하되 경고 출력
-);
+const supabase = isMockMode
+  ? null
+  : createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
+    );
+
+// ── 인메모리 Mock 스토어 ──────────────────────────────────
+const mockStore = {}; // { tableName: [row, ...] }
+let mockIdCounter = 1;
+
+function mockTable(table) {
+  if (!mockStore[table]) mockStore[table] = [];
+  return mockStore[table];
+}
+
+// character_library는 config.json의 기본 캐릭터로 미리 시딩 (기본 캐릭터가 항상 존재해야 하므로)
+function seedCharacterLibrary() {
+  try {
+    const { getCharacters } = require("../utils/config-loader");
+    return getCharacters().map((c, idx) => ({
+      id: `default-${idx}`,
+      character_name: c.name,
+      role: c.role || "",
+      tone_trait: c.toneTrait || "",
+      character_profile: [c.role, c.toneTrait].filter(Boolean).join(" · "),
+      voice_tone: c.toneTrait || "",
+      personality_traits: c.toneTrait ? c.toneTrait.split(/,\s*/) : [],
+      visual_description: "",
+      reference_image_url: null,
+      generation_count: 0,
+      source: "default",
+      created_at: new Date().toISOString(),
+    }));
+  } catch (e) {
+    return [];
+  }
+}
+
+if (isMockMode) {
+  mockStore.character_library = seedCharacterLibrary();
+}
+
+function matchesFilter(row, filter) {
+  return Object.entries(filter).every(([key, value]) => {
+    if (Array.isArray(value)) return value.includes(row[key]);
+    return row[key] === value;
+  });
+}
+
+async function callDatabaseMock(table, operation, data, filter) {
+  const rows = mockTable(table);
+
+  if (operation === "create") {
+    const items = Array.isArray(data) ? data : [data];
+    const inserted = items.map((item) => ({
+      id: `${table}-${mockIdCounter++}`,
+      ...item,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }));
+    rows.push(...inserted);
+    console.log(`[Mock DB] INSERT into ${table}: ${inserted.length}개 row`);
+    return { success: true, rows: inserted };
+  }
+
+  if (operation === "read") {
+    let result = filter && Object.keys(filter).length > 0
+      ? rows.filter((r) => matchesFilter(r, filter))
+      : [...rows];
+    result = result.slice().sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    );
+    console.log(`[Mock DB] SELECT from ${table}: ${result.length}개 row`);
+    return { success: true, rows: result };
+  }
+
+  if (operation === "update") {
+    if (!filter || Object.keys(filter).length === 0) {
+      throw new Error("UPDATE는 filter(WHERE 조건)이 필수입니다");
+    }
+    const updated = [];
+    for (const row of rows) {
+      if (matchesFilter(row, filter)) {
+        Object.assign(row, data, { updated_at: new Date().toISOString() });
+        updated.push(row);
+      }
+    }
+    console.log(`[Mock DB] UPDATE ${table}: ${updated.length}개 row`);
+    return { success: true, rows: updated };
+  }
+
+  if (operation === "delete") {
+    if (!filter || Object.keys(filter).length === 0) {
+      throw new Error("DELETE는 filter(WHERE 조건)이 필수입니다");
+    }
+    const remaining = [];
+    const deleted = [];
+    for (const row of rows) {
+      if (matchesFilter(row, filter)) deleted.push(row);
+      else remaining.push(row);
+    }
+    mockStore[table] = remaining;
+    console.log(`[Mock DB] DELETE from ${table}: ${deleted.length}개 row`);
+    return { success: true, rows: deleted };
+  }
+
+  return { success: false, error: "INVALID_OPERATION" };
+}
 
 // ============================================================================
 // [함수 1] callDatabase - 일반 CRUD 작업
@@ -41,6 +158,10 @@ const supabase = createClient(
  * @returns {object} {success, rows, error}
  */
 async function callDatabase(table, operation, data, filter) {
+  if (isMockMode) {
+    return callDatabaseMock(table, operation, data, filter);
+  }
+
   try {
     // ========== CREATE (INSERT) ==========
     if (operation === "create") {
@@ -182,6 +303,23 @@ async function getResourcesByFilter(filters = {}) {
     if (!hasCategories && !hasAgeGroups && !hasTargets && !hasFocus) {
       console.log(`  [✓] 필터 미선택: 빈 결과 반환`);
       return { success: true, rows: [], total: 0 };
+    }
+
+    if (isMockMode) {
+      const rows = mockTable("resources").filter((r) => {
+        if (r.status !== "completed") return false;
+        const md = r.metadata || {};
+        const has = (arr, want) =>
+          !want || want.length === 0 || (arr || []).some((v) => want.includes(v));
+        return (
+          has(md.categories, categories) &&
+          has(md.ageGroups, ageGroups) &&
+          has(md.targets, targets) &&
+          has(md.focus, focus)
+        );
+      });
+      console.log(`  [Mock] ${rows.length}개 자료 조회됨`);
+      return { success: true, rows, total: rows.length };
     }
 
     let query = supabase.from("resources").select("*");

@@ -24,7 +24,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
-export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro', videoType, duration = 120 }) {
+export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro', videoType, referenceMaterials = [] }) {
   // 상태 관리
   const [generating, setGenerating] = useState(false);
   const [generationData, setGenerationData] = useState(null);
@@ -37,20 +37,9 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoErrorDetail, setVideoErrorDetail] = useState(null);
   const [failedStep, setFailedStep] = useState(null);
+  // 업로드된 참고자료를 시나리오 작성에 반영할지 여부 (기본: 반영)
+  const [useReferenceMaterials, setUseReferenceMaterials] = useState(true);
   const pollingInterval = useRef(null);
-
-  // 성공/실패 배너 자동 소멸 (전 화면 통일 규칙: 성공 2.5초, 에러 4초)
-  useEffect(() => {
-    if (!successMessage) return;
-    const timer = setTimeout(() => setSuccessMessage(null), 2500);
-    return () => clearTimeout(timer);
-  }, [successMessage]);
-
-  useEffect(() => {
-    if (!error) return;
-    const timer = setTimeout(() => setError(null), 4000);
-    return () => clearTimeout(timer);
-  }, [error]);
 
   /**
    * "AI 생성" 버튼 클릭
@@ -81,7 +70,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       const res = await axios.post(`/api/generate/${resourceId}/start`, {
         requestType,
         videoType,
-        duration,
+        useReferenceMaterials: referenceMaterials.length > 0 ? useReferenceMaterials : undefined,
       });
 
       stopStatusPolling();
@@ -190,26 +179,23 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   // ─────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-2xl mx-auto p-6 ui-card animate-fade-in">
+    <div className="max-w-2xl mx-auto p-6 bg-white shadow rounded-lg">
       {/* 제목 */}
-      <h2 className="text-2xl font-bold mb-1">🎬 AI 콘텐츠 생성</h2>
-      <p className="text-sm text-dark-text-muted mb-6">
-        {videoType || '제품스토리'} · {duration}초 숏폼으로 생성됩니다
-      </p>
+      <h2 className="text-2xl font-bold mb-6">🎬 AI 콘텐츠 생성</h2>
 
       {/* 에러/성공 메시지 */}
       {error && (
-        <div className="bg-status-rejected/10 border border-status-rejected/30 text-status-rejected px-4 py-3 rounded mb-4 animate-fade-in">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           <div className="font-semibold">{error}</div>
           {errorDetails && (
             <div className="text-sm mt-2 space-y-1">
-              <div className="text-status-rejected/80">
+              <div className="text-red-600">
                 <strong>Step:</strong> {errorDetails.step}
               </div>
-              <div className="text-status-rejected/80">
+              <div className="text-red-600">
                 <strong>에러 코드:</strong> {errorDetails.error_code || 'UNKNOWN'}
               </div>
-              <div className="text-status-rejected/80">
+              <div className="text-red-600">
                 <strong>재시도 횟수:</strong> {errorDetails.attempt || 0}회
               </div>
             </div>
@@ -217,7 +203,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
         </div>
       )}
       {successMessage && (
-        <div className="bg-status-approved/10 border border-status-approved/30 text-status-approved px-4 py-3 rounded mb-4 animate-fade-in">
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
           {successMessage}
         </div>
       )}
@@ -228,45 +214,45 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
           {/* 현재 단계 */}
           <div className="text-center">
             <div className="text-lg font-semibold mb-2">{currentStep}</div>
-            <div className="text-3xl font-bold text-brand-blue">{progress}%</div>
+            <div className="text-3xl font-bold text-blue-600">{progress}%</div>
           </div>
 
           {/* 진행률 바 */}
           <div className="space-y-2">
-            <div className="w-full bg-dark-chip rounded-full h-4 overflow-hidden">
+            <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-brand-blue to-brand-blue-dark h-full transition-all duration-300 ease-out"
+                className="bg-gradient-to-r from-blue-500 to-blue-600 h-full transition-all duration-300 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="text-xs text-dark-text-muted text-center">
+            <div className="text-xs text-gray-600 text-center">
               {progress < 100
                 ? '이 과정은 1~2분 정도 소요됩니다...'
                 : '완료되었습니다!'}
             </div>
           </div>
 
-          {/* 8단계 진행 인디케이터 (연결선 포함) */}
-          <div className="bg-dark-bg rounded-lg p-4 space-y-0 text-sm">
-            <StepItem label="Step 1-3: 자료 분석 & 메타데이터" done={true} isLast={false} />
-            <StepItem label="Step 4: 캐릭터 설계" done={progress > 15} active={progress <= 15} isLast={false} />
-            <StepItem label="Step 5: 시나리오 작성" done={progress > 25} active={progress > 15 && progress <= 25} isLast={false} />
-            <StepItem label="Step 6: 제품명 생성" done={progress > 35} active={progress > 25 && progress <= 35} isLast={false} />
-            <StepItem label="Step 7: 카피 작성" done={progress > 45} active={progress > 35 && progress <= 45} isLast={false} />
-            <StepItem label="Step 8: 컴플라이언스" done={progress > 55} active={progress > 45 && progress <= 55} isLast={false} />
-            <StepItem label="Step 9: 영상 생성" done={progress > 70} active={progress > 55 && progress <= 70} isLast={true} />
+          {/* 단계별 체크리스트 */}
+          <div className="bg-gray-50 p-4 rounded space-y-2 text-sm">
+            <StepItem label="Step 1-3: 자료 분석 & 메타데이터" done={true} />
+            <StepItem label="Step 4: 캐릭터 설계" done={progress > 15} />
+            <StepItem label="Step 5: 시나리오 작성" done={progress > 25} />
+            <StepItem label="Step 6: 제품명 생성" done={progress > 35} />
+            <StepItem label="Step 7: 카피 작성" done={progress > 45} />
+            <StepItem label="Step 8: 컴플라이언스" done={progress > 55} />
+            <StepItem label="Step 9: 영상 생성" done={progress > 70} />
           </div>
 
           {/* 실패 정보 표시 */}
           {failedStep && errorDetails && (
-            <div className="bg-status-pending/10 border border-status-pending/30 p-4 rounded">
-              <div className="font-semibold text-status-pending mb-2">⚠️ 현재 단계 재시도 중</div>
-              <div className="text-sm text-dark-text space-y-1">
+            <div className="bg-orange-50 border border-orange-300 p-4 rounded">
+              <div className="font-semibold text-orange-700 mb-2">⚠️ 현재 단계 재시도 중</div>
+              <div className="text-sm text-orange-800 space-y-1">
                 <div><strong>단계:</strong> {errorDetails.step}</div>
                 <div><strong>에러:</strong> {errorDetails.error_message}</div>
                 <div><strong>코드:</strong> {errorDetails.error_code}</div>
                 <div><strong>시도:</strong> {errorDetails.attempt}회 / 3회</div>
-                <div className="text-xs text-status-pending/80 mt-2">
+                <div className="text-xs text-orange-600 mt-2">
                   자동으로 재시도 중입니다. 잠시만 기다려주세요...
                 </div>
               </div>
@@ -281,7 +267,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
               setCurrentStep(null);
               stopStatusPolling();
             }}
-            className="w-full px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
+            className="w-full px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
           >
             취소 (폴링만 중단)
           </button>
@@ -292,12 +278,12 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
           {videoFailed ? (
             // 콘텐츠(카피)는 생성됐지만 Higgsfield 영상화는 실패한 상태
             <div className="space-y-4">
-              <div className="bg-status-pending/10 p-4 rounded border border-status-pending/30">
-                <div className="text-lg font-bold text-status-pending mb-2">
+              <div className="bg-yellow-50 p-4 rounded border border-yellow-300">
+                <div className="text-lg font-bold text-yellow-800 mb-2">
                   ⚠️ 콘텐츠는 생성됐지만 영상 생성에 실패했습니다
                 </div>
                 {generationData && (
-                  <div className="text-sm text-dark-text space-y-1 mb-2">
+                  <div className="text-sm text-gray-700 space-y-1 mb-2">
                     <div>
                       <strong>검증 상태:</strong> {generationData.validationStatus}
                     </div>
@@ -306,26 +292,26 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                     </div>
                   </div>
                 )}
-                <div className="text-sm text-status-pending bg-status-pending/10 rounded p-2 mt-2">
+                <div className="text-sm text-yellow-800 bg-yellow-100 rounded p-2 mt-2">
                   {videoErrorDetail}
                 </div>
               </div>
               <button
                 onClick={handleGenerate}
-                className="w-full px-4 py-2 btn-primary"
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 🔄 영상 다시 생성
               </button>
             </div>
           ) : videoUrl ? (
             // 완료 상태: 비디오 표시
-            <div className="space-y-4 animate-fade-in">
-              <div className="bg-status-approved/10 p-4 rounded border border-status-approved/30">
-                <div className="text-lg font-bold text-status-approved mb-2">
+            <div className="space-y-4">
+              <div className="bg-green-50 p-4 rounded border border-green-200">
+                <div className="text-lg font-bold text-green-800 mb-2">
                   ✅ 영상이 생성되었습니다!
                 </div>
                 {generationData && (
-                  <div className="text-sm text-dark-text space-y-1">
+                  <div className="text-sm text-gray-700 space-y-1">
                     <div>
                       <strong>검증 상태:</strong> {generationData.validationStatus}
                     </div>
@@ -337,7 +323,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
               </div>
 
               {/* 비디오 재생 */}
-              <div className="bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-brand-blue">
+              <div className="bg-black rounded-lg overflow-hidden aspect-video flex items-center justify-center">
                 <video
                   src={videoUrl}
                   controls
@@ -349,11 +335,11 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
               </div>
 
               {/* 비디오 정보 */}
-              <div className="bg-dark-bg p-4 rounded-lg">
-                <div className="text-sm text-dark-text space-y-2">
+              <div className="bg-gray-50 p-4 rounded">
+                <div className="text-sm text-gray-700 space-y-2">
                   <div>
                     <strong>비디오 URL:</strong>{' '}
-                    <code className="bg-dark-chip px-2 py-1 rounded text-xs break-all">
+                    <code className="bg-white px-2 py-1 rounded text-xs break-all">
                       {videoUrl}
                     </code>
                   </div>
@@ -361,8 +347,9 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                     onClick={() => {
                       navigator.clipboard.writeText(videoUrl);
                       setSuccessMessage('URL이 복사되었습니다.');
+                      setTimeout(() => setSuccessMessage(null), 2000);
                     }}
-                    className="text-brand-blue hover:text-brand-blue-dark text-sm"
+                    className="text-blue-600 hover:text-blue-800 text-sm"
                   >
                     📋 복사
                   </button>
@@ -379,7 +366,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                   setProgress(0);
                   setCurrentStep(null);
                 }}
-                className="w-full px-4 py-2 btn-primary"
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 🔄 다시 생성
               </button>
@@ -387,9 +374,9 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
           ) : (
             <>
               {/* 생성 전: 정보 표시 */}
-              <div className="bg-brand-blue/10 p-4 rounded mb-4 text-sm">
+              <div className="bg-blue-50 p-4 rounded mb-4 text-sm">
                 <div className="font-semibold mb-2">📌 이제 시작할 생성 과정</div>
-                <ul className="list-disc list-inside space-y-1 text-dark-text">
+                <ul className="list-disc list-inside space-y-1 text-gray-700">
                   <li>Step 4: 캐릭터 추천</li>
                   <li>Step 5: 캐릭터 상세 설계</li>
                   <li>Step 6: 120초 시나리오 작성</li>
@@ -400,17 +387,42 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                 </ul>
               </div>
 
+              {/* 참고자료 반영 여부 확인 */}
+              {referenceMaterials.length > 0 && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4 text-sm">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useReferenceMaterials}
+                      onChange={(e) => setUseReferenceMaterials(e.target.checked)}
+                      className="mt-1 w-4 h-4"
+                    />
+                    <span>
+                      <strong>📎 업로드한 참고자료를 시나리오에 반영할까요?</strong>
+                      <ul className="mt-1 text-gray-700 list-disc list-inside">
+                        {referenceMaterials.map((f) => (
+                          <li key={f.filename}>{f.filename}</li>
+                        ))}
+                      </ul>
+                      <span className="text-xs text-gray-500">
+                        체크하면 AI가 이 파일 내용을 분석해서 시나리오 작성에 반영합니다.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              )}
+
               {/* 생성 버튼 */}
               <button
                 onClick={handleGenerate}
                 disabled={!resourceId}
-                className="w-full px-6 py-3 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
                 🚀 AI 콘텐츠 생성 시작
               </button>
 
               {!resourceId && (
-                <div className="mt-3 text-sm text-dark-text-muted text-center">
+                <div className="mt-3 text-sm text-gray-500 text-center">
                   자료를 먼저 선택하세요.
                 </div>
               )}
@@ -423,37 +435,19 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
 }
 
 /**
- * 단계별 체크리스트 항목 (연결선 포함 타임라인)
- * done: 완료(#00AEEF + 흰 체크) / active: 진행 중(#00AEEF + 로딩 애니메이션) / 그 외: 미진행(#1F3A52)
+ * 단계별 체크리스트 항목
  */
-function StepItem({ label, done, active, isLast }) {
+function StepItem({ label, done }) {
   return (
-    <div className="flex gap-3">
-      <div className="flex flex-col items-center">
-        <div
-          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-            done
-              ? 'step-circle-done'
-              : active
-              ? 'bg-brand-blue text-white'
-              : 'bg-dark-chip text-dark-text-muted'
-          }`}
-        >
-          {done ? '✓' : active ? (
-            <span className="step-circle-spinner block w-2.5 h-2.5 rounded-full border-2 border-t-transparent animate-spin" />
-          ) : (
-            '-'
-          )}
-        </div>
-        {!isLast && (
-          <div className={`w-0.5 flex-1 min-h-[14px] ${done ? 'bg-brand-blue' : 'bg-dark-chip'}`} />
-        )}
+    <div className="flex items-center gap-2">
+      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+        done
+          ? 'bg-green-500 text-white'
+          : 'bg-gray-300 text-gray-500'
+      }`}>
+        {done ? '✓' : '-'}
       </div>
-      <span
-        className={`pb-3 text-sm ${
-          done ? 'text-dark-text-muted line-through' : active ? 'text-dark-text font-semibold' : 'text-dark-text-muted'
-        }`}
-      >
+      <span className={done ? 'text-gray-800 line-through' : 'text-gray-600'}>
         {label}
       </span>
     </div>
