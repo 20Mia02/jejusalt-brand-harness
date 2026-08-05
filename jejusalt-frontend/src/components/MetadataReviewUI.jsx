@@ -21,17 +21,22 @@ const ALL_OPTIONS = {
   focus: ['신뢰', '기술', '건강', '감정', '자연', '감각', '연관', '가성비', '프리미엠'],
 };
 
-export default function MetadataReviewUI({ resourceId, onComplete, onError }) {
-  const [metadata, setMetadata] = useState(null);
+export default function MetadataReviewUI({ resourceId, initialMetadata, onComplete, onError }) {
+  const [metadata, setMetadata] = useState(initialMetadata || null);
   const [editing, setEditing] = useState(false);
   const [tempMetadata, setTempMetadata] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // 마운트 시 메타데이터 로드
+  // initialMetadata가 이미 있으면(자료 생성 직후) 재조회하지 않고 바로 사용.
+  // 없을 때만(예: 새로고침 등으로 이 화면에 직접 진입한 경우) API로 조회한다.
   useEffect(() => {
+    if (initialMetadata) {
+      setMetadata(initialMetadata);
+      return;
+    }
     loadMetadata();
-  }, [resourceId]);
+  }, [resourceId, initialMetadata]);
 
   const loadMetadata = async () => {
     try {
