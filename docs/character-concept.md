@@ -202,6 +202,17 @@ LAVA=짙은 색, MINERAL=분홍, FIRE=노랑/주황.
 
 ---
 
+## 컨셉 스케치 (Higgsfield 생성 전 임시 확인용)
+
+`docs/character-concept-sketches/`에 8개 캐릭터의 SVG 벡터 스케치가 있다. Higgsfield로 실제
+영상을 생성하기 전, 확정된 색상/형태/눈/입 스펙이 맞는지 앱 화면에서 미리 확인하기 위한
+용도로 제작했으며, Supabase `character_library.reference_image_url`에도 data URI로 저장되어
+있다 (`generation_seed = 'concept-sketch-v1'`로 표시해 실제 Higgsfield 생성본과 구분).
+외형이 최종 승인되면 위 PART 2의 Higgsfield 프롬프트로 실제 레퍼런스 영상을 생성해
+이 값을 교체한다.
+
+---
+
 ## PART 3. 일관성 관리 체크리스트
 
 **설계 단계**
