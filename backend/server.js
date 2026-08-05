@@ -12,9 +12,15 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const { getConfig } = require("./utils/config-loader");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// config.json 로드 및 검증
+const config = getConfig();
+console.log(`📋 브랜드 설정: ${config.brand.nameKorean}`);
+console.log(`🎭 등록된 캐릭터: ${config.characters.length}명`);
 
 // ============================================================================
 // 환경변수 검증 (서버 시작 시)
@@ -81,6 +87,20 @@ app.get("/health", (req, res) => {
 });
 
 // ============================================================================
+// Config API (프론트에서 브랜드/캐릭터 설정 조회)
+// ============================================================================
+
+app.get("/api/config", (req, res) => {
+  const cfg = getConfig();
+  res.json({
+    success: true,
+    brand: cfg.brand,
+    characters: cfg.characters,
+    generation: cfg.generation,
+  });
+});
+
+// ============================================================================
 // Pipeline Status Summary (모든 리소스의 생성 상태 요약)
 // ============================================================================
 
@@ -89,7 +109,8 @@ app.get("/api/pipeline/status", async (req, res) => {
     const { callDatabase } = require("./agents/database-agent");
 
     // 모든 리소스 조회
-    const resources = await callDatabase("resources", "query", {});
+    const resourcesResult = await callDatabase("resources", "read", null, {});
+    const resources = resourcesResult.success ? resourcesResult.rows : [];
 
     if (!resources || resources.length === 0) {
       return res.json({
@@ -102,9 +123,10 @@ app.get("/api/pipeline/status", async (req, res) => {
     // 각 리소스별 생성 로그 조회
     const statusSummary = await Promise.all(
       resources.map(async (resource) => {
-        const logs = await callDatabase("generation_logs", "query", {
-          filter: { resource_id: resource.id },
-        }).catch(() => []);
+        const logsResult = await callDatabase("generation_logs", "read", null, {
+          resource_id: resource.id,
+        }).catch(() => ({ success: false, rows: [] }));
+        const logs = logsResult.success ? logsResult.rows : [];
 
         const successCount = (logs || []).filter((l) => l.status === "success").length;
         const failureCount = (logs || []).filter((l) => l.status === "fail").length;

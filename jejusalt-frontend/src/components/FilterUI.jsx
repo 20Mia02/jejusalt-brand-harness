@@ -28,13 +28,25 @@ export default function FilterUI({ onResourceCreated }) {
 
   const loadMetadata = async () => {
     try {
-      const dummyMetadata = {
+      // config에서 메타데이터 추출
+      let metadata = {
         categories: ["식품", "뷰티", "웰스케어"],
         ageGroups: ["20~30대", "40~60대", "60대+"],
         targets: ["개인", "가족", "단체", "관광객", "기업"],
         focus: ["신뢰", "기술", "건강", "감정", "자연", "감각", "연관"],
       };
-      setMetadata(dummyMetadata);
+
+      if (window.appConfig?.brand) {
+        const cfg = window.appConfig.brand;
+        metadata = {
+          categories: cfg.categories || metadata.categories,
+          ageGroups: cfg.targetAges || metadata.ageGroups,
+          targets: cfg.targetAudience || metadata.targets,
+          focus: cfg.focus || metadata.focus,
+        };
+      }
+
+      setMetadata(metadata);
     } catch (err) {
       console.error("메타데이터 로드 실패:", err);
       setError("필터 데이터 로드 실패");

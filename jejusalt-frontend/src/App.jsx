@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import FilterUI from "./components/FilterUI"
 import GenerationUI from "./components/GenerationUI"
@@ -6,6 +6,9 @@ import MetadataReviewUI from "./components/MetadataReviewUI"
 import CharacterCreator from "./components/CharacterCreator"
 import AdminMode from "./components/AdminMode"
 import "./App.css"
+
+// Config 전역 상태
+window.appConfig = null;
 
 const STEP_LABELS = {
   filter: '자료 필터링',
@@ -75,7 +78,27 @@ function MainFlow({ currentStep, setCurrentStep }) {
 function App() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
-  const [currentStep, setCurrentStep] = useState('filter'); // 'filter', 'metadata', 'character', 'generation'
+  const [currentStep, setCurrentStep] = useState('filter');
+  const [brandName, setBrandName] = useState('제주도 라바 씨솔트');
+  const [brandNameEn, setBrandNameEn] = useState('JEJU LAVA SEA SALT');
+
+  useEffect(() => {
+    // 서버에서 config 로드
+    const loadConfig = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/config`);
+        if (res.ok) {
+          const data = await res.json();
+          window.appConfig = data;
+          setBrandName(data.brand.nameKorean);
+          setBrandNameEn(data.brand.nameEnglish);
+        }
+      } catch (err) {
+        console.warn('Config 로드 실패, 기본값 사용:', err);
+      }
+    };
+    loadConfig();
+  }, []);
 
   return (
     <div className="app">
@@ -100,8 +123,8 @@ function App() {
           </div>
 
           <div className="header-text">
-            <div className="header-text-korean">제주도 라바 씨솔트</div>
-            <h1>JEJU LAVA<br/>SEA SALT</h1>
+            <div className="header-text-korean">{brandName}</div>
+            <h1>{brandNameEn.split(' ').slice(0, -2).join(' ')}<br/>{brandNameEn.split(' ').slice(-2).join(' ')}</h1>
             <div className="header-divider"></div>
             <nav className="app-header-nav">
               <Link to="/" className={!isAdmin ? 'active' : ''}>메인</Link>
