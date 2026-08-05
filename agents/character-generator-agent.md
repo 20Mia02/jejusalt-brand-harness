@@ -1,10 +1,11 @@
 # character-generator-agent.md
 
 **에이전트 이름**: character-generator-agent  
-**버전**: v1.0  
-**작성일**: 2026.08.03  
+**버전**: v2.0 (v3 설계 시스템 통합)  
+**작성일**: 2026.08.03 | 업데이트: 2026.08.06  
 **담당 라인**: 제품 라인 (박주미)  
 **연결 Skill**: SKILL_character-generator  
+**참조 파일**: `config.json` (v3 캐릭터 데이터), `SYSTEM_PROMPT_CHARACTER_CREATOR_V3.md` (AI 지침)  
 
 ---
 
