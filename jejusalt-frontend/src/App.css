@@ -515,7 +515,7 @@ html.light .step-indicator-line {
   }
 }
 
-/* FilterUI 하단 로고: 다크모드에서 흰색으로 표시 */
+/* FilterUI 하단 로고: 다크모드에서 명시도 개선 */
 .filter-logo {
   filter: brightness(0) invert(1);
 }
