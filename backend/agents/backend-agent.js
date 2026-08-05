@@ -321,10 +321,10 @@ function getSystemPromptForAgent(agentName) {
 제품: ${brand.nameKorean || "제주소금"}
 브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
 
-사업 우선순위: ${(brand.categories || []).join(" > ") || "뷰티 > 웰스케어 > 식품"} 순으로 사업을 확장 중이므로, 제품이 여러 카테고리에 걸칠 경우 우선순위가 높은 카테고리를 먼저 배열에 넣으세요.
+사업 우선순위: ${(brand.categories || []).join(" > ") || "뷰티 > 헬스케어 > 식품"} 순으로 사업을 확장 중이므로, 제품이 여러 카테고리에 걸칠 경우 우선순위가 높은 카테고리를 먼저 배열에 넣으세요.
 
 제공된 제품명, 설명, 키워드를 기반으로:
-- 상품 카테고리 (${(brand.categories || []).join(", ") || "식품, 뷰티, 웰스케어"})
+- 상품 카테고리 (${(brand.categories || []).join(", ") || "식품, 뷰티, 헬스케어"})
 - 타겟 연령대 (${(brand.targetAges || []).join(", ") || "20~30대, 40~60대, 60대+"})
 - 타겟 고객층 (${(brand.targetAudience || []).join(", ") || "개인, 가족, 단체"})
 - 마케팅 포커스 (${(brand.focus || []).join(", ") || "신뢰, 기술, 건강"})

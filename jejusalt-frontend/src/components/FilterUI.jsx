@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 // 사업 우선순위 카테고리 (뷰티 > 헬스케어) — UI에서 ⭐ 우선순위 뱃지로 강조
-const PRIORITY_CATEGORIES = ["뷰티", "웰스케어"];
+const PRIORITY_CATEGORIES = ["뷰티", "헬스케어"];
 
 export default function FilterUI({ onResourceCreated }) {
   const [mode, setMode] = useState("input"); // 'input' 또는 'filter'
@@ -48,7 +48,7 @@ export default function FilterUI({ onResourceCreated }) {
     try {
       // config에서 메타데이터 추출
       let metadata = {
-        categories: ["뷰티", "웰스케어", "식품"],
+        categories: ["뷰티", "헬스케어", "식품"],
         ageGroups: ["20~30대", "40~60대", "60대+"],
         targets: ["개인", "가족", "단체", "관광객", "기업"],
         focus: ["신뢰", "기술", "건강", "감정", "자연", "감각", "연관"],
@@ -194,12 +194,12 @@ export default function FilterUI({ onResourceCreated }) {
         <img
           src="/assets/logo/jeju-salt-logo.png"
           alt="제주소금 JEJU LAVA SEA SALT 로고"
-          className="h-16 w-auto"
+          className="h-20 w-auto"
         />
       </div>
 
       {/* 모드 선택 탭 */}
-      <div className="flex gap-4 mb-6 border-b">
+      <div className="flex gap-4 mb-6 border-b border-brand-blue/20">
         <button
           onClick={() => {
             setMode("input");
@@ -209,7 +209,7 @@ export default function FilterUI({ onResourceCreated }) {
           className={`px-6 py-3 font-semibold border-b-2 transition ${
             mode === "input"
               ? "border-brand-blue text-brand-blue"
-              : "border-transparent text-gray-600 hover:text-gray-900"
+              : "border-transparent text-dark-text-muted hover:text-dark-text"
           }`}
         >
           📝 Step 1: 자료 입력
@@ -223,7 +223,7 @@ export default function FilterUI({ onResourceCreated }) {
           className={`px-6 py-3 font-semibold border-b-2 transition ${
             mode === "filter"
               ? "border-brand-blue text-brand-blue"
-              : "border-transparent text-gray-600 hover:text-gray-900"
+              : "border-transparent text-dark-text-muted hover:text-dark-text"
           }`}
         >
           🔍 기존 자료 검색
@@ -232,26 +232,26 @@ export default function FilterUI({ onResourceCreated }) {
 
       {/* 메시지 */}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-status-rejected/10 border border-status-rejected/30 text-status-rejected px-4 py-3 rounded mb-4 animate-fade-in">
           {error}
         </div>
       )}
       {successMessage && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+        <div className="bg-status-approved/10 border border-status-approved/30 text-status-approved px-4 py-3 rounded mb-4 animate-fade-in">
           {successMessage}
         </div>
       )}
 
       {/* 자료 입력 모드 */}
       {mode === "input" && (
-        <div className="bg-white shadow rounded-lg p-6 max-w-2xl mx-auto">
+        <div className="ui-card p-6 max-w-2xl mx-auto animate-fade-in">
           <h2 className="text-2xl font-bold mb-6">📝 제주소금 자료 입력</h2>
 
           <div className="space-y-4">
             {/* 제품명 */}
             <div>
               <label className="block text-sm font-semibold mb-2">
-                제품명 <span className="text-red-600">*</span>
+                제품명 <span className="text-status-rejected">*</span>
               </label>
               <input
                 type="text"
@@ -259,24 +259,24 @@ export default function FilterUI({ onResourceCreated }) {
                 value={inputForm.productName}
                 onChange={handleInputChange}
                 placeholder="예: 제주소금, 프리미엄 천연 해염"
-                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue"
+                className="w-full input-field"
               />
-              <p className="text-xs text-gray-500 mt-1">최소 3자 이상</p>
+              <p className="text-xs text-dark-text-muted mt-1">최소 3자 이상</p>
             </div>
 
             {/* 제품 정보 */}
             <div>
               <label className="block text-sm font-semibold mb-2">
-                제품 정보 <span className="text-red-600">*</span>
+                제품 정보 <span className="text-status-rejected">*</span>
               </label>
               <textarea
                 name="productInfo"
                 value={inputForm.productInfo}
                 onChange={handleInputChange}
                 placeholder="예: 제주 청정 해역에서 채취한 천연 소금입니다. 미네랄이 풍부하고..."
-                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue h-32"
+                className="w-full input-field h-32"
               />
-              <p className="text-xs text-gray-500 mt-1">최소 30자 이상</p>
+              <p className="text-xs text-dark-text-muted mt-1">최소 30자 이상</p>
             </div>
 
             {/* 키워드 */}
@@ -290,9 +290,9 @@ export default function FilterUI({ onResourceCreated }) {
                 value={inputForm.keywords}
                 onChange={handleInputChange}
                 placeholder="예: 건강, 웰빙, 프리미엄, 자연 (쉼표로 구분)"
-                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue"
+                className="w-full input-field"
               />
-              <p className="text-xs text-gray-500 mt-1">쉼표로 구분해서 입력하세요</p>
+              <p className="text-xs text-dark-text-muted mt-1">쉼표로 구분해서 입력하세요</p>
             </div>
 
             {/* 트렌드 키워드 (선택) */}
@@ -306,9 +306,9 @@ export default function FilterUI({ onResourceCreated }) {
                 value={inputForm.trendKeywords}
                 onChange={handleInputChange}
                 placeholder="예: 저속노화, 물광피부, 전해질 밸런스 (쉼표로 구분)"
-                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue"
+                className="w-full input-field"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-dark-text-muted mt-1">
                 최근 SNS/뉴스에서 화제인 키워드를 입력하면 AI가 트렌드를 반영한 콘텐츠 주제를 제안합니다.
               </p>
             </div>
@@ -323,9 +323,9 @@ export default function FilterUI({ onResourceCreated }) {
                 value={inputForm.customStyle}
                 onChange={handleInputChange}
                 placeholder="예: 20대가 좋아할 만한 발랄한 톤으로, '물광' 이라는 단어를 꼭 넣어주세요"
-                className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-brand-blue h-20"
+                className="w-full input-field h-20"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-dark-text-muted mt-1">
                 원하는 톤, 꼭 들어갔으면 하는 문구 등을 직접 입력하면 AI 생성에 반영됩니다.
               </p>
             </div>
@@ -334,7 +334,7 @@ export default function FilterUI({ onResourceCreated }) {
             <button
               onClick={handleSubmitResource}
               disabled={loading}
-              className="w-full mt-6 px-6 py-3 bg-gradient-to-r from-brand-blue to-brand-blue-dark text-white font-bold rounded-lg hover:shadow-lg disabled:opacity-50 transition"
+              className="w-full mt-6 px-6 py-3 btn-primary disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -367,9 +367,9 @@ export default function FilterUI({ onResourceCreated }) {
           </div>
 
           {/* 가이드 */}
-          <div className="mt-8 bg-brand-wave border border-brand-blue/30 rounded-lg p-4">
-            <h3 className="font-semibold text-brand-ocean mb-2">📋 작성 가이드</h3>
-            <ul className="text-sm text-brand-ocean space-y-1">
+          <div className="mt-8 bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4">
+            <h3 className="font-semibold text-brand-blue mb-2">📋 작성 가이드</h3>
+            <ul className="text-sm text-dark-text space-y-1">
               <li>✓ 제품명: 간결하게 (3자 이상)</li>
               <li>✓ 제품 정보: 특징과 효능을 자세히 (30자 이상)</li>
               <li>✓ 키워드: 5~10개 추천 (쉼표로 구분)</li>
@@ -380,89 +380,116 @@ export default function FilterUI({ onResourceCreated }) {
 
       {/* 필터링 모드 */}
       {mode === "filter" && (
-        <div>
+        <div className="animate-fade-in">
           {/* 필터 섹션 */}
-          <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <div className="ui-card p-6 mb-6">
             <h2 className="text-2xl font-bold mb-6">🔍 기존 자료 검색</h2>
 
             <div className="space-y-6">
               {/* 카테고리 */}
               <div>
                 <label className="block font-semibold mb-3">카테고리</label>
-                <div className="flex flex-wrap gap-3">
-                  {metadata.categories.map((cat) => (
-                    <label key={cat} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={filters.categories.includes(cat)}
-                        onChange={() => handleFilterChange("categories", cat)}
-                        className="w-4 h-4"
-                      />
-                      <span>{cat}</span>
-                      {PRIORITY_CATEGORIES.includes(cat) && (
-                        <span
-                          title="사업 우선순위 카테고리"
-                          className="text-xs bg-brand-wave text-brand-ocean px-1.5 py-0.5 rounded-full"
-                        >
-                          ⭐ 우선순위
-                        </span>
-                      )}
-                    </label>
-                  ))}
+                <div className="flex flex-wrap gap-2">
+                  {metadata.categories.map((cat) => {
+                    const selected = filters.categories.includes(cat);
+                    return (
+                      <label
+                        key={cat}
+                        className={`filter-chip flex items-center gap-1.5 px-4 py-2 cursor-pointer text-sm font-medium ${
+                          selected ? "is-selected" : ""
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => handleFilterChange("categories", cat)}
+                          className="sr-only"
+                        />
+                        <span>{cat}</span>
+                        {PRIORITY_CATEGORIES.includes(cat) && (
+                          <span title="사업 우선순위 카테고리">⭐</span>
+                        )}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* 나이대 */}
               <div>
                 <label className="block font-semibold mb-3">나이대</label>
-                <div className="flex flex-wrap gap-3">
-                  {metadata.ageGroups.map((age) => (
-                    <label key={age} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={filters.ageGroups.includes(age)}
-                        onChange={() => handleFilterChange("ageGroups", age)}
-                        className="w-4 h-4"
-                      />
-                      <span>{age}</span>
-                    </label>
-                  ))}
+                <div className="flex flex-wrap gap-2">
+                  {metadata.ageGroups.map((age) => {
+                    const selected = filters.ageGroups.includes(age);
+                    return (
+                      <label
+                        key={age}
+                        className={`filter-chip flex items-center gap-1.5 px-4 py-2 cursor-pointer text-sm font-medium ${
+                          selected ? "is-selected" : ""
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => handleFilterChange("ageGroups", age)}
+                          className="sr-only"
+                        />
+                        <span>{age}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* 대상 */}
               <div>
                 <label className="block font-semibold mb-3">대상</label>
-                <div className="flex flex-wrap gap-3">
-                  {metadata.targets.map((target) => (
-                    <label key={target} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={filters.targets.includes(target)}
-                        onChange={() => handleFilterChange("targets", target)}
-                        className="w-4 h-4"
-                      />
-                      <span>{target}</span>
-                    </label>
-                  ))}
+                <div className="flex flex-wrap gap-2">
+                  {metadata.targets.map((target) => {
+                    const selected = filters.targets.includes(target);
+                    return (
+                      <label
+                        key={target}
+                        className={`filter-chip flex items-center gap-1.5 px-4 py-2 cursor-pointer text-sm font-medium ${
+                          selected ? "is-selected" : ""
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => handleFilterChange("targets", target)}
+                          className="sr-only"
+                        />
+                        <span>{target}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* 강조점 */}
               <div>
                 <label className="block font-semibold mb-3">강조점</label>
-                <div className="flex flex-wrap gap-3">
-                  {metadata.focus.map((f) => (
-                    <label key={f} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={filters.focus.includes(f)}
-                        onChange={() => handleFilterChange("focus", f)}
-                        className="w-4 h-4"
-                      />
-                      <span>{f}</span>
-                    </label>
-                  ))}
+                <div className="flex flex-wrap gap-2">
+                  {metadata.focus.map((f) => {
+                    const selected = filters.focus.includes(f);
+                    return (
+                      <label
+                        key={f}
+                        className={`filter-chip flex items-center gap-1.5 px-4 py-2 cursor-pointer text-sm font-medium ${
+                          selected ? "is-selected" : ""
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => handleFilterChange("focus", f)}
+                          className="sr-only"
+                        />
+                        <span>{f}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -471,14 +498,14 @@ export default function FilterUI({ onResourceCreated }) {
                 <button
                   onClick={handleSearch}
                   disabled={loading}
-                  className="flex-1 px-6 py-3 bg-brand-blue text-white rounded hover:bg-brand-blue-dark disabled:opacity-50 font-semibold"
+                  className="flex-1 px-6 py-3 btn-primary disabled:opacity-50"
                 >
                   {loading ? "검색 중..." : "🔍 검색"}
                 </button>
                 <button
                   onClick={handleReset}
                   disabled={loading}
-                  className="px-6 py-3 bg-gray-400 text-white rounded hover:bg-gray-500 disabled:opacity-50"
+                  className="px-6 py-3 bg-dark-chip text-dark-text rounded-lg hover:brightness-125 disabled:opacity-50"
                 >
                   초기화
                 </button>
@@ -488,7 +515,7 @@ export default function FilterUI({ onResourceCreated }) {
             {/* 검색 안내 메시지 */}
             {filteredResources.length === 0 &&
               !Object.values(filters).some((f) => f.length > 0) && (
-                <div className="bg-brand-wave border border-brand-blue/30 text-brand-blue-dark px-4 py-3 rounded mt-6 text-center">
+                <div className="bg-brand-blue/10 border border-brand-blue/30 text-brand-blue px-4 py-3 rounded mt-6 text-center">
                   💡 필터를 선택하고 "검색" 버튼을 클릭하면 자료를 찾을 수 있습니다.
                 </div>
               )}
@@ -496,20 +523,17 @@ export default function FilterUI({ onResourceCreated }) {
 
           {/* 결과 섹션 */}
           {filteredResources.length > 0 && (
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="ui-card p-6">
               <h2 className="text-2xl font-bold mb-4">
                 검색 결과 ({filteredResources.length}개)
               </h2>
               <div className="grid grid-cols-1 gap-4">
                 {filteredResources.map((resource) => (
-                  <div
-                    key={resource.id}
-                    className="border rounded-lg p-4 hover:shadow-lg transition"
-                  >
+                  <div key={resource.id} className="result-card p-4">
                     <h3 className="text-lg font-semibold text-brand-blue">
                       {resource.product_name}
                     </h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-dark-text-muted mt-1">
                       {resource.product_info.substring(0, 100)}...
                     </p>
                     {resource.metadata && (
@@ -517,14 +541,14 @@ export default function FilterUI({ onResourceCreated }) {
                         {resource.metadata.categories?.map((cat) => (
                           <span
                             key={cat}
-                            className="bg-brand-wave text-brand-ocean text-xs px-2 py-1 rounded"
+                            className="bg-brand-blue/10 text-brand-blue text-xs px-2 py-1 rounded"
                           >
                             {cat}
                           </span>
                         ))}
                       </div>
                     )}
-                    <div className="text-xs text-gray-500 mt-2">
+                    <div className="text-xs text-dark-text-muted mt-2">
                       생성일: {new Date(resource.created_at).toLocaleDateString()}
                     </div>
                   </div>
@@ -535,7 +559,7 @@ export default function FilterUI({ onResourceCreated }) {
 
           {filteredResources.length === 0 &&
             Object.values(filters).some((f) => f.length > 0) && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-dark-text-muted">
                 해당하는 자료가 없습니다.
               </div>
             )}

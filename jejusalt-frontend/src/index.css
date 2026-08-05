@@ -3,6 +3,7 @@
 /* 제주소금 브랜드 컬러 시스템 — Tailwind v4 @theme
    bg-brand-blue / text-brand-ocean / border-brand-blue / ring-brand-blue 등으로 사용 */
 @theme {
+  /* Primary / Sub / Neutral (브랜드 가이드) */
   --color-brand-blue: #00aeef;
   --color-brand-blue-dark: #0090c7;
   --color-primary-black: #000000;
@@ -15,6 +16,59 @@
   --color-brand-green: #2d7a3e;
   --color-brand-earth: #8b6f47;
   --color-brand-sand: #e8d4b8;
+
+  /* 다크 모드 배경 (브랜드 톤 유지) */
+  --color-dark-bg: #0a1117;
+  --color-dark-card: #0d1b2a;
+  --color-dark-chip: #1f3a52;
+  --color-dark-text: #e8f0f7;
+  --color-dark-text-muted: #9fb3c8;
+
+  /* 상태 배지 */
+  --color-status-pending: #ffa500;
+  --color-status-approved: #10b981;
+  --color-status-rejected: #ef4444;
+
+  /* 섀도우 시스템 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.3);
+  --shadow-glow: 0 0 12px rgba(0, 174, 239, 0.3);
+
+  /* 기본 트랜지션 이징 */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 페이지/모달 진입 애니메이션 (Tailwind 유틸로 노출: animate-fade-in / animate-modal-in) */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s var(--ease-standard);
+}
+
+.animate-modal-in {
+  animation: modal-in 0.3s var(--ease-standard);
 }
 
 :root {
@@ -55,8 +109,14 @@ p {
 /* 버튼 마이크로 인터랙션: 클릭(press) 시 눌림 피드백을 전 버튼에 일괄 적용 */
 button,
 a[role="button"],
-[role="button"] {
-  transition: transform 0.1s ease, background-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+[role="button"],
+input,
+select,
+textarea,
+a {
+  transition: transform 0.15s var(--ease-standard), background-color 0.2s var(--ease-standard),
+    border-color 0.2s var(--ease-standard), box-shadow 0.2s var(--ease-standard), opacity 0.2s var(--ease-standard),
+    color 0.2s var(--ease-standard);
 }
 
 button:not(:disabled):active,
@@ -68,4 +128,112 @@ a[role="button"]:not([aria-disabled="true"]):active,
 button:disabled,
 [role="button"][aria-disabled="true"] {
   cursor: not-allowed;
+}
+
+/* ============================================================
+   다크 테마 컴포넌트 유틸리티 (FilterUI/GenerationUI/AdminMode 공용)
+   ============================================================ */
+
+/* 카드 컨테이너 */
+.ui-card {
+  background-color: var(--color-dark-card);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+/* 입력 필드 (input / textarea) */
+.input-field {
+  background-color: var(--color-dark-card);
+  border: 1px solid rgba(0, 174, 239, 0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--color-dark-text);
+}
+
+.input-field::placeholder {
+  color: var(--color-dark-text-muted);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--color-brand-blue);
+  box-shadow: var(--shadow-glow);
+}
+
+/* Primary 버튼 (그라데이션) */
+.btn-primary {
+  background: linear-gradient(135deg, #00aeef, #0088cc);
+  color: #ffffff;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 8px 16px rgba(0, 174, 239, 0.4);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* 필터/카테고리 칩 */
+.filter-chip {
+  background-color: var(--color-dark-chip);
+  border: 1px solid rgba(0, 174, 239, 0.3);
+  border-radius: 9999px;
+  color: var(--color-dark-text);
+}
+
+.filter-chip:hover {
+  filter: brightness(1.15);
+}
+
+.filter-chip.is-selected {
+  background-color: var(--color-brand-blue);
+  border-color: var(--color-brand-blue);
+  color: #000000;
+}
+
+/* sr-only 체크박스가 키보드 포커스를 받으면 부모 칩에 포커스 링 표시 (접근성 유지) */
+.filter-chip:has(input:focus-visible) {
+  outline: 2px solid var(--color-brand-blue);
+  outline-offset: 2px;
+}
+
+/* 상태 배지 (검토중/승인/반려) */
+.status-badge {
+  border-radius: 9999px;
+  font-weight: 600;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+}
+
+.status-badge.status-pending {
+  background-color: rgba(255, 165, 0, 0.2);
+  color: var(--color-status-pending);
+}
+
+.status-badge.status-approved {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: var(--color-status-approved);
+}
+
+.status-badge.status-rejected {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: var(--color-status-rejected);
+}
+
+/* 결과/콘텐츠 카드 (좌측 강조 보더) */
+.result-card {
+  background-color: var(--color-dark-card);
+  border-left: 4px solid var(--color-brand-blue);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  transition: transform 0.2s var(--ease-standard), box-shadow 0.2s var(--ease-standard);
+}
+
+.result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-xl);
 }

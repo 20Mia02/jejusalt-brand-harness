@@ -149,18 +149,18 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
     <div className="max-w-4xl mx-auto p-6">
       {/* 제목 */}
       <h2 className="text-3xl font-bold mb-2">🎭 캐릭터 선택</h2>
-      <p className="text-gray-600 mb-6">
+      <p className="text-dark-text-muted mb-6">
         AI가 추천한 캐릭터 중 1개를 선택하고 편집하세요.
       </p>
 
       {/* 메시지 */}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-status-rejected/10 border border-status-rejected/30 text-status-rejected px-4 py-3 rounded mb-4 animate-fade-in">
           {error}
         </div>
       )}
       {successMessage && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+        <div className="bg-status-approved/10 border border-status-approved/30 text-status-approved px-4 py-3 rounded mb-4 animate-fade-in">
           {successMessage}
         </div>
       )}
@@ -178,8 +178,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
             }`}
             className={`border-2 rounded-lg p-5 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 ${
               selectedId === char.id
-                ? 'border-brand-blue bg-brand-wave'
-                : 'border-gray-200 bg-white hover:border-gray-300'
+                ? 'border-brand-blue bg-brand-blue/10 shadow-lg'
+                : 'border-brand-blue/10 bg-dark-card hover:border-brand-blue/40'
             }`}
             onClick={() => handleSelectCharacter(char.id)}
             onKeyDown={(e) => {
@@ -191,11 +191,11 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
           >
             {/* 순위 + 선택 표시 */}
             <div className="flex justify-between items-start mb-3">
-              <div className="text-sm font-semibold text-gray-600">
+              <div className="text-sm font-semibold text-dark-text-muted">
                 🏆 {idx + 1}순위
               </div>
               {selectedId === char.id && (
-                <span className="bg-brand-blue text-white text-xs px-2 py-1 rounded-full">
+                <span className="bg-brand-blue text-black text-xs px-2 py-1 rounded-full font-semibold">
                   ✓ 선택됨
                 </span>
               )}
@@ -205,11 +205,11 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
             <h3 className="text-xl font-bold mb-4">
               {char.character_name}
               {char.is_base_character ? (
-                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded ml-2">
+                <span className="text-xs bg-status-pending/10 text-status-pending px-2 py-1 rounded ml-2">
                   ⭐ 기본 캐릭터
                 </span>
               ) : (
-                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded ml-2">
+                <span className="text-xs bg-brand-blue/10 text-brand-blue px-2 py-1 rounded ml-2">
                   ✨ 새로 생성됨
                 </span>
               )}
@@ -233,7 +233,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                           handleCharacterChange(char.id, 'voice_tone', e.target.value)
                         }
                         placeholder="예: 따뜨한 아버지"
-                        className="w-full px-2 py-1 border rounded text-sm"
+                        className="w-full input-field text-sm py-1.5"
                       />
                     </div>
 
@@ -257,7 +257,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                           handleCharacterChange(char.id, 'personality_traits', traits);
                         }}
                         placeholder="예: 유머감각, 신뢰성"
-                        className="w-full px-2 py-1 border rounded text-sm"
+                        className="w-full input-field text-sm py-1.5"
                       />
                     </div>
 
@@ -266,13 +266,13 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                       <button
                         onClick={() => handleSaveCharacter(char)}
                         disabled={loading}
-                        className="flex-1 px-2 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
+                        className="flex-1 px-2 py-1 bg-status-approved text-white text-sm rounded hover:brightness-110 disabled:opacity-50"
                       >
                         💾 저장
                       </button>
                       <button
                         onClick={() => setEditingId(null)}
-                        className="flex-1 px-2 py-1 bg-gray-400 text-white text-sm rounded hover:bg-gray-500"
+                        className="flex-1 px-2 py-1 bg-dark-chip text-dark-text text-sm rounded hover:brightness-125"
                       >
                         취소
                       </button>
@@ -299,7 +299,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                         e.stopPropagation();
                         setEditingId(char.id);
                       }}
-                      className="text-brand-blue hover:text-brand-ocean text-sm"
+                      className="text-brand-blue hover:brightness-125 text-sm"
                     >
                       ✏️ 편집
                     </button>
@@ -314,7 +314,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                 e.stopPropagation();
                 setExpandedId(expandedId === char.id ? null : char.id);
               }}
-              className="text-xs text-gray-500 hover:text-gray-700 underline"
+              className="text-xs text-dark-text-muted hover:text-dark-text underline"
             >
               {expandedId === char.id ? '▼ 상세정보 숨기기' : '▶ 상세정보 보기'}
             </button>
@@ -322,8 +322,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
             {/* 레퍼런스 이미지 (있으면 표시) */}
             {char.reference_image_url && (
               <div className="mt-3 mb-3">
-                <span className="text-xs font-semibold text-gray-600">🖼️ 레퍼런스 이미지:</span>
-                <div className="mt-2 w-full h-32 bg-gray-200 rounded border border-gray-300 flex items-center justify-center overflow-hidden">
+                <span className="text-xs font-semibold text-dark-text-muted">🖼️ 레퍼런스 이미지:</span>
+                <div className="mt-2 w-full h-32 bg-dark-chip rounded border border-brand-blue/20 flex items-center justify-center overflow-hidden">
                   <img
                     src={char.reference_image_url}
                     alt={`${char.character_name} reference`}
@@ -333,9 +333,9 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                     }}
                   />
                 </div>
-                <div className="text-xs text-gray-500 mt-2 break-all">
+                <div className="text-xs text-dark-text-muted mt-2 break-all">
                   {char.generation_count && char.generation_count > 0 && (
-                    <span className="text-green-600 font-semibold">
+                    <span className="text-status-approved font-semibold">
                       ✓ {char.generation_count}회 생성됨 (일관된 스타일 유지)
                     </span>
                   )}
@@ -345,7 +345,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
             {/* 전체 프로필 (확장) */}
             {expandedId === char.id && char.character_profile && (
-              <div className="mt-4 pt-4 border-t bg-gray-50 p-3 rounded text-xs text-gray-700 max-h-48 overflow-y-auto">
+              <div className="mt-4 pt-4 border-t border-brand-blue/10 bg-dark-bg p-3 rounded text-xs text-dark-text-muted max-h-48 overflow-y-auto">
                 <pre className="whitespace-pre-wrap">
                   {JSON.stringify(char.character_profile, null, 2)}
                 </pre>
@@ -357,7 +357,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
       {/* 선택된 캐릭터 정보 (큰 화면) */}
       {selectedId && (
-        <div className="bg-brand-wave border-2 border-brand-blue/30 rounded-lg p-6 mb-6">
+        <div className="bg-brand-blue/10 border-2 border-brand-blue/30 rounded-lg p-6 mb-6 animate-fade-in">
           {(() => {
             const selected = localCharacters.find((c) => c.id === selectedId);
             return selected ? (
@@ -378,7 +378,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                       : selected.personality_traits}
                   </div>
                 )}
-                <p className="text-sm text-gray-600 mt-3">
+                <p className="text-sm text-dark-text-muted mt-3">
                   이 캐릭터로 시나리오를 생성하게 됩니다.
                 </p>
               </div>
@@ -389,7 +389,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
       {/* 영상유형 선택 */}
       {selectedId && (
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="ui-card p-6 mb-6">
           <h4 className="font-semibold mb-3">🎬 영상유형 선택</h4>
           <div className="flex flex-wrap gap-3">
             {videoTypes.map((type) => (
@@ -397,8 +397,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                 key={type}
                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition ${
                   videoType === type
-                    ? 'border-brand-blue bg-brand-wave text-brand-blue-dark'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-brand-blue bg-brand-blue/10 text-brand-blue'
+                    : 'border-brand-blue/10 hover:border-brand-blue/40'
                 }`}
               >
                 <input
@@ -417,7 +417,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
       {/* 숏폼 길이 선택 */}
       {selectedId && (
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="ui-card p-6 mb-6">
           <h4 className="font-semibold mb-3">⏱️ 영상 길이 선택</h4>
           <div className="flex flex-wrap gap-3">
             {DURATION_OPTIONS.map((opt) => (
@@ -425,8 +425,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                 key={opt.value}
                 className={`flex flex-col items-start gap-0.5 px-4 py-2 border rounded-lg cursor-pointer transition ${
                   duration === opt.value
-                    ? 'border-brand-blue bg-brand-wave text-brand-blue-dark'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-brand-blue bg-brand-blue/10 text-brand-blue'
+                    : 'border-brand-blue/10 hover:border-brand-blue/40'
                 }`}
               >
                 <span className="flex items-center gap-2">
@@ -439,7 +439,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                   />
                   <span className="font-semibold">{opt.label}</span>
                 </span>
-                <span className="text-xs text-gray-500 ml-6">{opt.hint}</span>
+                <span className="text-xs text-dark-text-muted ml-6">{opt.hint}</span>
               </label>
             ))}
           </div>
@@ -448,8 +448,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
       {/* 다음 단계 안내 */}
       {selectedId && (
-        <div className="bg-green-50 border border-green-300 rounded-lg p-4 text-center">
-          <p className="text-green-800">
+        <div className="bg-status-approved/10 border border-status-approved/30 rounded-lg p-4 text-center">
+          <p className="text-status-approved">
             ✨ <strong>{localCharacters.find((c) => c.id === selectedId)?.character_name}</strong>로,
             <strong> {videoType}</strong> · <strong>{duration}초</strong> 형식으로 계속 진행할 준비가 되었습니다.
           </p>
@@ -459,7 +459,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                 onSelect(localCharacters.find((c) => c.id === selectedId), videoType, duration);
               }
             }}
-            className="mt-3 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            className="mt-3 px-6 py-2 bg-status-approved text-white rounded hover:brightness-110"
           >
             🚀 다음 단계로
           </button>
@@ -468,7 +468,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
       {/* 캐릭터가 없는 경우 */}
       {localCharacters.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-dark-text-muted">
           {loading ? (
             <p>캐릭터를 불러오는 중...</p>
           ) : (

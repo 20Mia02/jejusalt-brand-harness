@@ -260,12 +260,12 @@ export default function AdminMode() {
 
       {/* 메시지 */}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-status-rejected/10 border border-status-rejected/30 text-status-rejected px-4 py-3 rounded mb-4 animate-fade-in">
           {error}
         </div>
       )}
       {successMessage && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+        <div className="bg-status-approved/10 border border-status-approved/30 text-status-approved px-4 py-3 rounded mb-4 animate-fade-in">
           {successMessage}
         </div>
       )}
@@ -273,10 +273,10 @@ export default function AdminMode() {
       {/* 2열 레이아웃: 자료 목록 + 상세 편집 (모바일: 1열 스택) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 좌측: 자료 목록 */}
-        <div className="md:col-span-1 bg-white shadow rounded-lg p-4">
-          <h2 className="text-xl font-bold mb-4">자료 목록</h2>
+        <div className="md:col-span-1 ui-card p-4">
+          <h2 className="text-xl font-bold mb-4 pb-3 border-b-2 border-brand-blue">자료 목록</h2>
           {loading ? (
-            <div className="text-center py-8 flex items-center justify-center gap-2 text-gray-500">
+            <div className="text-center py-8 flex items-center justify-center gap-2 text-dark-text-muted">
               <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -284,23 +284,28 @@ export default function AdminMode() {
               로드 중...
             </div>
           ) : resources.length === 0 ? (
-            <div className="text-center py-8 text-sm text-gray-500">
+            <div className="text-center py-8 text-sm text-dark-text-muted">
               아직 등록된 자료가 없습니다.<br />
               "자료 입력" 화면에서 새 자료를 추가해보세요.
             </div>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {resources.map((resource) => (
+            <div className="space-y-1 max-h-96 overflow-y-auto">
+              {resources.map((resource, idx) => (
                 <button
                   key={resource.id}
                   onClick={() => handleSelectResource(resource)}
                   className={`w-full text-left p-3 rounded transition ${
                     selectedResource?.id === resource.id
-                      ? 'bg-brand-blue text-white'
-                      : 'bg-gray-100 hover:bg-gray-200'
+                      ? 'bg-brand-blue text-black'
+                      : idx % 2 === 0
+                      ? 'bg-dark-bg hover:bg-dark-chip'
+                      : 'bg-dark-card hover:bg-dark-chip'
                   }`}
                 >
-                  <div className="font-semibold">{resource.product_name}</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold truncate">{resource.product_name}</div>
+                    <ResourceStatusBadge status={resource.status} />
+                  </div>
                   <div className="text-xs opacity-75">
                     {new Date(resource.created_at).toLocaleDateString()}
                   </div>
@@ -315,8 +320,8 @@ export default function AdminMode() {
           {selectedResource ? (
             <>
               {/* 섹션 1: 자료 정보 수정 */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-bold mb-4">📦 자료 정보</h3>
+              <div className="ui-card p-6 animate-fade-in">
+                <h3 className="text-lg font-bold mb-4 pb-3 border-b-2 border-brand-blue">📦 자료 정보</h3>
 
                 <div className="space-y-4">
                   {/* 제품명 */}
@@ -333,7 +338,7 @@ export default function AdminMode() {
                           product_name: e.target.value,
                         })
                       }
-                      className="w-full px-3 py-2 border rounded"
+                      className="w-full input-field"
                     />
                   </div>
 
@@ -350,7 +355,7 @@ export default function AdminMode() {
                           product_info: e.target.value,
                         })
                       }
-                      className="w-full px-3 py-2 border rounded h-24"
+                      className="w-full input-field h-24"
                     />
                   </div>
 
@@ -360,7 +365,7 @@ export default function AdminMode() {
                       <label className="block text-sm font-semibold mb-1">
                         메타데이터 (자동 생성됨)
                       </label>
-                      <pre className="bg-gray-100 p-3 rounded text-xs overflow-auto max-h-24">
+                      <pre className="bg-dark-bg p-3 rounded text-xs overflow-auto max-h-24 text-dark-text-muted">
                         {JSON.stringify(selectedResource.metadata, null, 2)}
                       </pre>
                     </div>
@@ -370,7 +375,7 @@ export default function AdminMode() {
                   <button
                     onClick={handleUpdateResource}
                     disabled={loading}
-                    className="w-full px-4 py-2 bg-brand-blue text-white rounded hover:bg-brand-blue-dark disabled:opacity-50"
+                    className="w-full px-4 py-2 btn-primary disabled:opacity-50"
                   >
                     💾 자료 저장
                   </button>
@@ -378,19 +383,19 @@ export default function AdminMode() {
               </div>
 
               {/* 섹션 2: 캐릭터 편집 */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-bold mb-4">🎭 캐릭터 편집</h3>
+              <div className="ui-card p-6 animate-fade-in">
+                <h3 className="text-lg font-bold mb-4 pb-3 border-b-2 border-brand-blue">🎭 캐릭터 편집</h3>
 
                 <div className="space-y-4">
                   {characters.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
+                    <div className="text-center text-dark-text-muted py-8">
                       캐릭터가 없습니다. 먼저 AI 생성을 실행하세요.
                     </div>
                   ) : (
                     characters.map((char, idx) => (
                       <div
                         key={char.id}
-                        className="border-l-4 border-brand-blue pl-4 py-3 bg-gray-50 rounded"
+                        className="border-l-4 border-brand-blue pl-4 py-3 bg-dark-bg rounded shadow-md"
                       >
                         {/* 캐릭터 이름 + 선택 상태 */}
                         <div className="flex justify-between items-start mb-3">
@@ -399,14 +404,14 @@ export default function AdminMode() {
                               {idx + 1}순위: {char.character_name}
                             </h4>
                             {char.selected && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                              <span className="status-badge status-approved">
                                 ✓ 선택됨
                               </span>
                             )}
                           </div>
                           <button
                             onClick={() => setDeleteConfirm(char.id)}
-                            className="text-red-600 hover:text-red-800 text-sm"
+                            className="text-status-rejected hover:brightness-125 text-sm"
                           >
                             🗑️ 삭제
                           </button>
@@ -434,7 +439,7 @@ export default function AdminMode() {
                               })
                             }
                             placeholder="예: 따뜬한 아버지"
-                            className="w-full px-2 py-1 border rounded text-sm"
+                            className="w-full input-field text-sm py-1.5"
                           />
                         </div>
 
@@ -471,18 +476,18 @@ export default function AdminMode() {
                               })
                             }
                             placeholder="예: 유머감각, 신뢰성 (쉼표로 구분)"
-                            className="w-full px-2 py-1 border rounded text-sm"
+                            className="w-full input-field text-sm py-1.5"
                           />
                         </div>
 
                         {/* ⭐ 레퍼런스 이미지 & 생성 횟수 (재현성 추적) */}
-                        <div className="mt-3 p-3 bg-brand-wave rounded border border-brand-blue/30">
-                          <div className="text-xs font-semibold text-brand-ocean mb-2">
+                        <div className="mt-3 p-3 bg-brand-blue/10 rounded border border-brand-blue/30">
+                          <div className="text-xs font-semibold text-brand-blue mb-2">
                             🖼️ 레퍼런스 이미지 (재현성)
                           </div>
                           {char.reference_image_url && (
                             <>
-                              <div className="w-full h-20 bg-gray-200 rounded border border-gray-300 flex items-center justify-center overflow-hidden mb-2">
+                              <div className="w-full h-20 bg-dark-chip rounded border border-brand-blue/20 flex items-center justify-center overflow-hidden mb-2">
                                 <img
                                   src={char.reference_image_url}
                                   alt={`${char.character_name} reference`}
@@ -492,17 +497,17 @@ export default function AdminMode() {
                                   }}
                                 />
                               </div>
-                              <div className="text-xs text-gray-600 break-all mb-2">
+                              <div className="text-xs text-dark-text-muted break-all mb-2">
                                 <strong>URL:</strong> {char.reference_image_url.substring(0, 50)}...
                               </div>
                               {char.generation_count && char.generation_count > 0 && (
-                                <div className="text-xs text-green-700 font-semibold">
+                                <div className="text-xs text-status-approved font-semibold">
                                   ✓ {char.generation_count}회 생성됨
                                 </div>
                               )}
                             </>
                           ) || (
-                            <div className="text-xs text-gray-600">
+                            <div className="text-xs text-dark-text-muted">
                               아직 이미지 생성 안 됨. 첫 영상 생성 후 자동으로 저장됩니다.
                             </div>
                           )}
@@ -515,8 +520,8 @@ export default function AdminMode() {
 
               {/* 섹션 3: 네이밍 선택 (수정판) */}
               {naming && (
-                <div className="bg-white shadow rounded-lg p-6">
-                  <h3 className="text-lg font-bold mb-4">📝 네이밍 선택</h3>
+                <div className="ui-card p-6 animate-fade-in">
+                  <h3 className="text-lg font-bold mb-4 pb-3 border-b-2 border-brand-blue">📝 네이밍 선택</h3>
 
                   <div className="space-y-6">
                     {/* 제품명 3개 옵션 (State 기반) */}
@@ -526,7 +531,11 @@ export default function AdminMode() {
                         {[0, 1, 2].map((i) => (
                           <label
                             key={`product_${i}`}
-                            className="flex items-start gap-3 p-3 border rounded hover:bg-brand-wave cursor-pointer"
+                            className={`flex items-start gap-3 p-3 rounded cursor-pointer border transition ${
+                              selectedProductIdx === i
+                                ? 'bg-brand-blue/10 border-brand-blue'
+                                : 'bg-dark-bg border-transparent hover:bg-dark-chip'
+                            }`}
                           >
                             <input
                               type="radio"
@@ -540,7 +549,7 @@ export default function AdminMode() {
                                 {i + 1}순위: {naming[`product_name_${i + 1}`]} (
                                 {naming[`product_name_${i + 1}_score`]}점)
                               </div>
-                              <div className="text-sm text-gray-600">
+                              <div className="text-sm text-dark-text-muted">
                                 {naming[`product_name_${i + 1}_meaning`]}
                               </div>
                             </div>
@@ -556,7 +565,11 @@ export default function AdminMode() {
                         {[0, 1, 2].map((i) => (
                           <label
                             key={`content_${i}`}
-                            className="flex items-start gap-3 p-3 border rounded hover:bg-brand-wave cursor-pointer"
+                            className={`flex items-start gap-3 p-3 rounded cursor-pointer border transition ${
+                              selectedContentIdx === i
+                                ? 'bg-brand-blue/10 border-brand-blue'
+                                : 'bg-dark-bg border-transparent hover:bg-dark-chip'
+                            }`}
                           >
                             <input
                               type="radio"
@@ -570,7 +583,7 @@ export default function AdminMode() {
                                 {i + 1}순위: {naming[`content_name_${i + 1}`]} (
                                 {naming[`content_name_${i + 1}_score`]}점)
                               </div>
-                              <div className="text-sm text-gray-600">
+                              <div className="text-sm text-dark-text-muted">
                                 {naming[`content_name_${i + 1}_meaning`]}
                               </div>
                             </div>
@@ -583,7 +596,7 @@ export default function AdminMode() {
                     <button
                       onClick={handleSelectNaming}
                       disabled={loading}
-                      className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                      className="w-full px-4 py-2 btn-primary disabled:opacity-50"
                     >
                       ✅ 네이밍 저장
                     </button>
@@ -593,34 +606,34 @@ export default function AdminMode() {
 
               {/* 네이밍이 아직 없는 경우 */}
               {!naming && (
-                <div className="bg-brand-wave border border-brand-blue/30 rounded-lg p-4 text-center">
-                  <p className="text-brand-ocean">
+                <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4 text-center">
+                  <p className="text-brand-blue">
                     📝 아직 네이밍이 생성되지 않았습니다.
                   </p>
-                  <p className="text-sm text-brand-blue mt-1">
+                  <p className="text-sm text-dark-text-muted mt-1">
                     먼저 "AI 생성" 버튼을 클릭해서 Step 6(네이밍 생성)까지 완료하세요.
                   </p>
                 </div>
               )}
 
               {/* 섹션 4: 코멘트 스레드 (팀 협업) */}
-              <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-bold mb-4">💬 코멘트 스레드</h3>
+              <div className="ui-card p-6 animate-fade-in">
+                <h3 className="text-lg font-bold mb-4 pb-3 border-b-2 border-brand-blue">💬 코멘트 스레드</h3>
 
                 {/* 코멘트 목록 */}
                 <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
                   {comments.length === 0 ? (
-                    <p className="text-sm text-gray-500 text-center py-6">
+                    <p className="text-sm text-dark-text-muted text-center py-6">
                       아직 코멘트가 없습니다. 첫 코멘트를 남겨보세요.
                     </p>
                   ) : (
                     comments.map((c) => (
-                      <div key={c.id} className="border rounded-lg p-3 bg-gray-50">
+                      <div key={c.id} className="rounded-lg p-3 bg-dark-bg border border-brand-blue/10">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-semibold text-sm text-brand-ocean">
+                          <span className="font-semibold text-sm text-brand-blue">
                             {c.author}
                           </span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-dark-text-muted">
                             {new Date(c.created_at).toLocaleString()}
                           </span>
                         </div>
@@ -631,24 +644,24 @@ export default function AdminMode() {
                 </div>
 
                 {/* 코멘트 작성 폼 */}
-                <div className="space-y-2 border-t pt-4">
+                <div className="space-y-2 border-t border-brand-blue/20 pt-4">
                   <input
                     type="text"
                     value={newCommentAuthor}
                     onChange={(e) => setNewCommentAuthor(e.target.value)}
                     placeholder="작성자 이름"
-                    className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-brand-blue"
+                    className="w-full input-field text-sm py-2"
                   />
                   <textarea
                     value={newCommentMessage}
                     onChange={(e) => setNewCommentMessage(e.target.value)}
                     placeholder="이 자료에 대한 검토 의견을 남겨주세요..."
-                    className="w-full px-3 py-2 border rounded text-sm h-20 focus:ring-2 focus:ring-brand-blue"
+                    className="w-full input-field text-sm h-20"
                   />
                   <button
                     onClick={handleAddComment}
                     disabled={commentLoading || !newCommentMessage.trim()}
-                    className="w-full px-4 py-2 bg-brand-blue text-white rounded hover:bg-brand-blue-dark disabled:opacity-50 text-sm font-semibold"
+                    className="w-full px-4 py-2 btn-primary disabled:opacity-50 text-sm"
                   >
                     {commentLoading ? '등록 중...' : '💬 코멘트 등록'}
                   </button>
@@ -656,7 +669,7 @@ export default function AdminMode() {
               </div>
             </>
           ) : (
-            <div className="bg-white shadow rounded-lg p-12 text-center text-gray-500">
+            <div className="ui-card p-12 text-center text-dark-text-muted">
               좌측에서 자료를 선택하세요.
             </div>
           )}
@@ -665,23 +678,23 @@ export default function AdminMode() {
 
       {/* 삭제 확인 모달 */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="ui-card p-6 max-w-sm animate-modal-in">
             <h3 className="text-lg font-bold mb-4">캐릭터를 삭제하시겠습니까?</h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-dark-text-muted mb-6">
               이 작업은 되돌릴 수 없습니다.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                className="flex-1 px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
               >
                 취소
               </button>
               <button
                 onClick={() => handleDeleteCharacter(deleteConfirm)}
                 disabled={loading}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-status-rejected text-white rounded-lg hover:brightness-110 disabled:opacity-50"
               >
                 삭제
               </button>
@@ -691,4 +704,17 @@ export default function AdminMode() {
       )}
     </div>
   );
+}
+
+/**
+ * 자료 상태 배지 (검토중/승인/반려) — resources.status 값을 시각화
+ */
+function ResourceStatusBadge({ status }) {
+  const map = {
+    analyzing: { label: '검토중', cls: 'status-pending' },
+    analyzed: { label: '승인', cls: 'status-approved' },
+    failed: { label: '반려', cls: 'status-rejected' },
+  };
+  const info = map[status] || { label: status || '알수없음', cls: 'status-pending' };
+  return <span className={`status-badge ${info.cls} shrink-0`}>{info.label}</span>;
 }
