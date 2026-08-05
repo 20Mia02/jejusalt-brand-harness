@@ -1,0 +1,53 @@
+{
+  "compliance_reviewer_agent": {
+    "output": {
+      "compliance_status": "pass|warning|fail",
+      "confidence": "0-100",
+      "breakdown": {
+        "rule_compliance": {
+          "score": "0-100",
+          "passed_rules": ["string"],
+          "failed_rules": ["string"]
+        },
+        "risk_assessment": {
+          "score": "0-100",
+          "identified_risks": [
+            {
+              "risk_id": "string",
+              "type": "string",
+              "description": "string",
+              "severity": "critical|high|medium|low",
+              "recommendation": "string"
+            }
+          ]
+        }
+      },
+      "violations": [
+        {
+          "rule_id": "string",
+          "severity": "critical|high|medium|low",
+          "evidence": "string",
+          "correction": "string"
+        }
+      ],
+      "final_recommendation": "string",
+      "summary": "string"
+    }
+  },
+  "post_generation_qa_agent": {
+    "output": {
+      "qa_status": "pass|warning|fail",
+      "qa_passed": "boolean",
+      "qa_checks": [
+        {
+          "check_id": "string",
+          "result": "pass|warning|fail",
+          "details": "string",
+          "recommendation": "string|null"
+        }
+      ],
+      "overall_score": "0-100",
+      "action_required": "string"
+    }
+  }
+}

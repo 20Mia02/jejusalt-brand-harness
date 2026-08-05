@@ -17,7 +17,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { callAgent, callHiggsfield } = require("../agents/backend-agent");
+const { callAgent, callHiggsfield, getComplianceRulesForCategory } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
 const { getGenerationConfig } = require("../utils/config-loader");
 
@@ -409,13 +409,19 @@ router.post("/:resourceId/start", async (req, res) => {
     const generatedContent = contentResult.data.content;
 
     // ── 6. Step 8: compliance-reviewer-agent (검증) ──
-    console.log("[Step 8] compliance-reviewer-agent 호출...");
+    // ⭐ 멘토링 피드백 2: 카테고리별 규칙(compliance-rules.json)을 함께 전달해서
+    //    카테고리에 맞는 기준으로만 판단하게 한다.
+    const productCategory = metadata.categories?.[0] || "일반";
+    const complianceRules = getComplianceRulesForCategory(productCategory);
+
+    console.log(`[Step 8] compliance-reviewer-agent 호출... (카테고리: ${productCategory})`);
     const complianceResult = await callAgent(
       "compliance-reviewer-agent",
       {
         content: generatedContent,
-        category: metadata.categories?.[0] || "일반",
+        category: productCategory,
         productName: selectedProductName,
+        complianceRules,
       },
       { resourceId, step: "compliance-reviewer" }
     );
@@ -428,17 +434,23 @@ router.post("/:resourceId/start", async (req, res) => {
       });
     }
 
-    const validationStatus = complianceResult.data.validation?.status || "UNKNOWN";
-    const validationScore = complianceResult.data.validation?.score || 0;
+    // ⭐ 멘토링 피드백 1/5: 구조화된 응답(compliance_status/confidence/breakdown/violations)을
+    //    그대로 사용하되, 기존 코드(브랜드 보이스 캐시 필터 등)와의 호환을 위해
+    //    APPROVED/REJECTED 레거시 상태값도 함께 계산해서 유지한다.
+    const complianceData = complianceResult.data || {};
+    const complianceStatus = complianceData.compliance_status || "warning";
+    const validationScore = complianceData.confidence ?? 0;
+    const validationStatus = complianceStatus === "fail" ? "REJECTED" : "APPROVED";
 
-    console.log(`[Step 8] 검증 결과: ${validationStatus} (점수: ${validationScore})`);
+    console.log(
+      `[Step 8] 검증 결과: ${complianceStatus} (신뢰도: ${validationScore}, 위반 ${complianceData.violations?.length || 0}건)`
+    );
 
-    // REJECTED는 경고이지만 계속 진행 (선택사항)
-    if (validationStatus === "REJECTED") {
-      console.warn("⚠️ 컴플라이언스 검증 REJECTED - 그대로 진행");
+    if (complianceStatus === "fail") {
+      console.warn("⚠️ 컴플라이언스 검증 FAIL - 그대로 진행 (경고만 기록)");
     }
 
-    // contents 테이블에 저장
+    // contents 테이블에 저장 (validation_details에 구조화된 판단 근거 전체 보존)
     const contentDBResult = await callDatabase("contents", "create", {
       resource_id: resourceId,
       scenario_id: scenarioDBResult.rows?.[0]?.id || null,
@@ -447,6 +459,7 @@ router.post("/:resourceId/start", async (req, res) => {
       generated_content: generatedContent,
       validation_status: validationStatus,
       validation_score: validationScore,
+      validation_details: complianceData,
     });
 
     if (!contentDBResult.success) {
@@ -531,6 +544,42 @@ router.post("/:resourceId/start", async (req, res) => {
       }
     }
 
+    // ── 7-2. Step 10: post-generation-qa-agent (멘토링 피드백 3) ──
+    // 텍스트 검수(Step 8) → 영상 생성(Step 9) → 생성 영상 검수(Step 10) 순서로 확장.
+    // 영상이 실제로 생성됐을 때만 실행하며, 실패해도 파이프라인 자체는 막지 않는다
+    // (Higgsfield 재호출 비용이 크므로 QA 실패는 경고로만 처리하고 결과는 그대로 반환).
+    let qaResult = null;
+    if (higgsfieldResult.success && videoUrl) {
+      console.log("[Step 10] post-generation-qa-agent 호출...");
+      const qaCallResult = await callAgent(
+        "post-generation-qa-agent",
+        {
+          videoUrl,
+          expectedDuration: targetDuration,
+          character: selectedCharacter.character_name,
+          referenceImageUrl: selectedCharacter.reference_image_url || null,
+          generatedContent,
+        },
+        { resourceId, step: "post-generation-qa" }
+      );
+
+      if (qaCallResult.success) {
+        qaResult = qaCallResult.data;
+        console.log(`[Step 10] QA 결과: ${qaResult.qa_status} (점수: ${qaResult.overall_score})`);
+
+        if (!qaResult.qa_passed) {
+          await callDatabase("generation_logs", "create", {
+            resource_id: resourceId,
+            step: "post-generation-qa",
+            status: "QA_FAILED",
+            details: qaResult,
+          }).catch((e) => console.error("[QA 실패 로그 기록 실패]", e));
+        }
+      } else {
+        console.warn("[Step 10] post-generation-qa-agent 호출 실패 - 결과 없이 진행");
+      }
+    }
+
     // ── 8. 최종 응답 ──────────────────────────────
     console.log(`✅ POST /api/generate 완료`);
 
@@ -539,10 +588,12 @@ router.post("/:resourceId/start", async (req, res) => {
       contentId,
       validationStatus,
       validationScore,
+      complianceDetails: complianceData,
       duration: targetDuration,
       videoUrl: higgsfieldResult.success ? higgsfieldResult.data.video_url : null,
       videoStatus: higgsfieldResult.success ? "completed" : "failed",
       higgsfieldError: higgsfieldError,
+      qaResult,
     });
   } catch (error) {
     console.error("[POST /api/generate] 예외 발생:", error);

@@ -45,6 +45,11 @@ export default function AdminMode() {
   const [newCommentMessage, setNewCommentMessage] = useState('');
   const [commentLoading, setCommentLoading] = useState(false);
 
+  // 🆕 컴플라이언스 테스트 State (멘토링 피드백 4)
+  const [complianceTestResults, setComplianceTestResults] = useState(null);
+  const [complianceTestLoading, setComplianceTestLoading] = useState(false);
+  const [complianceTestError, setComplianceTestError] = useState(null);
+
   // 마운트 시 자료 목록 로드
   useEffect(() => {
     loadResources();
@@ -242,6 +247,25 @@ export default function AdminMode() {
     }
   };
 
+  /**
+   * 컴플라이언스 테스트 케이스 6개 실행 (멘토링 피드백 4)
+   */
+  const runComplianceTest = async () => {
+    try {
+      setComplianceTestLoading(true);
+      setComplianceTestError(null);
+      const res = await axios.get('/api/admin/compliance-test');
+      setComplianceTestResults(res.data);
+    } catch (err) {
+      console.error('컴플라이언스 테스트 실행 실패:', err);
+      setComplianceTestError(
+        err.response?.data?.message || '컴플라이언스 테스트 실행에 실패했습니다.'
+      );
+    } finally {
+      setComplianceTestLoading(false);
+    }
+  };
+
   // ─────────────────────────────────────────────────────
   // UI 렌더링
   // ─────────────────────────────────────────────────────
@@ -269,6 +293,76 @@ export default function AdminMode() {
           {successMessage}
         </div>
       )}
+
+      {/* 🆕 컴플라이언스 테스트 (멘토링 피드백 4) */}
+      <div className="ui-card p-6 mb-8 animate-fade-in">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b-2 border-brand-blue">
+          <h2 className="text-xl font-bold">🧪 컴플라이언스 테스트</h2>
+          <button
+            onClick={runComplianceTest}
+            disabled={complianceTestLoading}
+            className="px-4 py-2 btn-primary disabled:opacity-50 text-sm"
+          >
+            {complianceTestLoading ? '실행 중...' : '테스트 케이스 실행'}
+          </button>
+        </div>
+
+        {complianceTestError && (
+          <div className="bg-status-rejected/10 border border-status-rejected/30 text-status-rejected px-4 py-3 rounded mb-4">
+            {complianceTestError}
+          </div>
+        )}
+
+        {!complianceTestResults && !complianceTestLoading && (
+          <p className="text-sm text-dark-text-muted text-center py-6">
+            버튼을 눌러 고정된 6개 테스트 케이스(허위 효능, 원산지 거짓 표시, 과장 할인, 애매한 건강 표현,
+            뷰티 의학 용어, 정상 표현)를 compliance-reviewer-agent에 실제로 통과시켜 봅니다.
+          </p>
+        )}
+
+        {complianceTestResults && (
+          <>
+            <div className="flex items-center gap-4 mb-4 text-sm">
+              <span className="font-semibold">
+                통과율: {complianceTestResults.passRate}% ({complianceTestResults.passCount}/{complianceTestResults.total})
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-left border-b border-brand-blue/30">
+                    <th className="py-2 pr-3">케이스</th>
+                    <th className="py-2 pr-3">입력</th>
+                    <th className="py-2 pr-3">예상</th>
+                    <th className="py-2 pr-3">실제</th>
+                    <th className="py-2 pr-3">일치 여부</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {complianceTestResults.results.map((r) => (
+                    <tr key={r.id} className="border-b border-brand-blue/10">
+                      <td className="py-2 pr-3 font-mono text-xs">
+                        {r.id}
+                        <div className="text-dark-text-muted">{r.label}</div>
+                      </td>
+                      <td className="py-2 pr-3 max-w-xs">{r.input}</td>
+                      <td className="py-2 pr-3">{r.expected}</td>
+                      <td className="py-2 pr-3">{r.actual}</td>
+                      <td className="py-2 pr-3">
+                        {r.passed ? (
+                          <span className="status-badge status-approved">✅ 통과</span>
+                        ) : (
+                          <span className="status-badge status-rejected">❌ 불일치</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* 2열 레이아웃: 자료 목록 + 상세 편집 (모바일: 1열 스택) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
