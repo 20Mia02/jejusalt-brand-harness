@@ -16,14 +16,20 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const VIDEO_TYPES = ['캐릭터소개', '제품스토리', '일상밥상'];
+const getVideoTypes = () => {
+  if (window.appConfig?.generation?.videoTypes) {
+    return window.appConfig.generation.videoTypes;
+  }
+  return ['캐릭터소개', '제품스토리', '일상밥상'];
+};
 
 export default function CharacterCreator({ characters = [], resourceId, onSelect }) {
+  const videoTypes = getVideoTypes();
   const [localCharacters, setLocalCharacters] = useState(characters);
   const [selectedId, setSelectedId] = useState(
     characters.find((c) => c.selected)?.id || characters[0]?.id
   );
-  const [videoType, setVideoType] = useState(VIDEO_TYPES[1]); // 기본값: 제품스토리
+  const [videoType, setVideoType] = useState(videoTypes[1] || '제품스토리');
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -282,6 +288,30 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
             >
               {expandedId === char.id ? '▼ 상세정보 숨기기' : '▶ 상세정보 보기'}
             </button>
+
+            {/* 레퍼런스 이미지 (있으면 표시) */}
+            {char.reference_image_url && (
+              <div className="mt-3 mb-3">
+                <span className="text-xs font-semibold text-gray-600">🖼️ 레퍼런스 이미지:</span>
+                <div className="mt-2 w-full h-32 bg-gray-200 rounded border border-gray-300 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={char.reference_image_url}
+                    alt={`${char.character_name} reference`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50" y="50" text-anchor="middle" dy=".3em" fill="%23999" font-size="12"%3E이미지 로드 실패%3C/text%3E%3C/svg%3E';
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-gray-500 mt-2 break-all">
+                  {char.generation_count && char.generation_count > 0 && (
+                    <span className="text-green-600 font-semibold">
+                      ✓ {char.generation_count}회 생성됨 (일관된 스타일 유지)
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 전체 프로필 (확장) */}
             {expandedId === char.id && char.character_profile && (

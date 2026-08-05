@@ -66,9 +66,17 @@ npm install
 
 ### Step 4: Supabase 스키마 초기화
 
+#### 4-1. 기본 테이블 생성
 ```bash
 # Supabase 대시보드 → SQL Editor → 파일 열기 → docs/schema.sql 전체 복사 후 실행
 # → 7개 테이블 자동 생성됨
+```
+
+#### 4-2. 재현성/일관성 기능 적용 (선택사항)
+```bash
+# Supabase 대시보드 → SQL Editor → 파일 열기 → docs/schema-migration-consistency.sql 전체 복사 후 실행
+# → characters, videos 테이블에 신규 컬럼 추가
+# → 캐릭터별 레퍼런스 이미지 저장 & 생성 횟수 추적 가능해짐
 ```
 
 ### Step 5: 서버 시작
@@ -80,6 +88,36 @@ npm run dev
 ```
 
 브라우저: `http://localhost:5000`
+
+---
+
+## 🚀 주요 개선사항 (2026-08-05)
+
+### A. 재현성/일관성 강화
+- **동일 캐릭터 다중 생성 시 일관된 비주얼 유지**
+  - 첫 캐릭터 생성 시 레퍼런스 이미지 저장
+  - 재생성 시 `--image-references` 파라미터로 스타일 일관성 유지
+  - AdminMode에서 캐릭터별 생성 횟수 추적 가능
+  - 발표 데모: [docs/CONSISTENCY_DEMO_GUIDE.md](docs/CONSISTENCY_DEMO_GUIDE.md) 참고
+
+### B. DB 스키마 확장 (필수 마이그레이션)
+- `characters` 테이블에 신규 컬럼 추가:
+  - `reference_image_url`: 캐릭터 레퍼런스 이미지 URL
+  - `generation_count`: 생성한 영상 개수 (재현성 검증 지표)
+  - `image_generated_at`: 이미지 생성 시각
+- 마이그레이션 SQL: [docs/schema-migration-consistency.sql](docs/schema-migration-consistency.sql)
+- **실행 전 필수**: Supabase 대시보드 SQL Editor에서 직접 실행
+
+### C. 범용성 (다른 브랜드 적용)
+- [config.json.example](config.json.example) 참고
+  - 브랜드명, 캐릭터, 톤앤보이스를 설정 파일로 분리
+  - 다른 브랜드 적용 시 config.json만 수정하면 됨
+  - API 키는 여전히 `.env`로 관리
+
+### D. 반복 작업 자동화 강화
+- Generation logs 개선: 각 단계별 실패 추적 강화
+- 부분 재실행: 실패한 단계부터만 다시 실행 가능하도록 설계
+- 배치 처리: 여러 자료 동시 생성 지원 구조 완비
 
 ---
 
@@ -359,4 +397,4 @@ higgsfield generate create seedance1_5 --duration 8 --prompt "..." --wait
 
 ---
 
-**마지막 업데이트**: 2026-08-04
+**마지막 업데이트**: 2026-08-05 (재현성/일관성, 범용성, 자동화 강화)

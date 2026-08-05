@@ -353,6 +353,7 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
     // ✅ 메타데이터 기반 프롬프트 생성 (텍스트 제거)
     const character = videoConfig.character || 'woman';
     const voiceTone = videoConfig.voiceTone || 'professional';
+    const visualDescription = videoConfig.visualDescription || '';
     const metadata = `${character} character, ${voiceTone} tone, product promotion`;
 
     console.log(`[Step 9] Higgsfield CLI 호출 시작`);
@@ -360,7 +361,13 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
     console.log(`  메타데이터: ${metadata}`);
     console.log(`  duration: ${duration}초`);
 
-    const command = `higgsfield generate create seedance1_5 --prompt "${metadata}" --duration ${duration} --resolution 720p --wait`;
+    // ⭐ 캐릭터 레퍼런스 이미지가 있으면 --image-references 추가 (재현성)
+    let command = `higgsfield generate create seedance1_5 --prompt "${metadata}" --duration ${duration} --resolution 720p`;
+    if (videoConfig.referenceImageUrl) {
+      console.log(`  레퍼런스 이미지: ${videoConfig.referenceImageUrl}`);
+      command += ` --image-references "${videoConfig.referenceImageUrl}"`;
+    }
+    command += ` --wait`;
 
     console.log(`[Step 9] 명령 실행 중...`);
     const { stdout, stderr } = await execPromise(command, {

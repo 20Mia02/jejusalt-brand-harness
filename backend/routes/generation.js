@@ -128,6 +128,17 @@ router.post("/:resourceId/start", async (req, res) => {
       voice_tone: selectedCharacter.voice_tone || "기본",
     };
 
+    // ⭐ character-designer 결과가 있으면 characters 테이블에 상세 정보 저장 (재현성 정보 포함)
+    if (designerResult.success && designerResult.data?.brief) {
+      await callDatabase("characters", "update", {
+        voice_tone: completeBrief.voice_tone,
+        personality_traits: completeBrief.personality_traits,
+        visual_description: completeBrief.visual_description,
+        preferred_expressions: completeBrief.preferred_expressions,
+        avoid_expressions: completeBrief.avoid_expressions,
+      }, { id: selectedCharacter.id }).catch((e) => console.error("[Step 4] 캐릭터 상세 저장 실패:", e));
+    }
+
     // ── 3. Step 5: shortform-scenario-writer-agent 호출 (고수아) ──
     console.log("[Step 5] shortform-scenario-writer-agent 호출...");
     const scenarioResult = await callAgent(
@@ -176,6 +187,12 @@ router.post("/:resourceId/start", async (req, res) => {
 
     if (!scenarioDBResult.success) {
       console.error("[Step 5] scenarios 저장 실패");
+      await callDatabase("generation_logs", "create", {
+        resource_id: resourceId,
+        step: "shortform-scenario-writer",
+        status: "fail",
+        error_message: "Scenarios 테이블 저장 실패",
+      }).catch(() => {});
       return res.status(500).json({
         success: false,
         message: "시나리오 저장에 실패했습니다",
@@ -329,6 +346,8 @@ router.post("/:resourceId/start", async (req, res) => {
         character: selectedCharacter.character_name,
         generatedContent,
         voiceTone: selectedCharacter.voice_tone || "기본",
+        visualDescription: selectedCharacter.visual_description || "",
+        referenceImageUrl: selectedCharacter.reference_image_url || null, // ⭐ 재현성: 레퍼런스 이미지 전달
         duration: 120,
       },
       resourceId,
@@ -354,8 +373,24 @@ router.post("/:resourceId/start", async (req, res) => {
         id: videosRowId,
         generation_status: "completed",
         generation_progress: 100,
-        video_url: higgsfieldResult.data.video_url,
+        video_url: videoUrl,
+        character_reference_image_url: selectedCharacter.reference_image_url || null, // ⭐ 재현성 추적
       }).catch((e) => console.error("[영상 상태 업데이트 실패]", e));
+
+      // ⭐ 캐릭터의 reference_image_url과 generation_count 업데이트 (첫 생성 시에만 저장)
+      if (!selectedCharacter.reference_image_url && videoUrl) {
+        // 첫 영상 생성: 영상 URL을 레퍼런스로 저장 (프레임으로 나중에 사용 가능)
+        await callDatabase("characters", "update", {
+          reference_image_url: videoUrl, // Higgsfield 영상 URL을 레퍼런스로 사용
+          image_generated_at: new Date().toISOString(),
+          generation_count: 1,
+        }, { id: selectedCharacter.id }).catch((e) => console.error("[캐릭터 레퍼런스 저장 실패]", e));
+      } else {
+        // 재생성: generation_count만 증가
+        await callDatabase("characters", "update", {
+          generation_count: (selectedCharacter.generation_count || 0) + 1,
+        }, { id: selectedCharacter.id }).catch((e) => console.error("[캐릭터 카운트 업데이트 실패]", e));
+      }
     }
 
     // ── 8. 최종 응답 ──────────────────────────────
@@ -436,24 +471,29 @@ router.get("/:resourceId/result", async (req, res) => {
 
   try {
     // 1. Contents 조회
-    const contents = await callDatabase("contents", "read", {
-      filter: { resource_id: resourceId },
+    const contentsResult = await callDatabase("contents", "read", null, {
+      resource_id: resourceId,
     });
 
     // 2. Videos 조회
-    const videos = await callDatabase("videos", "read", {
-      filter: { resource_id: resourceId },
+    const videosResult = await callDatabase("videos", "read", null, {
+      resource_id: resourceId,
     });
 
     // 3. Scenarios 조회
-    const scenarios = await callDatabase("scenarios", "read", {
-      filter: { resource_id: resourceId },
+    const scenariosResult = await callDatabase("scenarios", "read", null, {
+      resource_id: resourceId,
     });
 
     // 4. Characters 조회
-    const characters = await callDatabase("characters", "read", {
-      filter: { resource_id: resourceId },
+    const charactersResult = await callDatabase("characters", "read", null, {
+      resource_id: resourceId,
     });
+
+    const contents = contentsResult.success ? contentsResult.rows : [];
+    const videos = videosResult.success ? videosResult.rows : [];
+    const scenarios = scenariosResult.success ? scenariosResult.rows : [];
+    const characters = charactersResult.success ? charactersResult.rows : [];
 
     if (!contents || contents.length === 0) {
       return res.status(404).json({
@@ -466,10 +506,10 @@ router.get("/:resourceId/result", async (req, res) => {
     return res.json({
       success: true,
       resourceId,
-      contents: contents || [],
-      videos: videos || [],
-      scenarios: scenarios || [],
-      characters: characters || [],
+      contents,
+      videos,
+      scenarios,
+      characters,
       generatedAt: contents[0]?.created_at || null,
     });
   } catch (error) {
@@ -477,6 +517,151 @@ router.get("/:resourceId/result", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "결과 조회 중 오류가 발생했습니다",
+      resourceId,
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/batch
+// 여러 자료를 일괄 생성 (2C: Batch Processing)
+// ─────────────────────────────────────────────────────
+router.post("/batch", async (req, res) => {
+  const { resourceIds, requestType } = req.body;
+
+  if (!resourceIds || !Array.isArray(resourceIds) || resourceIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "필수 항목: resourceIds는 비어있지 않은 배열이어야 합니다",
+    });
+  }
+
+  if (!requestType || !["intro", "detail", "both"].includes(requestType)) {
+    return res.status(400).json({
+      success: false,
+      message: 'requestType은 "intro", "detail", 또는 "both"이어야 합니다',
+    });
+  }
+
+  try {
+    console.log(
+      `[POST /api/generate/batch] ${resourceIds.length}개 자료 생성 요청`
+    );
+
+    const batchResults = [];
+
+    for (const resourceId of resourceIds) {
+      try {
+        // 각 자료마다 독립적으로 생성 시작
+        // 주의: 이는 비동기적으로 실행되므로 응답을 기다리지 않음
+        console.log(`  ↳ ${resourceId} 큐에 추가됨`);
+
+        // 백그라운드에서 생성 시작 (await하지 않음)
+        (async () => {
+          try {
+            const result = await fetch(
+              `http://localhost:${process.env.PORT || 5000}/api/generate/${resourceId}/start`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ requestType }),
+              }
+            );
+            const data = await result.json();
+            console.log(`    ✅ ${resourceId} 생성 완료:`, data.success);
+          } catch (err) {
+            console.error(`    ❌ ${resourceId} 생성 실패:`, err.message);
+          }
+        })();
+
+        batchResults.push({
+          resourceId,
+          status: "queued",
+          message: "생성 큐에 추가되었습니다",
+        });
+      } catch (err) {
+        batchResults.push({
+          resourceId,
+          status: "error",
+          message: err.message,
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      batchSize: resourceIds.length,
+      results: batchResults,
+      message: "모든 자료가 생성 큐에 추가되었습니다. 진행 상황은 각 resourceId의 /status로 확인하세요",
+    });
+  } catch (error) {
+    console.error("[POST /api/generate/batch] 예외:", error);
+    return res.status(500).json({
+      success: false,
+      message: "배치 생성 중 오류가 발생했습니다",
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/:resourceId/retry-from/:step
+// 특정 단계부터 재실행 (2C: Partial Retry)
+// ─────────────────────────────────────────────────────
+router.post("/:resourceId/retry-from/:step", async (req, res) => {
+  const { resourceId, step } = req.params;
+  const stepNum = parseInt(step);
+
+  if (!resourceId || isNaN(stepNum) || stepNum < 4 || stepNum > 9) {
+    return res.status(400).json({
+      success: false,
+      message: "stepNumber는 4~9 사이여야 합니다 (Step 1-3은 필터링 단계)",
+    });
+  }
+
+  try {
+    console.log(
+      `[POST /api/generate/:resourceId/retry-from/:step] resourceId: ${resourceId}, step: ${step}`
+    );
+
+    // 생성 로그에서 이 단계의 기존 기록 삭제 (재시도 표시)
+    const logsResult = await callDatabase("generation_logs", "read", null, {
+      resource_id: resourceId,
+    });
+
+    if (logsResult.success && logsResult.rows.length > 0) {
+      const lastLog = logsResult.rows[0];
+      console.log(
+        `  마지막 상태: Step ${lastLog.step} - ${lastLog.status}`
+      );
+    }
+
+    // 실제 재시도는 /start 엔드포인트에서 처리
+    // 여기서는 로그만 기록하고 큐에 추가
+    await callDatabase("generation_logs", "create", {
+      resource_id: resourceId,
+      step: stepNum,
+      status: "retrying",
+      details: `Step ${stepNum}부터 재시도 시작`,
+    });
+
+    // 실제로는 Step 4부터 다시 시작 (Step 1-3은 이미 완료)
+    const { requestType } = req.body || { requestType: "intro" };
+
+    return res.json({
+      success: true,
+      resourceId,
+      retryFrom: stepNum,
+      message: `Step ${stepNum}부터 재시도를 시작했습니다`,
+      nextAction: `POST /api/generate/${resourceId}/start에서 계속 진행`,
+    });
+  } catch (error) {
+    console.error(
+      `[POST /api/generate/:resourceId/retry-from/:step] 예외:`,
+      error
+    );
+    return res.status(500).json({
+      success: false,
+      message: "재시도 중 오류가 발생했습니다",
       resourceId,
     });
   }

@@ -388,6 +388,39 @@ export default function AdminMode() {
                             className="w-full px-2 py-1 border rounded text-sm"
                           />
                         </div>
+
+                        {/* ⭐ 레퍼런스 이미지 & 생성 횟수 (재현성 추적) */}
+                        <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
+                          <div className="text-xs font-semibold text-blue-900 mb-2">
+                            🖼️ 레퍼런스 이미지 (재현성)
+                          </div>
+                          {char.reference_image_url && (
+                            <>
+                              <div className="w-full h-20 bg-gray-200 rounded border border-gray-300 flex items-center justify-center overflow-hidden mb-2">
+                                <img
+                                  src={char.reference_image_url}
+                                  alt={`${char.character_name} reference`}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3C/svg%3E';
+                                  }}
+                                />
+                              </div>
+                              <div className="text-xs text-gray-600 break-all mb-2">
+                                <strong>URL:</strong> {char.reference_image_url.substring(0, 50)}...
+                              </div>
+                              {char.generation_count && char.generation_count > 0 && (
+                                <div className="text-xs text-green-700 font-semibold">
+                                  ✓ {char.generation_count}회 생성됨
+                                </div>
+                              )}
+                            </>
+                          ) || (
+                            <div className="text-xs text-gray-600">
+                              아직 이미지 생성 안 됨. 첫 영상 생성 후 자동으로 저장됩니다.
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
