@@ -171,6 +171,11 @@ html.light .app-header::after {
   width: 100%;
   height: auto;
   display: block;
+  filter: brightness(0) invert(1);
+}
+
+html.light .logo-image {
+  filter: none;
 }
 
 .header-text {
