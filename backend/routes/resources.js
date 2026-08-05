@@ -120,36 +120,93 @@ router.post("/", async (req, res) => {
       { id: resourceId }
     );
 
-    // ── 4. Step 2: character-generator-agent 호출 (backend-agent) ──
-    // metadata를 그대로 전달 (character-generator-agent.md 입력 스펙과 동일)
-    const step2 = await callAgent(
-      "character-generator-agent",
-      { productName, productInfo, keywords: keywordsArray, metadata },
-      { resourceId, step: "character-generator" }
-    );
+    // ── 4. Step 2: 캐릭터 추천 ──
+    //
+    // ⭐ 재현성 핵심: "AI가 매번 완전히 새로운 캐릭터 3명을 창작"하지 않고,
+    // character_library(기본 캐릭터 풀)에서 이 제품에 가장 잘 맞는 3명을 "선별"한다.
+    // 이렇게 해야 여러 제품을 거쳐도 같은 캐릭터(얼굴/톤/레퍼런스 이미지)가 재사용되어
+    // 브랜드 전체의 캐릭터 일관성이 유지된다. 라이브러리에 없는 완전히 새로운 캐릭터를
+    // 원할 때는 CharacterCreator의 "+ 새 캐릭터 만들기"에서 별도로 생성한다.
+    const libraryResult = await callDatabase("character_library", "read", null, {});
+    const library = libraryResult.success ? libraryResult.rows : [];
 
-    if (!step2.success) {
-      // 캐릭터 추천 실패해도 분석 결과는 이미 있으니 완전 실패로 처리하지 않고,
-      // status는 "analyzed"로 유지 (캐릭터는 나중에 AdminMode에서 재시도 가능)
-      return res.status(207).json({
-        success: true,
-        partial: true,
-        message:
-          "제품 분석은 완료됐지만 캐릭터 추천에는 실패했습니다. 잠시 후 다시 시도해주세요.",
-        resourceId,
-        metadata,
-        characters: [],
-        detail: step2,
-      });
+    let recommendedLibraryChars;
+
+    if (library.length === 0) {
+      // 라이브러리가 비어있는 극단적인 경우에만 폴백으로 새 캐릭터 생성
+      const step2 = await callAgent(
+        "character-generator-agent",
+        { productName, productInfo, keywords: keywordsArray, metadata },
+        { resourceId, step: "character-generator" }
+      );
+      if (!step2.success) {
+        return res.status(207).json({
+          success: true,
+          partial: true,
+          message: "제품 분석은 완료됐지만 캐릭터 추천에는 실패했습니다. 잠시 후 다시 시도해주세요.",
+          resourceId,
+          metadata,
+          characters: [],
+          detail: step2,
+        });
+      }
+      recommendedLibraryChars = step2.data.characters.map((c) => ({
+        character_name: c.name,
+        character_profile: c.description,
+        reason: c.reason,
+        score: c.score,
+      }));
+    } else {
+      const step2 = await callAgent(
+        "character-recommender-agent",
+        {
+          productName,
+          productInfo,
+          keywords: keywordsArray,
+          metadata,
+          libraryCharacters: library.map((c) => ({
+            id: c.id,
+            name: c.character_name,
+            role: c.role,
+            tone_trait: c.tone_trait,
+          })),
+        },
+        { resourceId, step: "character-recommender" }
+      );
+
+      const recommendations = step2.success ? step2.data.recommendations : null;
+
+      if (!recommendations || recommendations.length === 0) {
+        // 추천 실패 시 라이브러리 앞에서 3개를 그대로 사용 (완전 실패시키지 않음)
+        recommendedLibraryChars = library.slice(0, 3).map((c, idx) => ({
+          ...c,
+          reason: "기본 추천 (AI 추천 실패 폴백)",
+          score: 80 - idx * 5,
+        }));
+      } else {
+        recommendedLibraryChars = recommendations
+          .map((rec) => {
+            const lib = library.find((c) => c.id === rec.id || c.character_name === rec.name);
+            if (!lib) return null;
+            return { ...lib, reason: rec.reason, score: rec.score };
+          })
+          .filter(Boolean);
+      }
     }
 
-    const characters = step2.data.characters; // [{name, description, reason, score}, ...]
-
-    // ── 5. characters 3개 저장 (1순위를 selected: true로) ──
-    const characterRows = characters.map((c, idx) => ({
+    // ── 5. 추천된 라이브러리 캐릭터들을 이 자료의 characters로 복사 저장 ──
+    // 프로필/레퍼런스 이미지를 그대로 복사 -> 재사용시 AI 재호출 없이 바로 일관된 결과
+    const characterRows = recommendedLibraryChars.map((c, idx) => ({
       resource_id: resourceId,
-      character_name: c.name,
-      character_profile: c.description,
+      character_name: c.character_name,
+      is_base_character: !!c.id, // 라이브러리 출신이면 true
+      character_profile: c.character_profile || c.character_name,
+      voice_tone: c.voice_tone || null,
+      personality_traits: c.personality_traits || null,
+      visual_description: c.visual_description || null,
+      reference_image_url: c.reference_image_url || null,
+      generation_count: c.generation_count || 0,
+      library_character_id: c.id || null,
       reason: c.reason,
       score: c.score,
       selected: idx === 0,
@@ -167,7 +224,7 @@ router.post("/", async (req, res) => {
         message: "캐릭터 저장에 실패했습니다.",
         resourceId,
         metadata,
-        characters, // DB 저장은 실패했지만 분석 결과는 프론트에 보여줄 수 있게 반환
+        characters: recommendedLibraryChars, // DB 저장은 실패했지만 분석 결과는 프론트에 보여줄 수 있게 반환
         detail: savedCharacters,
       });
     }

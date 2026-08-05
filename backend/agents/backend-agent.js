@@ -203,10 +203,22 @@ async function callTimelyAIAgent(agentName, payload) {
 // ============================================================================
 
 function getMockResponseForAgent(agentName, payload) {
+  const { getConfig } = require("../utils/config-loader");
+  const brand = getConfig().brand || {};
+  const styleGuideline = brand.characterStyleGuideline || "귀엽고 매력적인 인형(마스코트) 같은 스타일";
+  const commonMotif =
+    brand.characterCommonMotif ||
+    "알 모양의 동글동글한 몸통, 이마 위 작은 육각형 소금 결정 브로치, 단순한 점 눈";
+
   // character-creator-agent는 사용자가 입력한 이름/방향성에 따라 매번 결과가 달라져야 하므로
   // (라이브러리 신규 캐릭터 생성 데모가 실제로 반영되는 것처럼 보이도록) 정적 맵 대신 payload 기반으로 생성
   if (agentName === "character-creator-agent") {
-    const characterName = payload?.characterName || "새 캐릭터";
+    const SURPRISE_NAME_POOL = ["몽글이", "포동이", "동글이", "말랑이", "복숭이", "토실이", "새콤이", "부들이"];
+    const characterName =
+      payload?.characterName ||
+      (payload?.surprise
+        ? SURPRISE_NAME_POOL[Math.floor(Math.random() * SURPRISE_NAME_POOL.length)]
+        : "새 캐릭터");
     const direction = payload?.direction || "";
     return {
       brief: {
@@ -215,10 +227,43 @@ function getMockResponseForAgent(agentName, payload) {
         personality_traits: direction
           ? direction.split(/[,\s]+/).filter((w) => w.length > 1).slice(0, 4)
           : ["친근함", "신뢰감"],
+        // ⭐ 브랜드 가이드라인 + 시그니처 공통 요소를 모든 캐릭터 외형 묘사에 항상 반영
         visual_description: direction
-          ? `${direction} 컨셉을 반영한 외형과 표정`
-          : "브랜드 톤에 맞는 표준적인 외형",
+          ? `${direction} 컨셉을 반영한 ${styleGuideline}. 공통 요소: ${commonMotif}`
+          : `${styleGuideline}, 브랜드 톤에 맞는 표준적인 외형. 공통 요소: ${commonMotif}`,
       },
+    };
+  }
+
+  // character-recommender-agent: 제품 metadata와 라이브러리 목록을 바탕으로
+  // "새로 만들지 않고" 기존 라이브러리 중 3개를 골라 추천한다 (재현성 핵심).
+  // 실제 매칭 로직: focus/role/tone_trait 텍스트 겹침이 많은 순으로 정렬 (결정론적).
+  if (agentName === "character-recommender-agent") {
+    const library = payload?.libraryCharacters || [];
+    const focusText = (payload?.metadata?.focus || []).join(" ");
+
+    const scored = library.map((c) => {
+      const haystack = `${c.role || ""} ${c.tone_trait || ""}`;
+      let score = 70;
+      focusText.split(/\s+/).forEach((kw) => {
+        if (kw && haystack.includes(kw)) score += 10;
+      });
+      return { id: c.id, name: c.name, score: Math.min(score, 95) };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    const top3 = scored.slice(0, 3);
+
+    return {
+      recommendations: top3.map((c, idx) => ({
+        id: c.id,
+        name: c.name,
+        score: c.score - idx, // 동점 방지용 미세 조정
+        reason:
+          idx === 0
+            ? "제품의 핵심 강조점과 가장 잘 맞는 기본 캐릭터"
+            : "브랜드 라이브러리 내 대체 추천 캐릭터",
+      })),
     };
   }
 
@@ -387,13 +432,37 @@ function getSystemPromptForAgent(agentName) {
     "character-creator-agent": `당신은 사용자가 입력한 방향성(direction)을 바탕으로 완전히 새로운 캐릭터를 설계하는 AI 에이전트입니다.
 브랜드: ${brand.nameKorean || "제주소금"}
 브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
+⭐ 브랜드 캐릭터 스타일 가이드라인(반드시 반영): ${brand.characterStyleGuideline || "귀엽고 매력적인 인형(마스코트) 같은 스타일"}
+
+⭐⭐ 브랜드 시그니처 공통 요소 (모든 캐릭터가 반드시 공유해야 함 — "같은 회사 캐릭터"라는 것이 한눈에 느껴지도록):
+${brand.characterCommonMotif || "알(egg) 모양의 동글동글한 몸통, 이마 위에 작은 육각형 소금 결정 모양 브로치, 단순한 검은 점 눈동자에 흰색 하이라이트 하나"}
+색상과 소품은 캐릭터마다 다르게 하되, 위 공통 요소는 절대 빠뜨리지 마세요.
 
 사용자가 입력한 캐릭터 이름과 방향성 설명을 최대한 반영해서:
 - 음성 톤 설명
 - 성격 특성 (배열)
-- 시각적 묘사 (의상, 표정, 외형)
+- 시각적 묘사 (의상, 표정, 외형) — 반드시 위 스타일 가이드라인과 브랜드 시그니처 공통 요소를 모두 반영해서 작성
 을 작성하세요. 이 캐릭터는 이후 여러 자료(제품)에서 재사용되는 "기본 캐릭터"로 라이브러리에 저장되므로,
-한 번 정해지면 계속 일관되게 재사용될 수 있도록 구체적이고 명확하게 작성하세요.`,
+한 번 정해지면 계속 일관되게 재사용될 수 있도록 구체적이고 명확하게 작성하세요.
+
+🚫🚫 매우 중요 (저작권/표절 방지 — 반드시 지킬 것):
+실제로 존재하는 유명 캐릭터(카카오프렌즈의 라이언·어피치·무지·네오, 라인프렌즈의 브라운·코니,
+산리오의 헬로키티·쿠로미, 뽀로로, 미니언즈, 디즈니/픽사, 포켓몬, 짱구, 펭수 등)를 절대 떠올리게
+해서는 안 됩니다. 구체적으로 다음을 금지합니다:
+- 특정 동물(곰, 토끼, 사자, 펭귄, 고양이 등)을 그대로 형상화하는 디자인
+- 얼굴 없이 단순 원통형 몸통에 짧은 팔다리만 있는 구조(라이언/코니 스타일)
+- 노란색 피부에 파란 멜빵바지(미니언즈 연상)
+- 그 외 "어디서 본 것 같은" 조합
+대신 이 브랜드만의 고유한 정체성(제주/소금/용암/바다/화산 등 브랜드 세계관)에서 나온 독창적인
+형태와 색을 만들어내세요. 목표는 "널리 사랑받는 마스코트 수준의 매력과 완성도"이되, 완전히
+새로운 창작물이어야 합니다.`,
+
+    "character-recommender-agent": `당신은 제품 정보에 가장 잘 맞는 캐릭터를 "기존 캐릭터 라이브러리 중에서만" 골라 추천하는 AI 에이전트입니다.
+브랜드: ${brand.nameKorean || "제주소금"}
+
+⭐ 매우 중요: 새로운 캐릭터를 만들지 마세요. 입력으로 제공되는 libraryCharacters 목록에 있는
+캐릭터의 id/name만 사용해서 정확히 3개를 골라 순위를 매기세요 (목록에 없는 이름을 만들어내면 안 됩니다).
+같은 캐릭터가 여러 제품에서 반복 사용되어야 브랜드 전체의 캐릭터 일관성이 유지됩니다.`,
 
     "shortform-scenario-writer-agent": `당신은 120초 영상 시나리오를 작성하는 AI 에이전트입니다.
 다음을 포함하세요:
@@ -478,6 +547,15 @@ function getOutputSpecForAgent(agentName) {
   }
 }`,
 
+    "character-recommender-agent": `반드시 아래 JSON 형태로만 응답하세요 (recommendations는 정확히 3개, id/name은 입력받은 libraryCharacters 목록에서만 선택):
+{
+  "recommendations": [
+    { "id": "라이브러리 캐릭터 id", "name": "캐릭터명", "score": 90, "reason": "추천 이유" },
+    { "id": "라이브러리 캐릭터 id", "name": "캐릭터명", "score": 85, "reason": "추천 이유" },
+    { "id": "라이브러리 캐릭터 id", "name": "캐릭터명", "score": 80, "reason": "추천 이유" }
+  ]
+}`,
+
     "shortform-scenario-writer-agent": `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 정확히 120):
 {
   "scenario": {
@@ -545,7 +623,11 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
     const character = videoConfig.character || 'woman';
     const voiceTone = videoConfig.voiceTone || 'professional';
     const visualDescription = videoConfig.visualDescription || '';
-    const metadata = `${character} character, ${voiceTone} tone, product promotion`;
+    // ⚠️ 버그 수정: visualDescription을 추출해놓고 실제 프롬프트에는 반영하지 않고 있었음.
+    // 캐릭터의 시각적 특징이 반영되지 않으면 매번 다른 외형이 나올 위험이 커서 재현성이 깨짐.
+    const metadata = visualDescription
+      ? `${character} character, ${visualDescription}, ${voiceTone} tone, product promotion`
+      : `${character} character, ${voiceTone} tone, product promotion`;
 
     console.log(`[Step 9] Higgsfield CLI 호출 시작`);
     console.log(`  명령: higgsfield generate create seedance1_5`);
@@ -606,6 +688,44 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
       message: error.message,
       statusCode: error.code,
     };
+  }
+}
+
+// ============================================================================
+// [함수 2-1] generateCharacterReferenceImage - 라이브러리 캐릭터의 레퍼런스 이미지만 생성
+// ============================================================================
+/**
+ * character_library의 기본 캐릭터를 위한 레퍼런스 영상/이미지를 생성한다.
+ * callHiggsfield와 달리 특정 resource/content에 종속되지 않으므로 videos 테이블에는
+ * 기록하지 않고, 결과 URL만 반환한다 (호출한 쪽에서 character_library에 직접 저장).
+ */
+async function generateCharacterReferenceImage({ characterName, voiceTone, visualDescription }) {
+  try {
+    const metadata = visualDescription
+      ? `${characterName} character, ${visualDescription}, ${voiceTone || ""} tone, cute mascot reference shot, single character centered, plain background`
+      : `${characterName} character, ${voiceTone || "friendly"} tone, cute mascot reference shot`;
+
+    console.log(`[라이브러리 레퍼런스 생성] ${characterName}`);
+    console.log(`  프롬프트: ${metadata}`);
+
+    // 레퍼런스용이므로 최소 duration(4초)만 사용해 크레딧을 절약한다
+    const command = `higgsfield generate create seedance1_5 --prompt "${metadata}" --duration 4 --resolution 720p --wait`;
+
+    const { stdout } = await execPromise(command, {
+      timeout: 600000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    const videoUrl = stdout.trim();
+    if (!videoUrl.startsWith("https://")) {
+      throw new Error(`유효하지 않은 URL: ${videoUrl}`);
+    }
+
+    console.log(`[✓] ${characterName} 레퍼런스 생성 완료: ${videoUrl}`);
+    return { success: true, video_url: videoUrl };
+  } catch (error) {
+    console.error(`[✗] ${characterName} 레퍼런스 생성 실패: ${error.message}`);
+    return { success: false, error: "HIGGSFIELD_CLI_ERROR", message: error.message };
   }
 }
 
@@ -728,4 +848,5 @@ module.exports = {
   callAgent,
   callHiggsfield,
   pollHiggsfield,
+  generateCharacterReferenceImage,
 };

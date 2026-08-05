@@ -18,7 +18,7 @@ const ALL_OPTIONS = {
   categories: ['식품', '뷰티', '웰스케어', '의류', '가전', '디지털'],
   ageGroups: ['10대', '20대', '30대', '40대', '50대', '60대+'],
   targets: ['개인', '가족', '직장인', '학생', '관광객', '기업'],
-  focus: ['신뢰', '기술', '건강', '감정', '자연', '감각', '연관', '가성비', '프리미엠'],
+  focus: ['신뢰', '기술', '건강', '감정', '자연', '감각', '연관', '가성비', '프리미엄'],
 };
 
 export default function MetadataReviewUI({ resourceId, initialMetadata, onComplete, onError }) {
@@ -27,6 +27,13 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
   const [tempMetadata, setTempMetadata] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // 각 카테고리별로 사용자가 직접 입력 중인 커스텀 키워드 텍스트
+  const [customInputs, setCustomInputs] = useState({
+    categories: '',
+    ageGroups: '',
+    targets: '',
+    focus: '',
+  });
 
   // initialMetadata가 이미 있으면(자료 생성 직후) 재조회하지 않고 바로 사용.
   // 없을 때만(예: 새로고침 등으로 이 화면에 직접 진입한 경우) API로 조회한다.
@@ -113,6 +120,43 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
   const handleCancel = () => {
     setEditing(false);
     setTempMetadata(null);
+  };
+
+  /**
+   * 직접 입력한 키워드를 해당 카테고리에 추가 (이미 있으면 무시, 쉼표로 여러 개 한번에 추가 가능)
+   */
+  const handleAddCustomKeyword = (category) => {
+    const raw = customInputs[category].trim();
+    if (!raw || !tempMetadata) return;
+
+    const newValues = raw
+      .split(',')
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+
+    const current = tempMetadata[category] || [];
+    const merged = [...current];
+    newValues.forEach((v) => {
+      if (!merged.includes(v)) merged.push(v);
+    });
+
+    setTempMetadata({ ...tempMetadata, [category]: merged });
+    setCustomInputs({ ...customInputs, [category]: '' });
+  };
+
+  const handleCustomInputKeyDown = (category, e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddCustomKeyword(category);
+    }
+  };
+
+  const handleRemoveKeyword = (category, value) => {
+    if (!tempMetadata) return;
+    setTempMetadata({
+      ...tempMetadata,
+      [category]: (tempMetadata[category] || []).filter((v) => v !== value),
+    });
   };
 
   if (loading && !metadata) {
@@ -276,76 +320,52 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
           </div>
 
           {/* 카테고리 수정 */}
-          <div className="border rounded-lg p-4">
-            <h3 className="font-semibold text-lg mb-3">📦 카테고리</h3>
-            <div className="space-y-2">
-              {ALL_OPTIONS.categories.map((cat) => (
-                <label key={cat} className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={(tempMetadata?.categories || []).includes(cat)}
-                    onChange={() => handleToggleOption('categories', cat)}
-                    className="w-4 h-4"
-                  />
-                  <span>{cat}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <CategoryEditor
+            icon="📦" title="카테고리" category="categories"
+            options={ALL_OPTIONS.categories} tempMetadata={tempMetadata}
+            customInput={customInputs.categories}
+            onToggle={handleToggleOption}
+            onCustomInputChange={(v) => setCustomInputs({ ...customInputs, categories: v })}
+            onCustomInputKeyDown={(e) => handleCustomInputKeyDown('categories', e)}
+            onAddCustom={() => handleAddCustomKeyword('categories')}
+            onRemove={handleRemoveKeyword}
+          />
 
           {/* 나이대 수정 */}
-          <div className="border rounded-lg p-4">
-            <h3 className="font-semibold text-lg mb-3">👥 나이대</h3>
-            <div className="space-y-2">
-              {ALL_OPTIONS.ageGroups.map((age) => (
-                <label key={age} className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={(tempMetadata?.ageGroups || []).includes(age)}
-                    onChange={() => handleToggleOption('ageGroups', age)}
-                    className="w-4 h-4"
-                  />
-                  <span>{age}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <CategoryEditor
+            icon="👥" title="나이대" category="ageGroups"
+            options={ALL_OPTIONS.ageGroups} tempMetadata={tempMetadata}
+            customInput={customInputs.ageGroups}
+            onToggle={handleToggleOption}
+            onCustomInputChange={(v) => setCustomInputs({ ...customInputs, ageGroups: v })}
+            onCustomInputKeyDown={(e) => handleCustomInputKeyDown('ageGroups', e)}
+            onAddCustom={() => handleAddCustomKeyword('ageGroups')}
+            onRemove={handleRemoveKeyword}
+          />
 
           {/* 대상 수정 */}
-          <div className="border rounded-lg p-4">
-            <h3 className="font-semibold text-lg mb-3">🎯 대상</h3>
-            <div className="space-y-2">
-              {ALL_OPTIONS.targets.map((target) => (
-                <label key={target} className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={(tempMetadata?.targets || []).includes(target)}
-                    onChange={() => handleToggleOption('targets', target)}
-                    className="w-4 h-4"
-                  />
-                  <span>{target}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <CategoryEditor
+            icon="🎯" title="대상" category="targets"
+            options={ALL_OPTIONS.targets} tempMetadata={tempMetadata}
+            customInput={customInputs.targets}
+            onToggle={handleToggleOption}
+            onCustomInputChange={(v) => setCustomInputs({ ...customInputs, targets: v })}
+            onCustomInputKeyDown={(e) => handleCustomInputKeyDown('targets', e)}
+            onAddCustom={() => handleAddCustomKeyword('targets')}
+            onRemove={handleRemoveKeyword}
+          />
 
           {/* 강조점 수정 */}
-          <div className="border rounded-lg p-4">
-            <h3 className="font-semibold text-lg mb-3">⭐ 강조점</h3>
-            <div className="space-y-2">
-              {ALL_OPTIONS.focus.map((f) => (
-                <label key={f} className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={(tempMetadata?.focus || []).includes(f)}
-                    onChange={() => handleToggleOption('focus', f)}
-                    className="w-4 h-4"
-                  />
-                  <span>{f}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <CategoryEditor
+            icon="⭐" title="강조점" category="focus"
+            options={ALL_OPTIONS.focus} tempMetadata={tempMetadata}
+            customInput={customInputs.focus}
+            onToggle={handleToggleOption}
+            onCustomInputChange={(v) => setCustomInputs({ ...customInputs, focus: v })}
+            onCustomInputKeyDown={(e) => handleCustomInputKeyDown('focus', e)}
+            onAddCustom={() => handleAddCustomKeyword('focus')}
+            onRemove={handleRemoveKeyword}
+          />
 
           {/* 액션 버튼 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
@@ -366,6 +386,92 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * 카테고리 하나(카테고리/나이대/대상/강조점)의 편집 UI
+ * - 미리 정의된 옵션은 체크박스로 선택/해제
+ * - AI가 추천했거나 사용자가 직접 추가한 커스텀 키워드는 옵션 목록에 없어도
+ *   별도의 칩으로 표시되고 X로 제거 가능
+ * - 하단 입력창 + "추가" 버튼(또는 Enter)으로 새 키워드를 자유롭게 추가
+ */
+function CategoryEditor({
+  icon,
+  title,
+  category,
+  options,
+  tempMetadata,
+  customInput,
+  onToggle,
+  onCustomInputChange,
+  onCustomInputKeyDown,
+  onAddCustom,
+  onRemove,
+}) {
+  const selected = tempMetadata?.[category] || [];
+  const customSelected = selected.filter((v) => !options.includes(v));
+
+  return (
+    <div className="border rounded-lg p-4">
+      <h3 className="font-semibold text-lg mb-3">{icon} {title}</h3>
+
+      {/* 미리 정의된 옵션 */}
+      <div className="space-y-2 mb-3">
+        {options.map((opt) => (
+          <label key={opt} className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={selected.includes(opt)}
+              onChange={() => onToggle(category, opt)}
+              className="w-4 h-4"
+            />
+            <span>{opt}</span>
+          </label>
+        ))}
+      </div>
+
+      {/* 직접 추가한(또는 AI가 추천한 목록 외) 커스텀 키워드 */}
+      {customSelected.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-3">
+          {customSelected.map((v) => (
+            <span
+              key={v}
+              className="flex items-center gap-1 bg-indigo-100 text-indigo-800 text-sm px-3 py-1 rounded-full"
+            >
+              {v}
+              <button
+                type="button"
+                onClick={() => onRemove(category, v)}
+                className="text-indigo-600 hover:text-indigo-900 font-bold"
+                aria-label={`${v} 제거`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 새 키워드 직접 입력 */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={customInput}
+          onChange={(e) => onCustomInputChange(e.target.value)}
+          onKeyDown={onCustomInputKeyDown}
+          placeholder="직접 입력 (쉼표로 여러 개 가능)"
+          className="flex-1 px-3 py-1.5 border rounded text-sm"
+        />
+        <button
+          type="button"
+          onClick={onAddCustom}
+          className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+        >
+          + 추가
+        </button>
+      </div>
     </div>
   );
 }

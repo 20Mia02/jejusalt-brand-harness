@@ -21,7 +21,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { callAgent } = require("../agents/backend-agent");
+const { callAgent, generateCharacterReferenceImage } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
 
 // ─────────────────────────────────────────────
@@ -45,13 +45,14 @@ router.get("/library", async (req, res) => {
 // POST /api/characters/library — 새 캐릭터 생성 (수동 입력 또는 AI 생성) 후 라이브러리에 추가
 //
 // body:
-//   { characterName, direction, useAI: true }   → AI가 direction(방향성)을 바탕으로 캐릭터 상세 생성
+//   { characterName, direction, useAI: true }              → AI가 direction(방향성)을 바탕으로 캐릭터 상세 생성
+//   { useAI: true, surprise: true }                        → 이름/방향성 모두 AI가 알아서 창작 ("AI가 알아서 만들기")
 //   { characterName, characterProfile, voiceTone, personalityTraits, useAI: false } → 수동 입력 그대로 저장
 // ─────────────────────────────────────────────
 router.post("/library", async (req, res) => {
-  const { characterName, direction, useAI, characterProfile, voiceTone, personalityTraits } = req.body;
+  const { characterName, direction, useAI, surprise, characterProfile, voiceTone, personalityTraits } = req.body;
 
-  if (!characterName || !characterName.trim()) {
+  if (!surprise && (!characterName || !characterName.trim())) {
     return res.status(400).json({
       success: false,
       message: "캐릭터 이름을 입력해주세요.",
@@ -62,7 +63,11 @@ router.post("/library", async (req, res) => {
     let newCharacter;
 
     if (useAI) {
-      if (!direction || direction.trim().length < 5) {
+      const effectiveDirection = surprise
+        ? "브랜드 톤에 어울리는 매력적인 마스코트 캐릭터를 자유롭게 창작해주세요. 이름도 새로 지어주세요."
+        : direction;
+
+      if (!surprise && (!direction || direction.trim().length < 5)) {
         return res.status(400).json({
           success: false,
           message: "AI 생성을 위한 방향성 설명을 5자 이상 입력해주세요. (예: 유쾌하고 젊은 20대 여성)",
@@ -70,9 +75,10 @@ router.post("/library", async (req, res) => {
       }
 
       // AI(TimelyAI/mock)로 캐릭터 상세 생성 — 사용자가 입력한 이름/방향성을 반영
+      // surprise 모드에서는 characterName을 비워 보내 AI가 이름까지 창작하게 한다
       const result = await callAgent(
         "character-creator-agent",
-        { characterName, direction },
+        { characterName: surprise ? "" : characterName, direction: effectiveDirection, surprise: !!surprise },
         { step: "character-library-create" }
       );
 
@@ -86,8 +92,8 @@ router.post("/library", async (req, res) => {
 
       const brief = result.data?.brief || {};
       newCharacter = {
-        character_name: characterName,
-        character_profile: brief.visual_description || direction,
+        character_name: brief.character || characterName || "새 캐릭터",
+        character_profile: brief.visual_description || effectiveDirection,
         voice_tone: brief.voice_tone || "",
         personality_traits: brief.personality_traits || [],
         visual_description: brief.visual_description || "",
@@ -253,6 +259,103 @@ router.get("/library/:id/consistency-check", async (req, res) => {
       ? `✅ ${rounds}회 반복 조회 결과가 모두 동일합니다 (일관성 확인됨)`
       : `⚠️ ${rounds}회 반복 조회 결과가 서로 다릅니다 (일관성 문제 발견)`,
   });
+});
+
+// ─────────────────────────────────────────────
+// POST /api/characters/library/:id/generate-reference
+//
+// 라이브러리 캐릭터의 레퍼런스 영상(이미지)을 실제로 1회 생성해서 영구 저장한다.
+// - visual_description이 없으면 먼저 character-creator-agent로 채운다
+//   (이때 표절 방지 지침이 시스템 프롬프트에 항상 포함됨)
+// - Higgsfield로 실제 레퍼런스 생성 (실제 크레딧 소모)
+// - reference_image_url / image_generated_at / generation_count(=1)을 저장
+//   이후 이 캐릭터를 쓰는 모든 자료는 이 레퍼런스를 그대로 재사용 (일관성 핵심)
+//
+// body: { forceRegenerateProfile?: boolean, direction?: string }
+// ─────────────────────────────────────────────
+router.post("/library/:id/generate-reference", async (req, res) => {
+  const { id } = req.params;
+  const { direction, forceRegenerateProfile, referencePrompt } = req.body || {};
+
+  const libResult = await callDatabase("character_library", "read", null, { id });
+  if (!libResult.success || libResult.rows.length === 0) {
+    return res.status(404).json({ success: false, message: "해당 캐릭터를 찾을 수 없습니다." });
+  }
+  let lib = libResult.rows[0];
+
+  try {
+    // 1) 시각적 묘사가 없거나, forceRegenerateProfile로 재생성을 요청한 경우 다시 채운다
+    //    (표절 방지 지침이 항상 포함된 프롬프트 사용)
+    if (!lib.visual_description || forceRegenerateProfile) {
+      const designResult = await callAgent(
+        "character-creator-agent",
+        {
+          characterName: lib.character_name,
+          direction: direction || `${lib.role || ""} ${lib.tone_trait || ""}`.trim(),
+        },
+        { step: "character-library-backfill" }
+      );
+
+      if (!designResult.success) {
+        return res.status(502).json({
+          success: false,
+          message: "캐릭터 프로필 생성에 실패했습니다.",
+          detail: designResult,
+        });
+      }
+
+      const brief = designResult.data?.brief || {};
+      const updated = await callDatabase(
+        "character_library",
+        "update",
+        {
+          voice_tone: brief.voice_tone || lib.voice_tone,
+          personality_traits: brief.personality_traits || lib.personality_traits,
+          visual_description: brief.visual_description,
+          character_profile: brief.visual_description,
+        },
+        { id }
+      );
+      lib = updated.rows?.[0] || { ...lib, visual_description: brief.visual_description };
+    }
+
+    // 2) 실제 Higgsfield 레퍼런스 생성 (실제 크레딧 소모)
+    //
+    // ⚠️ 주의: AI가 만든 상세한 한국어 visual_description을 그대로 Higgsfield 프롬프트에
+    // 쓰면 길고 복잡한 문장 때문에 콘텐츠 필터에 오탐(nsfw)으로 걸리는 경우가 있었다.
+    // referencePrompt(짧고 안전한 영어 요약)가 주어지면 그것을 실제 생성에 사용하고,
+    // 화면에 보여주는 상세 한국어 visual_description은 그대로 유지한다.
+    const genResult = await generateCharacterReferenceImage({
+      characterName: lib.character_name,
+      voiceTone: lib.voice_tone,
+      visualDescription: referencePrompt || lib.visual_description,
+    });
+
+    if (!genResult.success) {
+      return res.status(502).json({
+        success: false,
+        message: "레퍼런스 생성(Higgsfield)에 실패했습니다.",
+        detail: genResult,
+      });
+    }
+
+    // 3) 결과를 라이브러리에 영구 저장 -> 앞으로 이 캐릭터를 쓰는 모든 자료가 재사용
+    const finalUpdate = await callDatabase(
+      "character_library",
+      "update",
+      {
+        reference_image_url: genResult.video_url,
+        image_generated_at: new Date().toISOString(),
+        generation_count: (lib.generation_count || 0) + 1,
+      },
+      { id }
+    );
+
+    return res.json({ success: true, character: finalUpdate.rows?.[0] });
+  } catch (error) {
+    console.error(`[POST /api/characters/library/:id/generate-reference] 예외:`, error);
+    return res.status(500).json({ success: false, message: "레퍼런스 생성 중 오류가 발생했습니다." });
+  }
 });
 
 module.exports = router;
