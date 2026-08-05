@@ -33,3 +33,6 @@ logs/
 higgsfield_setup.py
 *.pyc
 __pycache__/
+
+# Supabase CLI local link metadata (project ref/org info, churns every db push)
+supabase/.temp/

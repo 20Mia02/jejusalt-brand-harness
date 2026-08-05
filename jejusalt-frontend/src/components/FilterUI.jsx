@@ -189,6 +189,15 @@ export default function FilterUI({ onResourceCreated }) {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      {/* 로고 */}
+      <div className="flex justify-center mb-6">
+        <img
+          src="/assets/logo/jeju-salt-logo.png"
+          alt="제주소금 JEJU LAVA SEA SALT 로고"
+          className="h-16 w-auto"
+        />
+      </div>
+
       {/* 모드 선택 탭 */}
       <div className="flex gap-4 mb-6 border-b">
         <button

@@ -248,8 +248,15 @@ export default function AdminMode() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      {/* 제목 */}
-      <h1 className="text-3xl font-bold mb-8">🛠️ 관리자 모드</h1>
+      {/* 로고 + 제목 */}
+      <div className="flex items-center gap-4 mb-8">
+        <img
+          src="/assets/logo/jeju-salt-logo.png"
+          alt="제주소금 JEJU LAVA SEA SALT 로고"
+          className="h-12 w-auto"
+        />
+        <h1 className="text-3xl font-bold">🛠️ 관리자 모드</h1>
+      </div>
 
       {/* 메시지 */}
       {error && (

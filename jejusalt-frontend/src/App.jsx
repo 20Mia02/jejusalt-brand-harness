@@ -149,21 +149,13 @@ function App() {
       <header className="app-header">
         <div className="app-header-content">
           <div className="logo-section">
-            <svg
-              className="logo-icon"
-              viewBox="0 0 100 100"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <defs>
-                <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style={{stopColor: "#ffffff", stopOpacity: 1}} />
-                  <stop offset="100%" style={{stopColor: "#00AEEF", stopOpacity: 1}} />
-                </linearGradient>
-              </defs>
-              <circle cx="50" cy="50" r="42" fill="none" stroke="url(#logoGradient)" strokeWidth="3"/>
-              <path d="M 35 60 Q 40 35 45 60" fill="none" stroke="#00AEEF" strokeWidth="3.5" strokeLinecap="round"/>
-              <path d="M 55 60 Q 60 35 65 60" fill="none" stroke="#ffffff" strokeWidth="3" strokeLinecap="round"/>
-            </svg>
+            <div className="logo-badge">
+              <img
+                src="/assets/logo/jeju-salt-logo.png"
+                alt="제주소금 JEJU LAVA SEA SALT 로고"
+                className="logo-image"
+              />
+            </div>
           </div>
 
           <div className="header-text">
