@@ -4,9 +4,9 @@ const path = require('path');
 const logoPath = path.join(__dirname, 'jejusalt-frontend/public/assets/logo/jeju-salt-logo.png');
 const outputPath = path.join(__dirname, 'jejusalt-frontend/public/assets/logo/jeju-salt-logo-dark.png');
 
-// 파란색 #00AEEF (RGB: 0, 174, 239)
-const brandBlue = { r: 0, g: 174, b: 239 };
-const blueThreshold = 30; // 파란색 인식 범위
+// 파란색 #2AABE2 (RGB: 42, 171, 226) - 원본 로고의 파란색
+const brandBlue = { r: 42, g: 171, b: 226 };
+const blueThreshold = 10; // 파란색 인식 범위
 
 async function convertLogo() {
   try {
