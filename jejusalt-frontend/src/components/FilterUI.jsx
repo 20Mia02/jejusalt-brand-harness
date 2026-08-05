@@ -17,6 +17,7 @@ export default function FilterUI({ onResourceCreated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // 성공/실패 배너 자동 소멸 (전 화면 통일 규칙: 성공 2.5초, 에러 4초)
   useEffect(() => {
@@ -65,6 +66,20 @@ export default function FilterUI({ onResourceCreated }) {
 
   useEffect(() => {
     loadMetadata();
+
+    // 현재 테마 감지
+    const updateTheme = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(isDark);
+    };
+
+    updateTheme();
+
+    // 테마 변경 감지
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, { attributes: true });
+
+    return () => observer.disconnect();
   }, []);
 
   const loadMetadata = async () => {
@@ -217,9 +232,9 @@ export default function FilterUI({ onResourceCreated }) {
       {/* 로고 */}
       <div className="flex justify-center mb-6">
         <img
-          src="/assets/logo/jeju-salt-logo.png"
+          src={isDarkMode ? "/assets/logo/jeju-salt-logo-dark.png" : "/assets/logo/jeju-salt-logo.png"}
           alt="제주소금 JEJU LAVA SEA SALT 로고"
-          className="h-20 w-auto filter-logo"
+          className="h-20 w-auto"
         />
       </div>
 
