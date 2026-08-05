@@ -99,7 +99,7 @@ function MainFlow({ currentStep, setCurrentStep }) {
     setCurrentStep('character');
   };
 
-  const handleCharacterSelected = (character, selectedVideoType, selectedDuration) => {
+  const handleCharacterSelected = (selectedCharacters, selectedVideoType, selectedDuration) => {
     setVideoType(selectedVideoType);
     setDuration(selectedDuration || 30);
     setCurrentStep('generation');

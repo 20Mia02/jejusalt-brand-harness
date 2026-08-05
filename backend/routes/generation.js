@@ -1,17 +1,22 @@
 /**
  * backend/routes/generation.js
- * 
+ *
  * 기능4: AI 콘텐츠 생성 + Higgsfield 영상 생성
  * 담당: 박주미
  * 의존: backend-agent.md (callAgent, callHiggsfield), database-agent.md (callDatabase)
- * 
- * Step 4~9:
- * Step 4: character-designer-agent (고수아)
- * Step 5: shortform-scenario-writer-agent (고수아)
- * Step 6: naming-generator-agent (고수아)
- * Step 7: product-intro-writer-agent 또는 product-detail-page-writer-agent (박주미)
- * Step 8: compliance-reviewer-agent (박주미)
- * Step 9: Higgsfield 호출 (박주미)
+ *
+ * Step 4~9 (사람 검토 지점: Step4 캐릭터 브리프 / Step5 시나리오 / Step6 영상 제목 / Step7 카피):
+ * Step 4: character-designer-agent (고수아) — 생성 후 사람 검토
+ * Step 5: shortform-scenario-writer-agent (고수아) — 생성 후 사람 검토
+ * Step 6: naming-generator-agent (고수아) — 생성 후 사람 검토 (영상 제목만. 제품명은 Step1 값 고정)
+ * Step 7: product-intro/detail-writer-agent (박주미) — 생성 후 사람 검토
+ * Step 8: compliance-reviewer-agent (박주미) — 자동
+ * Step 9: Higgsfield 호출 (박주미) — 자동
+ *
+ * ⭐ 파이프라인이 한번에 끝까지 자동 실행되지 않고, Step4/5/6/7 뒤에서 각각 멈춰서
+ * 프론트가 사용자 검토/수정 결과를 confirm 엔드포인트로 보내야 다음 단계로 진행된다.
+ * 각 단계 사이의 "합의된 상태"(요청 옵션, 확정된 영상 제목 등)는 resources.metadata에 저장해
+ * 다음 단계 호출 시 다시 조회한다.
  */
 
 const express = require("express");
@@ -20,6 +25,7 @@ const router = express.Router();
 const { callAgent, callHiggsfield } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
 const { getGenerationConfig } = require("../utils/config-loader");
+const scenarioTemplates = require("../config/scenario-templates.json");
 
 // ─────────────────────────────────────────────────────
 // GET /api/generate/:resourceId/recommend-video-type
@@ -72,6 +78,49 @@ router.get("/:resourceId/recommend-video-type", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────
+// GET /api/generate/:resourceId/trends
+//
+// "최근 트렌드 추천" — TimelyAI(LLM)를 이용한 지식 기반 추천이며 실시간 검색이 아니다.
+// ─────────────────────────────────────────────────────
+router.get("/:resourceId/trends", async (req, res) => {
+  const { resourceId } = req.params;
+
+  try {
+    const resourceResult = await callDatabase("resources", "read", null, { id: resourceId });
+    if (!resourceResult.success || resourceResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "해당 자료를 찾을 수 없습니다" });
+    }
+
+    const resource = resourceResult.rows[0];
+    const metadata = resource.metadata || {};
+
+    const trendResult = await callAgent(
+      "trend-analyzer-agent",
+      {
+        category: metadata.categories?.[0] || "일반",
+        focus: metadata.focus || [],
+        productName: resource.product_name,
+      },
+      { resourceId, step: "trend-analyzer" }
+    );
+
+    if (!trendResult.success) {
+      return res.status(502).json({ success: false, message: "트렌드 추천에 실패했습니다" });
+    }
+
+    return res.json({
+      success: true,
+      resourceId,
+      trends: trendResult.data.trends || [],
+      disclaimer: "AI 지식 기반 추천입니다 (실시간 검색 결과가 아닙니다).",
+    });
+  } catch (error) {
+    console.error("[GET /api/generate/:resourceId/trends] 예외:", error);
+    return res.status(500).json({ success: false, message: "트렌드 추천 중 오류가 발생했습니다" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
 // 호환성: POST /api/generate (resourceId in body)
 // ─────────────────────────────────────────────────────
 router.post("/", async (req, res) => {
@@ -90,23 +139,10 @@ router.post("/", async (req, res) => {
 
 // ─────────────────────────────────────────────────────
 // POST /api/generate/:resourceId/start
-// AI 콘텐츠 생성 (Step 4~9)
+// Step 4(캐릭터설계) ~ Step 5(시나리오 작성)까지만 실행하고,
+// 사람 검토를 위해 여기서 멈춘다. 다음 단계는 /scenario/:scenarioId/confirm.
 // ─────────────────────────────────────────────────────
 
-/**
- * 입력: { requestType: "intro"|"detail"|"both", videoType?: "캐릭터소개"|"제품스토리"|"일상밥상" } in body
- * URL params: { resourceId }
- * 출력: {
- *   success: true,
- *   contentId,
- *   validationStatus,
- *   validationScore,
- *   higgsfieldId,
- *   generationStatus,
- *   generationProgress,
- *   videoUrl
- * }
- */
 router.post("/:resourceId/start", async (req, res) => {
   const { resourceId } = req.params;
   const { requestType, videoType, duration, useReferenceMaterials } = req.body;
@@ -133,7 +169,6 @@ router.post("/:resourceId/start", async (req, res) => {
     : 120;
 
   try {
-    // ── 1. 필요한 정보 조회 ──────────────────────────
     console.log(`[POST /api/generate] resourceId: ${resourceId}, type: ${requestType}`);
 
     // resources 조회
@@ -161,93 +196,326 @@ router.post("/:resourceId/start", async (req, res) => {
       });
     }
 
-    const selectedCharacter = charactersResult.rows[0];
+    // ⭐ 멀티 캐릭터 지원: 선택된 캐릭터가 여러 명이면 전원의 브리프를 만든다.
+    const selectedCharacters = charactersResult.rows;
 
-    // ── 2. Step 4: character-designer-agent 호출 (고수아) ──
+    // ── Step 4: character-designer-agent 호출 (고수아) — 선택된 캐릭터 각각에 대해 ──
     //
-    // ⭐ 재현성 핵심: 이 캐릭터가 이미 상세 프로필(voice_tone + visual_description)을
+    // ⭐ 재현성 핵심: 캐릭터가 이미 상세 프로필(voice_tone + visual_description)을
     // 가지고 있으면(라이브러리에서 가져왔거나 이전에 이미 설계된 경우) AI를 다시 호출하지 않고
-    // 저장된 프로필을 그대로 재사용한다. 매번 AI를 새로 호출하면 같은 캐릭터라도 응답이
-    // 조금씩 달라질 수 있어(temperature 0.7) "동일 캐릭터 → 동일 결과" 원칙이 깨지기 때문이다.
-    const hasStoredProfile = !!(selectedCharacter.voice_tone && selectedCharacter.visual_description);
+    // 저장된 프로필을 그대로 재사용한다.
+    const characterBriefs = [];
+    for (const character of selectedCharacters) {
+      const hasStoredProfile = !!(character.voice_tone && character.visual_description);
 
-    let completeBrief;
-    if (hasStoredProfile) {
-      console.log("[Step 4] 기존 캐릭터 프로필 재사용 (AI 재호출 생략 → 재현성 보장)");
-      completeBrief = {
-        character: selectedCharacter.character_name,
-        voice_tone: selectedCharacter.voice_tone,
-        personality_traits: selectedCharacter.personality_traits,
-        visual_description: selectedCharacter.visual_description,
-      };
-      await callDatabase("generation_logs", "create", {
-        resource_id: resourceId,
-        step: "character-designer",
-        status: "success",
-        error_message: null,
-        attempt: 0, // 0 = AI 미호출, 캐시된 프로필 재사용
-      }).catch(() => {});
-    } else {
-      console.log("[Step 4] character-designer-agent 호출... (신규 프로필 생성)");
-      const designerResult = await callAgent(
-        "character-designer-agent",
-        {
-          character: selectedCharacter.character_name,
-          productName: resource.product_name,
-          productInfo: resource.product_info,
-          metadata,
-        },
-        { resourceId, step: "character-designer" }
-      );
+      let brief;
+      if (hasStoredProfile) {
+        console.log(`[Step 4] "${character.character_name}" 기존 프로필 재사용 (AI 재호출 생략 → 재현성 보장)`);
+        brief = {
+          character: character.character_name,
+          voice_tone: character.voice_tone,
+          personality_traits: character.personality_traits,
+          visual_description: character.visual_description,
+        };
+        await callDatabase("generation_logs", "create", {
+          resource_id: resourceId,
+          step: "character-designer",
+          status: "success",
+          error_message: null,
+          attempt: 0, // 0 = AI 미호출, 캐시된 프로필 재사용
+        }).catch(() => {});
+      } else {
+        console.log(`[Step 4] "${character.character_name}" character-designer-agent 호출... (신규 프로필 생성)`);
+        const designerResult = await callAgent(
+          "character-designer-agent",
+          {
+            character: character.character_name,
+            productName: resource.product_name,
+            productInfo: resource.product_info,
+            metadata,
+          },
+          { resourceId, step: "character-designer" }
+        );
 
-      if (!designerResult.success) {
-        console.warn("[Step 4] character-designer 실패, 기본 정보로 계속");
-      }
+        if (!designerResult.success) {
+          console.warn(`[Step 4] "${character.character_name}" character-designer 실패, 기본 정보로 계속`);
+        }
 
-      completeBrief = designerResult.data?.brief || {
-        character: selectedCharacter.character_name,
-        voice_tone: selectedCharacter.voice_tone || "기본",
-      };
+        brief = designerResult.data?.brief || {
+          character: character.character_name,
+          voice_tone: character.voice_tone || "기본",
+        };
 
-      // ⭐ 새로 생성된 프로필은 characters 테이블에 저장 → 다음 요청부터는 재사용됨
-      if (designerResult.success && designerResult.data?.brief) {
-        await callDatabase("characters", "update", {
-          voice_tone: completeBrief.voice_tone,
-          personality_traits: completeBrief.personality_traits,
-          visual_description: completeBrief.visual_description,
-          preferred_expressions: completeBrief.preferred_expressions,
-          avoid_expressions: completeBrief.avoid_expressions,
-        }, { id: selectedCharacter.id }).catch((e) => console.error("[Step 4] 캐릭터 상세 저장 실패:", e));
+        // ⭐ 새로 생성된 프로필은 characters 테이블에 저장 → 다음 요청부터는 재사용됨
+        if (designerResult.success && designerResult.data?.brief) {
+          await callDatabase("characters", "update", {
+            voice_tone: brief.voice_tone,
+            personality_traits: brief.personality_traits,
+            visual_description: brief.visual_description,
+            preferred_expressions: brief.preferred_expressions,
+            avoid_expressions: brief.avoid_expressions,
+          }, { id: character.id }).catch((e) => console.error("[Step 4] 캐릭터 상세 저장 실패:", e));
 
-        // 라이브러리에서 온 캐릭터라면 라이브러리 원본에도 반영 (다른 자료에서도 동일 프로필 재사용)
-        if (selectedCharacter.library_character_id) {
-          await callDatabase("character_library", "update", {
-            voice_tone: completeBrief.voice_tone,
-            personality_traits: completeBrief.personality_traits,
-            visual_description: completeBrief.visual_description,
-          }, { id: selectedCharacter.library_character_id }).catch(() => {});
+          // 라이브러리에서 온 캐릭터라면 라이브러리 원본에도 반영 (다른 자료에서도 동일 프로필 재사용)
+          if (character.library_character_id) {
+            await callDatabase("character_library", "update", {
+              voice_tone: brief.voice_tone,
+              personality_traits: brief.personality_traits,
+              visual_description: brief.visual_description,
+            }, { id: character.library_character_id }).catch(() => {});
+          }
         }
       }
+
+      characterBriefs.push({ characterId: character.id, ...brief });
     }
 
-    // ── 3. Step 5: shortform-scenario-writer-agent 호출 (고수아) ──
-    // 참고자료(기업자료_요약.md 등)가 업로드되어 있고, 사용자가 반영을 원하면 함께 전달한다.
-    // useReferenceMaterials가 명시적으로 false가 아닌 한 기본적으로 반영한다.
-    const referenceMaterials =
-      useReferenceMaterials === false ? [] : resource.reference_materials || [];
+    // ⭐ 이 단계에서 합의된 생성 옵션(요청 타입/영상유형/길이/참고자료 반영 여부)을
+    // resources.metadata에 저장 → 뒤 단계(confirm 엔드포인트들)에서 다시 조회해서 이어간다.
+    await callDatabase(
+      "resources",
+      "update",
+      {
+        metadata: {
+          ...metadata,
+          generation_settings: {
+            requestType,
+            videoType: videoType || "제품스토리",
+            duration: targetDuration,
+            useReferenceMaterials: useReferenceMaterials !== false,
+          },
+        },
+      },
+      { id: resourceId }
+    ).catch((e) => console.error("[Step 4] generation_settings 저장 실패:", e));
 
-    if (referenceMaterials.length > 0) {
-      console.log(
-        `[Step 5] 참고자료 ${referenceMaterials.length}건 반영: ${referenceMaterials.map((f) => f.filename).join(", ")}`
-      );
+    return res.status(201).json({
+      success: true,
+      stage: "character_review",
+      resourceId,
+      characterBriefs,
+    });
+  } catch (error) {
+    console.error("[POST /api/generate] 예외 발생:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "서버 내부 오류가 발생했습니다",
+      resourceId: resourceId || null,
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/:resourceId/character/confirm
+// 캐릭터 브리프(말투/성격/외형) 검토/수정 확정 → Step 5(시나리오 작성)까지 실행
+// ─────────────────────────────────────────────────────
+router.post("/:resourceId/character/confirm", async (req, res) => {
+  const { resourceId } = req.params;
+  // editedBriefs: { [characterId]: { voice_tone?, personality_traits?, visual_description? } } — 수정된 캐릭터만 포함
+  const { editedBriefs, feedback } = req.body || {};
+
+  try {
+    const charactersResult = await callDatabase("characters", "read", null, {
+      resource_id: resourceId,
+      selected: true,
+    });
+    if (!charactersResult.success || charactersResult.rows.length === 0) {
+      return res.status(400).json({ success: false, message: "선택된 캐릭터를 찾을 수 없습니다" });
+    }
+    const selectedCharacters = charactersResult.rows;
+
+    // ⭐ 멀티 캐릭터: 각 캐릭터마다 Step4에서 저장된 브리프를 기본값으로, 사용자가 수정한
+    // 필드만 덮어쓴다. 시나리오 작성(Step5)에는 이 확정된 브리프 전원이 함께 전달된다.
+    const completeBriefs = [];
+    for (const character of selectedCharacters) {
+      const edit = editedBriefs?.[character.id];
+      const brief = {
+        character: character.character_name,
+        voice_tone: edit?.voice_tone || character.voice_tone,
+        personality_traits: edit?.personality_traits || character.personality_traits,
+        visual_description: edit?.visual_description || character.visual_description,
+      };
+
+      if (edit) {
+        await callDatabase("characters", "update", {
+          voice_tone: brief.voice_tone,
+          personality_traits: brief.personality_traits,
+          visual_description: brief.visual_description,
+        }, { id: character.id }).catch((e) => console.error("[Step 4 확정] 캐릭터 수정 저장 실패:", e));
+
+        if (character.library_character_id) {
+          await callDatabase("character_library", "update", {
+            voice_tone: brief.voice_tone,
+            personality_traits: brief.personality_traits,
+            visual_description: brief.visual_description,
+          }, { id: character.library_character_id }).catch(() => {});
+        }
+      }
+
+      completeBriefs.push({ ...character, ...brief });
     }
 
-    console.log("[Step 5] shortform-scenario-writer-agent 호출...");
-    const scenarioResult = await callAgent(
+    console.log(`[Step 4 확정] resourceId: ${resourceId}, 캐릭터 수: ${completeBriefs.length}, 수정여부: ${!!editedBriefs}`);
+
+    // ⭐ Step5는 더 이상 여기서 자동 실행하지 않는다 — "어떤 스타일로 만들까요?" 템플릿
+    // 선택 화면을 먼저 보여주고, 사용자가 템플릿(AI 추천 경로) 또는 직접 작성(검토 경로)을
+    // 고른 뒤에야 실제 시나리오 생성이 시작된다.
+    return res.status(201).json({
+      success: true,
+      stage: "template_select",
+      resourceId,
+      templates: scenarioTemplates,
+    });
+  } catch (error) {
+    console.error("[POST /character/confirm] 예외 발생:", error);
+    return res.status(500).json({ success: false, message: "캐릭터 확정 중 오류가 발생했습니다" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// 공통 헬퍼: 완성된 시나리오(scenario)를 scenarios 테이블에 저장하고
+// scenario_review 단계 응답 형태로 반환한다.
+// (AI 추천 경로의 generate-from-logline과 직접 작성 경로의 finalize-draft가 공유)
+// ─────────────────────────────────────────────────────
+async function saveScenarioAndBuildResponse({ resourceId, characterId, scenario, timingVerification, targetDuration }) {
+  if (timingVerification?.total_duration !== targetDuration) {
+    console.warn(
+      `⚠️ 시나리오가 ${targetDuration}초 요청에 ${timingVerification?.total_duration}초로 응답했습니다`
+    );
+  }
+
+  const scenarioDBResult = await callDatabase("scenarios", "create", {
+    resource_id: resourceId,
+    character_id: characterId,
+    scenario_title: scenario.title,
+    story_content: scenario.story_content || scenario.content || "",
+    scenario_json: scenario.acts || scenario,
+    total_duration_seconds: timingVerification?.total_duration || targetDuration,
+    dialogue_seconds: timingVerification?.dialogue_seconds || null,
+    narration_seconds: timingVerification?.narration_seconds || null,
+    timing_valid: timingVerification?.total_duration === targetDuration,
+  });
+
+  if (!scenarioDBResult.success) {
+    console.error("[Step 5] scenarios 저장 실패");
+    await callDatabase("generation_logs", "create", {
+      resource_id: resourceId,
+      step: "shortform-scenario-writer",
+      status: "fail",
+      error_message: "Scenarios 테이블 저장 실패",
+    }).catch(() => {});
+    return { success: false };
+  }
+
+  return {
+    success: true,
+    body: {
+      success: true,
+      stage: "scenario_review",
+      resourceId,
+      scenarioId: scenarioDBResult.rows?.[0]?.id || null,
+      scenario: {
+        title: scenario.title,
+        story_content: scenario.story_content || scenario.content || "",
+        acts: scenario.acts || [],
+      },
+      timingVerification: timingVerification || null,
+    },
+  };
+}
+
+// 공통 헬퍼: resource + 선택된 캐릭터(전원) + generation_settings 조회
+async function loadResourceAndCharacters(resourceId) {
+  const resourceResult = await callDatabase("resources", "read", null, { id: resourceId });
+  if (!resourceResult.success || resourceResult.rows.length === 0) {
+    return { error: { status: 404, message: "해당 자료를 찾을 수 없습니다" } };
+  }
+  const resource = resourceResult.rows[0];
+  const metadata = resource.metadata || {};
+  const generationSettings = metadata.generation_settings || {};
+
+  const charactersResult = await callDatabase("characters", "read", null, {
+    resource_id: resourceId,
+    selected: true,
+  });
+  if (!charactersResult.success || charactersResult.rows.length === 0) {
+    return { error: { status: 400, message: "선택된 캐릭터를 찾을 수 없습니다" } };
+  }
+
+  return { resource, metadata, generationSettings, selectedCharacters: charactersResult.rows };
+}
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/:resourceId/scenario/loglines
+// (AI 추천 경로 1단계) 템플릿 선택 → 로그라인 3개 제안
+// ─────────────────────────────────────────────────────
+router.post("/:resourceId/scenario/loglines", async (req, res) => {
+  const { resourceId } = req.params;
+  const { templateId } = req.body || {};
+
+  try {
+    const ctx = await loadResourceAndCharacters(resourceId);
+    if (ctx.error) return res.status(ctx.error.status).json({ success: false, message: ctx.error.message });
+    const { generationSettings, selectedCharacters } = ctx;
+    const requestType = generationSettings.requestType || "intro";
+
+    console.log(`[Step 5] 로그라인 생성 요청... (템플릿: ${templateId})`);
+    const result = await callAgent(
       "shortform-scenario-writer-agent",
       {
-        brief: completeBrief,
-        final_characters: [selectedCharacter],
+        mode: "loglines",
+        templateId,
+        brief: selectedCharacters[0],
+        final_characters: selectedCharacters,
+        scenario_context: requestType,
+      },
+      { resourceId, step: "shortform-scenario-writer" }
+    );
+
+    if (!result.success) {
+      return res.status(502).json({ success: false, message: "로그라인 생성에 실패했습니다", resourceId });
+    }
+
+    return res.json({
+      success: true,
+      stage: "logline_review",
+      resourceId,
+      templateId,
+      loglineOptions: result.data.loglineOptions || [],
+    });
+  } catch (error) {
+    console.error("[POST /scenario/loglines] 예외 발생:", error);
+    return res.status(500).json({ success: false, message: "로그라인 생성 중 오류가 발생했습니다" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/:resourceId/scenario/generate-from-logline
+// (AI 추천 경로 2단계) 선택한 로그라인 → 전체 시나리오 생성 → 저장
+// ─────────────────────────────────────────────────────
+router.post("/:resourceId/scenario/generate-from-logline", async (req, res) => {
+  const { resourceId } = req.params;
+  const { templateId, selectedLogline } = req.body || {};
+
+  try {
+    const ctx = await loadResourceAndCharacters(resourceId);
+    if (ctx.error) return res.status(ctx.error.status).json({ success: false, message: ctx.error.message });
+    const { resource, generationSettings, selectedCharacters } = ctx;
+    const requestType = generationSettings.requestType || "intro";
+    const targetDuration = generationSettings.duration || 120;
+    const useReferenceMaterials = generationSettings.useReferenceMaterials !== false;
+    const referenceMaterials = useReferenceMaterials ? resource.reference_materials || [] : [];
+
+    console.log(`[Step 5] 전체 시나리오 생성 요청... (템플릿: ${templateId}, 로그라인: ${selectedLogline?.title})`);
+    const result = await callAgent(
+      "shortform-scenario-writer-agent",
+      {
+        mode: "full_scenario",
+        templateId,
+        selectedLogline,
+        brief: selectedCharacters[0],
+        final_characters: selectedCharacters,
         scenario_context: requestType,
         target_duration_seconds: targetDuration,
         referenceMaterials,
@@ -255,60 +523,197 @@ router.post("/:resourceId/start", async (req, res) => {
       { resourceId, step: "shortform-scenario-writer" }
     );
 
-    if (!scenarioResult.success) {
-      return res.status(502).json({
-        success: false,
-        message: "시나리오 생성에 실패했습니다",
-        resourceId,
-      });
+    if (!result.success) {
+      return res.status(502).json({ success: false, message: "시나리오 생성에 실패했습니다", resourceId });
     }
 
-    const scenario = scenarioResult.data.scenario;
-    const higgsfieldSpecs = scenarioResult.data.higgsfield_specifications;
-
-    // 시나리오가 요청한 길이(targetDuration)와 일치하는지 확인
-    if (scenarioResult.data.timing_verification?.total_duration !== targetDuration) {
-      console.warn(
-        `⚠️ 시나리오가 ${targetDuration}초 요청에 ${scenarioResult.data.timing_verification?.total_duration}초로 응답했습니다`
-      );
-    }
-
-    // scenarios 테이블에 저장
-    // ⚠️ schema.sql 컬럼명과 정확히 일치시킴:
-    //    scenario_title, story_content, scenario_json,
-    //    total_duration_seconds, dialogue_seconds, narration_seconds, timing_valid
-    const scenarioDBResult = await callDatabase("scenarios", "create", {
-      resource_id: resourceId,
-      character_id: selectedCharacter.id,
-      scenario_title: scenario.title,
-      story_content: scenario.story_content || scenario.content || "",
-      scenario_json: scenario.acts || scenario,
-      total_duration_seconds: scenarioResult.data.timing_verification?.total_duration || targetDuration,
-      dialogue_seconds: scenarioResult.data.timing_verification?.dialogue_seconds || null,
-      narration_seconds: scenarioResult.data.timing_verification?.narration_seconds || null,
-      timing_valid: scenarioResult.data.timing_verification?.total_duration === targetDuration,
+    const saved = await saveScenarioAndBuildResponse({
+      resourceId,
+      characterId: selectedCharacters[0].id,
+      scenario: result.data.scenario,
+      timingVerification: result.data.timing_verification,
+      targetDuration,
     });
+    if (!saved.success) {
+      return res.status(500).json({ success: false, message: "시나리오 저장에 실패했습니다" });
+    }
+    return res.status(201).json(saved.body);
+  } catch (error) {
+    console.error("[POST /scenario/generate-from-logline] 예외 발생:", error);
+    return res.status(500).json({ success: false, message: "시나리오 생성 중 오류가 발생했습니다" });
+  }
+});
 
-    if (!scenarioDBResult.success) {
-      console.error("[Step 5] scenarios 저장 실패");
-      await callDatabase("generation_logs", "create", {
-        resource_id: resourceId,
-        step: "shortform-scenario-writer",
-        status: "fail",
-        error_message: "Scenarios 테이블 저장 실패",
-      }).catch(() => {});
-      return res.status(500).json({
-        success: false,
-        message: "시나리오 저장에 실패했습니다",
-      });
+// ⭐ 재현성/신뢰성: LLM(gpt-4.1-mini)이 컴플라이언스 위반을 발견하고도 issues를 비운 채
+// status만 PASS로 응답하는 경우가 관찰되어(구조화 초안에서는 알아서 표현을 순화하지만,
+// 그 사실을 issues에 보고하지 않음), AI 판정과 별개로 사용자 원문을 직접 스캔하는 규칙
+// 기반 안전장치를 둔다 (recommend-video-type과 같은 "AI 재호출 없는 결정론적 규칙" 패턴).
+const COMPLIANCE_RED_FLAGS = [
+  { pattern: /치료|완치|낫는다|낫게/, reason: "질병 치료 효능을 암시하는 의료 표현으로 금지됨", suggestion: "건강한 밸런스에 도움을 줄 수 있어요" },
+  { pattern: /혈압|당뇨|암\s|고혈압/, reason: "특정 질환과의 연관성을 암시하는 표현으로 금지됨", suggestion: "질환명을 언급하지 않는 건강 관련 표현으로 순화" },
+  { pattern: /유일무이|최고의|가장 좋은|넘버원|1위/, reason: "근거 없는 자극적 비교/과장 표현", suggestion: "구체적 근거가 있는 표현으로 순화" },
+];
+
+function scanComplianceRedFlags(text) {
+  const issues = [];
+  for (const flag of COMPLIANCE_RED_FLAGS) {
+    const match = text.match(flag.pattern);
+    if (match) {
+      issues.push({ text: match[0], reason: flag.reason, suggestion: flag.suggestion });
+    }
+  }
+  return issues;
+}
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/:resourceId/scenario/draft-review
+// (직접 작성 경로) 사용자 아이디어 → 브랜드보이스/컴플라이언스 검토 + 구조화 초안
+// (DB에 저장하지 않음 — 사용자가 "이대로 진행"을 눌러야 finalize-draft에서 저장됨)
+// ─────────────────────────────────────────────────────
+router.post("/:resourceId/scenario/draft-review", async (req, res) => {
+  const { resourceId } = req.params;
+  const { userIdea } = req.body || {};
+
+  if (!userIdea || !userIdea.trim()) {
+    return res.status(400).json({ success: false, message: "아이디어를 입력해주세요" });
+  }
+
+  try {
+    const ctx = await loadResourceAndCharacters(resourceId);
+    if (ctx.error) return res.status(ctx.error.status).json({ success: false, message: ctx.error.message });
+    const { generationSettings, selectedCharacters } = ctx;
+
+    console.log(`[Step 5] 사용자 아이디어 검토 요청...`);
+    const result = await callAgent(
+      "shortform-scenario-writer-agent",
+      {
+        mode: "draft_review",
+        userIdea,
+        brief: selectedCharacters[0],
+        final_characters: selectedCharacters,
+        scenario_context: generationSettings.requestType || "intro",
+        target_duration_seconds: generationSettings.duration || 120,
+      },
+      { resourceId, step: "shortform-scenario-writer" }
+    );
+
+    if (!result.success) {
+      return res.status(502).json({ success: false, message: "아이디어 검토에 실패했습니다", resourceId });
     }
 
-    // ── 4. Step 6: naming-generator-agent 호출 (고수아) ──
+    const review = result.data.review;
+    const ruleBasedIssues = scanComplianceRedFlags(userIdea);
+    if (ruleBasedIssues.length > 0) {
+      const existingTexts = new Set((review.complianceCheck?.issues || []).map((i) => i.text));
+      const newIssues = ruleBasedIssues.filter((i) => !existingTexts.has(i.text));
+      if (newIssues.length > 0) {
+        console.warn(`[Step 5] 규칙 기반 컴플라이언스 스캔이 AI가 놓친 문제 표현을 발견함: ${newIssues.map((i) => i.text).join(", ")}`);
+        review.complianceCheck = {
+          status: review.complianceCheck?.status === "FAIL" ? "FAIL" : "WARNING",
+          issues: [...(review.complianceCheck?.issues || []), ...newIssues],
+        };
+      }
+    }
+
+    return res.json({
+      success: true,
+      stage: "draft_review",
+      resourceId,
+      review,
+    });
+  } catch (error) {
+    console.error("[POST /scenario/draft-review] 예외 발생:", error);
+    return res.status(500).json({ success: false, message: "아이디어 검토 중 오류가 발생했습니다" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/:resourceId/scenario/finalize-draft
+// (직접 작성 경로) 검토를 마친 구조화 초안을 확정 저장
+// ─────────────────────────────────────────────────────
+router.post("/:resourceId/scenario/finalize-draft", async (req, res) => {
+  const { resourceId } = req.params;
+  const { structuredDraft } = req.body || {};
+
+  if (!structuredDraft || !structuredDraft.title) {
+    return res.status(400).json({ success: false, message: "structuredDraft가 필요합니다" });
+  }
+
+  try {
+    const ctx = await loadResourceAndCharacters(resourceId);
+    if (ctx.error) return res.status(ctx.error.status).json({ success: false, message: ctx.error.message });
+    const { generationSettings, selectedCharacters } = ctx;
+    const targetDuration = generationSettings.duration || 120;
+
+    const totalDuration =
+      (structuredDraft.acts || []).reduce((sum, a) => sum + (a.duration_seconds || 0), 0) || targetDuration;
+
+    const saved = await saveScenarioAndBuildResponse({
+      resourceId,
+      characterId: selectedCharacters[0].id,
+      scenario: structuredDraft,
+      timingVerification: { total_duration: totalDuration },
+      targetDuration,
+    });
+    if (!saved.success) {
+      return res.status(500).json({ success: false, message: "시나리오 저장에 실패했습니다" });
+    }
+    return res.status(201).json(saved.body);
+  } catch (error) {
+    console.error("[POST /scenario/finalize-draft] 예외 발생:", error);
+    return res.status(500).json({ success: false, message: "시나리오 확정 중 오류가 발생했습니다" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/:resourceId/scenario/:scenarioId/confirm
+// 시나리오 검토/수정 확정 → Step 6(영상 제목 생성)까지 실행
+// ─────────────────────────────────────────────────────
+router.post("/:resourceId/scenario/:scenarioId/confirm", async (req, res) => {
+  const { resourceId, scenarioId } = req.params;
+  const { editedStoryContent, editedActs, feedback } = req.body;
+
+  try {
+    const scenarioResult = await callDatabase("scenarios", "read", null, { id: scenarioId });
+    if (!scenarioResult.success || scenarioResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "해당 시나리오를 찾을 수 없습니다" });
+    }
+    const scenarioRow = scenarioResult.rows[0];
+
+    const resourceResult = await callDatabase("resources", "read", null, { id: resourceId });
+    if (!resourceResult.success || resourceResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "해당 자료를 찾을 수 없습니다" });
+    }
+    const resource = resourceResult.rows[0];
+    const metadata = resource.metadata || {};
+
+    // 사용자가 수정했으면 반영, 아니면 AI 초안 그대로 확정
+    const finalStoryContent = editedStoryContent || scenarioRow.story_content;
+    const finalActs = editedActs || scenarioRow.scenario_json;
+
+    await callDatabase(
+      "scenarios",
+      "update",
+      {
+        story_content: finalStoryContent,
+        scenario_json: finalActs,
+        marketer_approved: true,
+        marketer_feedback: feedback || null,
+      },
+      { id: scenarioId }
+    );
+
+    console.log(`[Step 5 확정] resourceId: ${resourceId}, 수정여부: ${!!editedStoryContent || !!editedActs}`);
+
+    // ── Step 6: naming-generator-agent 호출 (고수아) ──
+    // ⭐ "다음 단계에만 전달": 확정된(수정됐을 수도 있는) 시나리오 내용을 참고 컨텍스트로 함께 전달해
+    // 별도의 재분석 AI 호출 없이도 다음 단계가 최신 내용을 반영하도록 한다.
     console.log("[Step 6] naming-generator-agent 호출...");
     const namingResult = await callAgent(
       "naming-generator-agent",
       {
-        scenario_id: scenarioDBResult.rows?.[0]?.id || null,
+        scenario_id: scenarioId,
+        scenario_text: finalStoryContent,
         primary_message: metadata.focus?.join(", ") || "제품의 가치",
         tone_analysis: metadata.focus || ["기본"],
         business_area: metadata.categories?.[0] || "일반",
@@ -321,14 +726,9 @@ router.post("/:resourceId/start", async (req, res) => {
       console.warn("[Step 6] naming-generator 실패, 기본 이름으로 계속");
     }
 
-    // 1순위 이름 선택
     const productNameOptions = namingResult.data?.product_name_options || [];
     const contentNameOptions = namingResult.data?.content_name_options || [];
 
-    const selectedProductName = productNameOptions[0]?.name || resource.product_name;
-    const selectedContentName = contentNameOptions[0]?.name || scenario.title;
-
-    // naming 테이블에 저장
     const namingDBResult = await callDatabase("naming", "create", {
       resource_id: resourceId,
       product_name_1: productNameOptions[0]?.name || "",
@@ -351,19 +751,113 @@ router.post("/:resourceId/start", async (req, res) => {
       content_name_3_meaning: contentNameOptions[2]?.meaning || "",
     });
 
-    // ── 5. Step 7: product-intro-writer-agent 또는 product-detail-page-writer-agent ──
+    if (!namingDBResult.success) {
+      return res.status(500).json({ success: false, message: "네이밍 결과 저장에 실패했습니다" });
+    }
+
+    return res.json({
+      success: true,
+      stage: "naming_review",
+      resourceId,
+      namingId: namingDBResult.rows?.[0]?.id || null,
+      // ⭐ 실제 제품명(Step1에서 사용자가 입력한 값)은 참고로만 보여준다 — Step6은 이 이름을
+      // 대체하는 단계가 아니라 "이 제품명/설명을 바탕으로 한 영상 제목"만 정하는 단계다.
+      realProductName: resource.product_name,
+      contentNameOptions,
+      fallbackContentName: scenarioRow.scenario_title,
+    });
+  } catch (error) {
+    console.error("[POST /scenario/confirm] 예외 발생:", error);
+    return res.status(500).json({ success: false, message: "시나리오 확정 중 오류가 발생했습니다" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/:resourceId/naming/confirm
+// 영상 제목(콘텐츠명) 확정 → Step 7(카피 작성)까지 실행
+//
+// ⚠️ 제품명은 여기서 다루지 않는다. Step1에서 이미 입력한 실제 제품명(resource.product_name)이
+// 유일한 제품명이며, naming-generator-agent가 만드는 "제품명 후보"는 신제품 네이밍용으로 설계된
+// 필드라 이 파이프라인(기존 제품 홍보 콘텐츠 제작)과 맞지 않아 사용하지 않는다. 여기서 정하는 것은
+// 오직 "영상/콘텐츠 제목"(content_name)뿐이다.
+// ─────────────────────────────────────────────────────
+router.post("/:resourceId/naming/confirm", async (req, res) => {
+  const { resourceId } = req.params;
+  const { selectedContentName } = req.body;
+
+  try {
+    const namingResult = await callDatabase("naming", "read", null, { resource_id: resourceId });
+    if (!namingResult.success || namingResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "해당 자료의 네이밍 결과를 찾을 수 없습니다. 먼저 시나리오를 확정해주세요.",
+      });
+    }
+    const namingRow = namingResult.rows.sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    )[0];
+
+    const resourceResult = await callDatabase("resources", "read", null, { id: resourceId });
+    if (!resourceResult.success || resourceResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "해당 자료를 찾을 수 없습니다" });
+    }
+    const resource = resourceResult.rows[0];
+    const metadata = resource.metadata || {};
+    const generationSettings = metadata.generation_settings || {};
+    const requestType = generationSettings.requestType || "intro";
+    const videoType = generationSettings.videoType || "제품스토리";
+
+    // 실제 제품명은 절대 대체되지 않는다 — Step1 입력값 그대로 사용
+    const finalProductName = resource.product_name;
+    const finalContentName = selectedContentName || namingRow.content_name_1 || resource.product_name;
+
+    // resources.metadata에 콘텐츠명(영상 제목)만 병합 저장 (metadata 전체를 덮어쓰지 않기 위해 spread)
+    await callDatabase(
+      "resources",
+      "update",
+      {
+        metadata: {
+          ...metadata,
+          selected_content_name: finalContentName,
+        },
+      },
+      { id: resourceId }
+    );
+
+    console.log(`[Step 6 확정] resourceId: ${resourceId}, 영상 제목: ${finalContentName} (제품명은 변경되지 않음: ${finalProductName})`);
+
+    // 최신 시나리오(사람 검토 확정본) 조회 — Step 7 카피 작성에 사용
+    const scenarioResult = await callDatabase("scenarios", "read", null, { resource_id: resourceId });
+    const scenarioRow = scenarioResult.success
+      ? scenarioResult.rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+      : null;
+    const scenarioForContent = scenarioRow
+      ? {
+          title: scenarioRow.scenario_title,
+          story_content: scenarioRow.story_content,
+          acts: scenarioRow.scenario_json,
+        }
+      : null;
+
+    // 선택된 캐릭터 조회 (카피 작성 컨텍스트에 필요, 여러 명일 수 있음)
+    const charactersResult = await callDatabase("characters", "read", null, {
+      resource_id: resourceId,
+      selected: true,
+    });
+    const selectedCharacters = charactersResult.success ? charactersResult.rows : [];
+    const characterNames = selectedCharacters.map((c) => c.character_name).filter(Boolean).join(", ");
+
+    // ── Step 7: product-intro-writer-agent 또는 product-detail-page-writer-agent ──
     let agentName;
     if (requestType === "intro") {
       agentName = "product-intro-writer-agent";
     } else if (requestType === "detail") {
       agentName = "product-detail-page-writer-agent";
     } else {
-      // both: 일단 intro로 진행 (또는 둘 다 할 수도 있음)
       agentName = "product-intro-writer-agent";
     }
 
-    // ⭐ 브랜드 보이스 학습 캐시: 과거에 승인(APPROVED)된 콘텐츠를 few-shot 예시로 프롬프트에 주입해
-    //    매번 다른 담당자가 생성해도 톤이 일관되게 유지되도록 함
+    // ⭐ 브랜드 보이스 학습 캐시: 과거에 승인(APPROVED)된 콘텐츠를 few-shot 예시로 프롬프트에 주입
     let approvedExamples = [];
     try {
       const pastApproved = await callDatabase("contents", "read", null, {
@@ -380,19 +874,19 @@ router.post("/:resourceId/start", async (req, res) => {
       console.warn("[브랜드 보이스 캐시] 과거 승인 콘텐츠 조회 실패 (무시하고 계속):", e.message);
     }
 
-    console.log(`[Step 7] ${agentName} 호출... (videoType: ${videoType || "제품스토리"}, 참고 예시: ${approvedExamples.length}건)`);
+    console.log(`[Step 7] ${agentName} 호출... (videoType: ${videoType}, 참고 예시: ${approvedExamples.length}건)`);
     const contentResult = await callAgent(
       agentName,
       {
         category: metadata.categories?.[0] || "일반",
-        character: selectedCharacter.character_name,
-        productName: selectedProductName,
+        character: characterNames,
+        productName: finalProductName,
         productInfo: resource.product_info,
         keywords: resource.keywords || [],
         trendKeywords: metadata.trendKeywords || [],
         customStyle: metadata.customStyle || null,
-        scenario,
-        videoType: videoType || "제품스토리",
+        scenario: scenarioForContent,
+        videoType,
         approvedExamples,
       },
       { resourceId, step: agentName }
@@ -408,14 +902,76 @@ router.post("/:resourceId/start", async (req, res) => {
 
     const generatedContent = contentResult.data.content;
 
-    // ── 6. Step 8: compliance-reviewer-agent (검증) ──
+    // contents 테이블에 초안 저장 (컴플라이언스는 아직 실행 전 → DRAFT)
+    const contentDBResult = await callDatabase("contents", "create", {
+      resource_id: resourceId,
+      scenario_id: scenarioRow?.id || null,
+      naming_id: namingRow.id,
+      content_type: requestType === "intro" ? "intro" : "detail",
+      generated_content: generatedContent,
+      validation_status: "DRAFT",
+      validation_score: null,
+    });
+
+    if (!contentDBResult.success) {
+      console.error("[Step 7] contents 저장 실패");
+      return res.status(500).json({ success: false, message: "콘텐츠 저장에 실패했습니다" });
+    }
+
+    return res.json({
+      success: true,
+      stage: "copy_review",
+      resourceId,
+      contentId: contentDBResult.rows?.[0]?.id || null,
+      generatedContent,
+    });
+  } catch (error) {
+    console.error("[POST /naming/confirm] 예외 발생:", error);
+    return res.status(500).json({ success: false, message: "네이밍 확정 중 오류가 발생했습니다" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/:resourceId/copy/:contentId/confirm
+// 카피 검토/수정 확정 → Step 8(컴플라이언스) + Step 9(영상 생성) 실행
+// ─────────────────────────────────────────────────────
+router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
+  const { resourceId, contentId } = req.params;
+  const { editedContent } = req.body;
+
+  try {
+    const contentResult = await callDatabase("contents", "read", null, { id: contentId });
+    if (!contentResult.success || contentResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "해당 콘텐츠를 찾을 수 없습니다" });
+    }
+    const contentRow = contentResult.rows[0];
+
+    const resourceResult = await callDatabase("resources", "read", null, { id: resourceId });
+    if (!resourceResult.success || resourceResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: "해당 자료를 찾을 수 없습니다" });
+    }
+    const resource = resourceResult.rows[0];
+    const metadata = resource.metadata || {};
+    const generationSettings = metadata.generation_settings || {};
+    const targetDuration = generationSettings.duration || 120;
+
+    const finalContent = editedContent || contentRow.generated_content;
+    const finalProductName = resource.product_name; // 실제 제품명은 항상 Step1 입력값 그대로
+
+    if (editedContent) {
+      await callDatabase("contents", "update", { generated_content: finalContent }, { id: contentId });
+    }
+
+    console.log(`[Step 7 확정] resourceId: ${resourceId}, 수정여부: ${!!editedContent}`);
+
+    // ── Step 8: compliance-reviewer-agent (검증) ──
     console.log("[Step 8] compliance-reviewer-agent 호출...");
     const complianceResult = await callAgent(
       "compliance-reviewer-agent",
       {
-        content: generatedContent,
+        content: finalContent,
         category: metadata.categories?.[0] || "일반",
-        productName: selectedProductName,
+        productName: finalProductName,
       },
       { resourceId, step: "compliance-reviewer" }
     );
@@ -433,46 +989,51 @@ router.post("/:resourceId/start", async (req, res) => {
 
     console.log(`[Step 8] 검증 결과: ${validationStatus} (점수: ${validationScore})`);
 
-    // REJECTED는 경고이지만 계속 진행 (선택사항)
     if (validationStatus === "REJECTED") {
       console.warn("⚠️ 컴플라이언스 검증 REJECTED - 그대로 진행");
     }
 
-    // contents 테이블에 저장
-    const contentDBResult = await callDatabase("contents", "create", {
+    await callDatabase(
+      "contents",
+      "update",
+      { validation_status: validationStatus, validation_score: validationScore },
+      { id: contentId }
+    );
+
+    // 선택된 캐릭터 재조회 (Higgsfield 호출에 필요, 여러 명일 수 있음)
+    const charactersResult = await callDatabase("characters", "read", null, {
       resource_id: resourceId,
-      scenario_id: scenarioDBResult.rows?.[0]?.id || null,
-      naming_id: namingDBResult.rows?.[0]?.id || null,
-      content_type: requestType === "intro" ? "intro" : "detail",
-      generated_content: generatedContent,
-      validation_status: validationStatus,
-      validation_score: validationScore,
+      selected: true,
     });
-
-    if (!contentDBResult.success) {
-      console.error("[Step 7/8] contents 저장 실패");
+    if (!charactersResult.success || charactersResult.rows.length === 0) {
+      return res.status(400).json({ success: false, message: "선택된 캐릭터를 찾을 수 없습니다" });
     }
+    const selectedCharacters = charactersResult.rows;
+    // ⭐ Higgsfield 영상 모델은 --start-image(첫 프레임 고정)를 캐릭터 1명 분량만 받을 수 있다.
+    // 그래서 시각적 일관성(레퍼런스 이미지)은 "대표 캐릭터" 1명만 보장하고, 나머지 캐릭터는
+    // 프롬프트 텍스트(이름+외형 묘사)로만 장면에 함께 등장하도록 반영한다.
+    const primaryCharacter = selectedCharacters[0];
+    const coCharacters = selectedCharacters.slice(1);
+    const coCharacterDescriptions = coCharacters
+      .map((c) => `${c.character_name}(${c.visual_description || "설명 없음"})`)
+      .join(", ");
 
-    const contentId = contentDBResult.rows?.[0]?.id || null;
-    const scenarioId = scenarioDBResult.rows?.[0]?.id || null;
-    const namingId = namingDBResult.rows?.[0]?.id || null;
-
-    // ── 7. Step 9: Higgsfield 호출 ──
-    console.log("[Step 9] Higgsfield 영상 생성 요청...");
-    let higgsfieldId = null;
+    // ── Step 9: Higgsfield 호출 ──
+    console.log(`[Step 9] Higgsfield 영상 생성 요청... (대표 캐릭터: ${primaryCharacter.character_name}${coCharacters.length ? `, 공동출연: ${coCharacters.map((c) => c.character_name).join(", ")}` : ""})`);
     let videoUrl = null;
-    let generationStatus = "pending";
-    let generationProgress = 0;
     let videosRowId = null;
     let higgsfieldError = null;
 
     const higgsfieldResult = await callHiggsfield(
       {
-        character: selectedCharacter.character_name,
-        generatedContent,
-        voiceTone: selectedCharacter.voice_tone || "기본",
-        visualDescription: selectedCharacter.visual_description || "",
-        referenceImageUrl: selectedCharacter.reference_image_url || null, // ⭐ 재현성: 레퍼런스 이미지 전달
+        character: primaryCharacter.character_name,
+        generatedContent: finalContent,
+        voiceTone: primaryCharacter.voice_tone || "기본",
+        visualDescription: coCharacterDescriptions
+          ? `${primaryCharacter.visual_description || ""}, 함께 등장하는 캐릭터: ${coCharacterDescriptions}`
+          : primaryCharacter.visual_description || "",
+        // ⭐ 재현성: --start-image는 URL이 아니라 job id(generation_seed)를 받는다
+        referenceJobId: primaryCharacter.generation_seed || null,
         duration: targetDuration,
       },
       resourceId,
@@ -480,19 +1041,15 @@ router.post("/:resourceId/start", async (req, res) => {
     );
 
     if (higgsfieldResult.success) {
-      higgsfieldId = higgsfieldResult.data.higgsfield_id;
       videoUrl = higgsfieldResult.data.video_url;
-      generationStatus = higgsfieldResult.data.generation_status;
-      generationProgress = higgsfieldResult.data.generation_progress;
       videosRowId = higgsfieldResult.data.videos_row_id;
-      console.log(`[Step 9] Higgsfield ID: ${higgsfieldId}, 진행률: ${generationProgress}%`);
+      console.log(`[Step 9] 영상 생성 완료: ${videoUrl}`);
     } else {
       higgsfieldError = higgsfieldResult.error || "Unknown error";
       console.warn(`[Step 9] Higgsfield 호출 실패: ${higgsfieldError}`);
     }
 
-    // ── 7-1. 최종 상태 업데이트 ──
-    // ✅ CLI의 --wait 플래그로 완료까지 기다렸으므로 pollHiggsfield 불필요
+    // ── 최종 상태 업데이트 ──
     if (higgsfieldResult.success && videosRowId) {
       await callDatabase(
         "videos",
@@ -501,41 +1058,33 @@ router.post("/:resourceId/start", async (req, res) => {
           generation_status: "completed",
           generation_progress: 100,
           video_url: videoUrl,
-          character_reference_image_url: selectedCharacter.reference_image_url || null, // ⭐ 재현성 추적
+          character_reference_image_url: primaryCharacter.reference_image_url || null,
         },
         { id: videosRowId }
       ).catch((e) => console.error("[영상 상태 업데이트 실패]", e));
 
-      // ⭐ 캐릭터의 reference_image_url과 generation_count 업데이트 (첫 생성 시에만 저장)
-      const isFirstGeneration = !selectedCharacter.reference_image_url && videoUrl;
-      const characterUpdate = isFirstGeneration
-        ? {
-            reference_image_url: videoUrl, // Higgsfield 영상 URL을 레퍼런스로 사용
-            image_generated_at: new Date().toISOString(),
-            generation_count: 1,
-          }
-        : {
-            generation_count: (selectedCharacter.generation_count || 0) + 1,
-          };
+      // ⚠️ reference_image_url은 반드시 "이미지"여야 하므로 (Higgsfield --start-image 요구사항),
+      // 방금 생성된 영상 URL을 여기서 자동으로 레퍼런스 이미지로 저장하지 않는다.
+      // 레퍼런스 이미지는 오직 /api/characters/library/:id/generate-reference(이미지 모델 호출)를
+      // 통해서만 설정된다. 여기서는 생성 횟수만 갱신한다.
+      for (const character of selectedCharacters) {
+        const characterUpdate = { generation_count: (character.generation_count || 0) + 1 };
+        await callDatabase("characters", "update", characterUpdate, { id: character.id })
+          .catch((e) => console.error("[캐릭터 생성 카운트 저장 실패]", e));
 
-      await callDatabase("characters", "update", characterUpdate, { id: selectedCharacter.id })
-        .catch((e) => console.error("[캐릭터 레퍼런스/카운트 저장 실패]", e));
-
-      // ⭐ 라이브러리에서 온 캐릭터라면, 라이브러리 원본에도 동일하게 반영한다.
-      // 이렇게 해야 "결이"를 다른 자료(resource)에서 다시 선택했을 때도
-      // 처음부터 같은 레퍼런스 이미지로 생성되어 자료 간에도 스타일이 일관되게 유지된다.
-      if (selectedCharacter.library_character_id) {
-        await callDatabase("character_library", "update", characterUpdate, {
-          id: selectedCharacter.library_character_id,
-        }).catch((e) => console.error("[라이브러리 레퍼런스 동기화 실패]", e));
+        if (character.library_character_id) {
+          await callDatabase("character_library", "update", characterUpdate, {
+            id: character.library_character_id,
+          }).catch((e) => console.error("[라이브러리 생성 카운트 동기화 실패]", e));
+        }
       }
     }
 
-    // ── 8. 최종 응답 ──────────────────────────────
     console.log(`✅ POST /api/generate 완료`);
 
     return res.status(201).json({
       success: true,
+      stage: "done",
       contentId,
       validationStatus,
       validationScore,
@@ -545,13 +1094,8 @@ router.post("/:resourceId/start", async (req, res) => {
       higgsfieldError: higgsfieldError,
     });
   } catch (error) {
-    console.error("[POST /api/generate] 예외 발생:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "서버 내부 오류가 발생했습니다",
-      resourceId: resourceId || null,
-    });
+    console.error("[POST /copy/confirm] 예외 발생:", error);
+    return res.status(500).json({ success: false, message: "카피 확정 중 오류가 발생했습니다" });
   }
 });
 
@@ -578,7 +1122,9 @@ router.get("/:resourceId/status", async (req, res) => {
 
     const logs = logsResult.rows;
     const currentStep = logs[0];
-    const successCount = logs.filter((l) => l.status === "success").length;
+    // ⚠️ 같은 resourceId로 여러 번 재시도/재확정하면 같은 step이 여러 번 성공 기록을 남길 수 있다.
+    // 전체 row 수를 그대로 세면 100%를 넘어가 버리므로, "성공한 서로 다른 step 이름의 개수"로 센다.
+    const successCount = new Set(logs.filter((l) => l.status === "success").map((l) => l.step)).size;
     const failureCount = logs.filter((l) => l.status === "fail").length;
     const retryingCount = logs.filter((l) => l.status === "retrying").length;
     const totalSteps = 9; // Step 1~9
@@ -608,7 +1154,7 @@ router.get("/:resourceId/status", async (req, res) => {
       resourceId,
       currentStep: currentStep.step,
       currentStatus: currentStep.status,
-      progress: Math.round((successCount / totalSteps) * 100),
+      progress: Math.min(100, Math.round((successCount / totalSteps) * 100)),
       completedSteps: successCount,
       failedSteps: failureCount,
       retiringSteps: retryingCount,
@@ -749,6 +1295,9 @@ router.get("/:resourceId/logs", async (req, res) => {
 // ─────────────────────────────────────────────────────
 // POST /api/generate/batch
 // 여러 자료를 일괄 생성 (2C: Batch Processing)
+//
+// ⚠️ 참고: Step5/6/7 사람 검토가 도입되면서 /start는 이제 시나리오 검토 단계에서
+// 멈춘다. 배치 큐에 넣은 자료들도 각자 시나리오 검토 화면부터 사람이 이어서 진행해야 한다.
 // ─────────────────────────────────────────────────────
 router.post("/batch", async (req, res) => {
   const { resourceIds, requestType } = req.body;
@@ -776,11 +1325,8 @@ router.post("/batch", async (req, res) => {
 
     for (const resourceId of resourceIds) {
       try {
-        // 각 자료마다 독립적으로 생성 시작
-        // 주의: 이는 비동기적으로 실행되므로 응답을 기다리지 않음
         console.log(`  ↳ ${resourceId} 큐에 추가됨`);
 
-        // 백그라운드에서 생성 시작 (await하지 않음)
         (async () => {
           try {
             const result = await fetch(
@@ -792,7 +1338,7 @@ router.post("/batch", async (req, res) => {
               }
             );
             const data = await result.json();
-            console.log(`    ✅ ${resourceId} 생성 완료:`, data.success);
+            console.log(`    ✅ ${resourceId} 시나리오 초안 생성 완료 (검토 대기):`, data.success);
           } catch (err) {
             console.error(`    ❌ ${resourceId} 생성 실패:`, err.message);
           }
@@ -816,7 +1362,7 @@ router.post("/batch", async (req, res) => {
       success: true,
       batchSize: resourceIds.length,
       results: batchResults,
-      message: "모든 자료가 생성 큐에 추가되었습니다. 진행 상황은 각 resourceId의 /status로 확인하세요",
+      message: "모든 자료가 생성 큐에 추가되었습니다. 각 자료는 시나리오 검토부터 사람이 이어서 진행해야 합니다.",
     });
   } catch (error) {
     console.error("[POST /api/generate/batch] 예외:", error);
@@ -847,7 +1393,6 @@ router.post("/:resourceId/retry-from/:step", async (req, res) => {
       `[POST /api/generate/:resourceId/retry-from/:step] resourceId: ${resourceId}, step: ${step}`
     );
 
-    // 생성 로그에서 이 단계의 기존 기록 삭제 (재시도 표시)
     const logsResult = await callDatabase("generation_logs", "read", null, {
       resource_id: resourceId,
     });
@@ -859,17 +1404,12 @@ router.post("/:resourceId/retry-from/:step", async (req, res) => {
       );
     }
 
-    // 실제 재시도는 /start 엔드포인트에서 처리
-    // 여기서는 로그만 기록하고 큐에 추가
     await callDatabase("generation_logs", "create", {
       resource_id: resourceId,
       step: stepNum,
       status: "retrying",
       details: `Step ${stepNum}부터 재시도 시작`,
     });
-
-    // 실제로는 Step 4부터 다시 시작 (Step 1-3은 이미 완료)
-    const { requestType } = req.body || { requestType: "intro" };
 
     return res.json({
       success: true,

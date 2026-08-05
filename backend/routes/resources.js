@@ -224,6 +224,7 @@ router.post("/", async (req, res) => {
       personality_traits: c.personality_traits || null,
       visual_description: c.visual_description || null,
       reference_image_url: c.reference_image_url || null,
+      generation_seed: c.generation_seed || null, // Higgsfield job id — --start-image 재사용용
       generation_count: c.generation_count || 0,
       library_character_id: c.id || null,
       reason: c.reason,

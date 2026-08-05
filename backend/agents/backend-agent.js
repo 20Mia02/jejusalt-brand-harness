@@ -21,6 +21,17 @@ const { callDatabase } = require("./database-agent");
 const OpenAI = require("openai");
 
 // ============================================================================
+// 숏폼 시나리오 템플릿 라이브러리
+// ============================================================================
+let _scenarioTemplatesCache = null;
+function getScenarioTemplates() {
+  if (!_scenarioTemplatesCache) {
+    _scenarioTemplatesCache = require("../config/scenario-templates.json");
+  }
+  return _scenarioTemplatesCache;
+}
+
+// ============================================================================
 // [함수 1] callAgent - TimelyAI SDK를 통한 에이전트 호출
 // ============================================================================
 /**
@@ -139,8 +150,8 @@ async function callTimelyAIAgent(agentName, payload) {
     baseURL: baseURL,
   });
 
-  const systemPrompt = getSystemPromptForAgent(agentName);
-  const outputSpec = getOutputSpecForAgent(agentName);
+  const systemPrompt = getSystemPromptForAgent(agentName, payload);
+  const outputSpec = getOutputSpecForAgent(agentName, payload);
 
   console.log(`  [OpenAI SDK] 에이전트 호출: ${agentName}`);
   console.log(`    모델: openai/gpt-4.1-mini`);
@@ -267,6 +278,56 @@ function getMockResponseForAgent(agentName, payload) {
     };
   }
 
+  // shortform-scenario-writer-agent의 템플릿 기반 모드(loglines/full_scenario/draft_review)는
+  // mode별로 완전히 다른 응답 모양이라 아래 정적 mockData 맵과 별개로 분기 처리한다.
+  if (agentName === "shortform-scenario-writer-agent" && payload?.mode) {
+    const templates = getScenarioTemplates();
+    const template = templates.find((t) => t.id === payload.templateId);
+
+    if (payload.mode === "loglines") {
+      const label = template?.label || "숏폼";
+      return {
+        loglineOptions: [
+          { id: "opt1", title: `${label} 아이디어 1`, logline: `${template?.example || "제품이 자연스럽게 등장하는"} 짧은 이야기 (mock)` },
+          { id: "opt2", title: `${label} 아이디어 2`, logline: `${template?.toneKeywords?.[0] || "임팩트 있는"} 톤으로 전개되는 이야기 (mock)` },
+          { id: "opt3", title: `${label} 아이디어 3`, logline: `${template?.durationRange || "짧은"} 분량의 대안 전개 (mock)` },
+        ],
+      };
+    }
+
+    if (payload.mode === "full_scenario") {
+      const targetDuration = payload?.target_duration_seconds || 30;
+      return {
+        scenario: {
+          title: payload.selectedLogline?.title || `${template?.label || "숏폼"} 시나리오`,
+          story_content: payload.selectedLogline?.logline || "mock 시나리오 내용",
+          acts: [{ act: 1, duration_seconds: targetDuration, content: `(mock) ${template?.structureHint || ""}` }],
+        },
+        higgsfield_specifications: { style: template?.toneKeywords?.join(", ") || "기본", mood: "밝음" },
+        timing_verification: {
+          total_duration: targetDuration,
+          dialogue_seconds: Math.round(targetDuration / 2),
+          narration_seconds: targetDuration - Math.round(targetDuration / 2),
+        },
+      };
+    }
+
+    if (payload.mode === "draft_review") {
+      return {
+        review: {
+          brandVoiceFit: { status: "PASS", comment: "(mock) 브랜드 보이스와 대체로 어울립니다" },
+          complianceCheck: { status: "PASS", issues: [] },
+          suggestedDuration: "30초",
+          structuredDraft: {
+            title: "사용자 아이디어 기반 시나리오 (mock)",
+            story_content: payload.userIdea || "",
+            acts: [{ act: 1, duration_seconds: 30, content: payload.userIdea || "" }],
+          },
+        },
+      };
+    }
+  }
+
   const mockData = {
     "resource-analyzer-agent": {
       metadata: {
@@ -372,6 +433,15 @@ function getMockResponseForAgent(agentName, payload) {
         score: 90,
         issues: []
       }
+    },
+    "trend-analyzer-agent": {
+      trends: [
+        { keyword: "저속노화", angle: "자극적이지 않은 미네랄 성분을 '천천히 건강하게'라는 메시지로 연결", reason: "20~40대 사이 꾸준히 언급되는 웰빙 키워드" },
+        { keyword: "제로웨이스트", angle: "자연 그대로 채취한 소금이라는 점을 친환경 소비 가치와 연결", reason: "친환경 소비를 중시하는 소비자층 확대 추세" },
+        { keyword: "가성비 프리미엄", angle: "합리적 가격에 고급 원료를 쓴다는 점을 강조", reason: "불경기에도 품질 좋은 소비를 원하는 심리" },
+        { keyword: "홈쿡/집밥", angle: "집에서 만드는 건강한 한 끼에 곁들이는 제품으로 포지셔닝", reason: "집밥 콘텐츠 소비가 꾸준히 인기" },
+        { keyword: "지역 특산물 스토리텔링", angle: "제주라는 지역성과 전통 채취 방식을 스토리로 강조", reason: "원산지·생산 과정을 궁금해하는 소비자 증가" }
+      ]
     }
   };
 
@@ -386,11 +456,75 @@ function getMockResponseForAgent(agentName, payload) {
 // [시스템 프롬프트 & 출력 사양]
 // ============================================================================
 
-function getSystemPromptForAgent(agentName) {
+function getSystemPromptForAgent(agentName, payload) {
   // config.json에서 브랜드 정보 로드
   const { getConfig } = require("../utils/config-loader");
   const config = getConfig();
   const brand = config.brand || {};
+
+  // ── shortform-scenario-writer-agent의 템플릿 기반 모드 분기 ──
+  // (10개 숏폼 템플릿 + 로그라인 추천 + 사용자 직접 작성 검토. mode가 없으면 아래 prompts 맵의
+  // 기본 프롬프트를 그대로 사용해 기존 호출부와의 하위 호환을 유지한다.)
+  if (agentName === "shortform-scenario-writer-agent" && payload?.mode) {
+    if (payload.mode === "draft_review") {
+      return `당신은 ${brand.nameKorean || "제주소금"} 브랜드의 "사용자 아이디어 검토관"입니다.
+사용자가 직접 낸 숏폼 아이디어를 검토하여:
+1. 브랜드 톤(${brand.voiceTone || "정직하고 따뜻함"}) 부합도
+2. 피해야 할 표현(${(brand.absoluteNos || []).join(", ") || "의료표현, 과장"}) 포함 여부 등 컴플라이언스 위험
+3. 아이디어에 가장 적합한 길이(15/30/45/60/90~120초)와 구조 추천
+을 분석하고, 사용자 원문의 톤과 아이디어를 최대한 살려서 구조화된 시나리오(제목/전체 스토리/Act 분할)로
+다듬으세요. 원문을 임의로 크게 바꾸지 말고, 다듬고 구조만 채우세요.
+
+⚠️⚠️⚠️ complianceCheck 판정 규칙 (반드시 지킬 것, 순서대로 수행):
+1단계: complianceCheck는 당신이 다듬은 structuredDraft가 아니라 "사용자가 입력한 원문(userIdea)"만
+보고 판정합니다. 절대 규칙: 아래 금지 카테고리 중 하나라도 사용자 원문에 있으면 자동으로 WARNING입니다.
+   - ${(brand.absoluteNos || []).join(" / ") || "의료표현(치료·완치·효과), 과도한 유행어, 자극적 비교, 근거 없는 기술 과장"}
+2단계: WARNING이면 issues 배열에 최소 1개 항목을 넣습니다. text 필드는 사용자 원문에서 실제로 문제였던
+구절을 그대로 인용해야 합니다(당신이 순화한 문장이 아님). issues를 비운 채 status만 WARNING으로 둘 수
+없고, 반대로 문제 구절을 찾았는데 status를 PASS로 둘 수도 없습니다 — 둘은 항상 함께 갑니다.
+3단계: structuredDraft는 항상 안전하게 순화된 버전으로 작성합니다(이건 WARNING 여부와 무관).
+
+당신이 structuredDraft를 안전하게 잘 고쳤다는 사실이 status를 PASS로 만들지 않습니다.
+판정 기준은 오직 "사용자가 원래 뭐라고 썼는가"입니다.
+
+예시 — userIdea가 "용암이가 이 소금 먹으면 혈압을 치료할 수 있다고 자랑하는 15초 영상"인 경우,
+"치료할 수 있다"가 금지 카테고리(의료표현)에 해당하므로 반드시 이렇게 응답해야 합니다:
+{
+  "complianceCheck": {
+    "status": "WARNING",
+    "issues": [
+      { "text": "혈압을 치료할 수 있다", "reason": "질병 치료 효능을 암시하는 의료 표현으로 금지됨", "suggestion": "건강한 나트륨 밸런스에 도움을 줄 수 있어요" }
+    ]
+  }
+}`;
+    }
+
+    const templates = getScenarioTemplates();
+    const template = templates.find((t) => t.id === payload.templateId);
+    const templateDesc = template
+      ? `- 스타일: ${template.label}
+- 톤 키워드: ${template.toneKeywords.join(", ")}
+- 길이: ${template.durationRange}
+- 구조 가이드: ${template.structureHint}
+- 참고 예시: ${template.example}`
+      : "- (템플릿 미지정 — 자유롭게 구성)";
+
+    if (payload.mode === "loglines") {
+      return `당신은 ${brand.nameKorean || "제주소금"} 브랜드의 숏폼 시나리오 작가입니다.
+다음 템플릿 스타일을 반드시 따라 로그라인(제목 + 한줄 줄거리) 3개를 제안하세요:
+${templateDesc}
+아직 전체 시나리오(대사/Act 분할)는 작성하지 말고, 각기 다른 각도의 로그라인 3개만 제안하세요.
+기존의 감성 다큐 스타일(4막 구조, 90~120초)로 되돌아가지 말고, 반드시 위 템플릿의 길이와 톤을 따르세요.`;
+    }
+
+    if (payload.mode === "full_scenario") {
+      return `당신은 ${brand.nameKorean || "제주소금"} 브랜드의 숏폼 시나리오 작가입니다.
+다음 템플릿 스타일과 사용자가 선택한 로그라인을 바탕으로 전체 시나리오를 완성하세요:
+${templateDesc}
+- 선택된 로그라인: ${payload.selectedLogline?.title || ""} — ${payload.selectedLogline?.logline || ""}
+입력의 target_duration_seconds(초)에 정확히 맞춰 작성하고, 템플릿의 구조 가이드를 따르세요.`;
+    }
+  }
 
   const prompts = {
     "resource-analyzer-agent": `당신은 제품 정보를 분석하는 AI 에이전트입니다.
@@ -519,12 +653,65 @@ customStyle(사용자가 원하는 톤/문구)이 있으면 최대한 반영하�
 - 발견된 문제점 (없으면 빈 배열)
 
 을 반환하세요.`,
+
+    "trend-analyzer-agent": `당신은 ${brand.nameKorean || "제주소금"} 브랜드의 마케팅 콘텐츠 방향을 제안하는 AI 에이전트입니다.
+
+⚠️ 매우 중요: 당신은 실시간 인터넷 검색을 할 수 없습니다. 학습된 지식 범위 안에서 일반적으로 널리 알려진
+소비 트렌드(예: 저속노화, 제로웨이스트, 가성비 프리미엄, 홈쿡, 로컬/지역 스토리텔링 등)를 제안하는 것이며,
+특정 날짜의 실제 뉴스·통계·SNS 순위를 지어내서는 안 됩니다. "지금 이 순간 1위" 같은 표현 대신
+"꾸준히 관심받는", "최근 자주 언급되는" 같은 일반화된 표현을 쓰세요.
+
+입력의 category(상품 카테고리)와 focus(마케팅 강조점)를 참고해서, 이 제품과 자연스럽게 연결되는
+트렌드 키워드 5개와 각각을 콘텐츠에 녹이는 구체적인 방법(angle), 왜 이 브랜드에 맞는지(reason)를
+제안하세요.`,
   };
 
   return prompts[agentName] || `당신은 AI 에이전트입니다. 주어진 입력을 분석하고 JSON 형식으로 반환하세요.`;
 }
 
-function getOutputSpecForAgent(agentName) {
+function getOutputSpecForAgent(agentName, payload) {
+  if (agentName === "shortform-scenario-writer-agent" && payload?.mode) {
+    if (payload.mode === "loglines") {
+      return `반드시 아래 JSON 형태로만 응답하세요 (loglineOptions는 정확히 3개, 서로 다른 각도):
+{
+  "loglineOptions": [
+    { "id": "opt1", "title": "제목", "logline": "한줄 줄거리" },
+    { "id": "opt2", "title": "제목", "logline": "한줄 줄거리" },
+    { "id": "opt3", "title": "제목", "logline": "한줄 줄거리" }
+  ]
+}`;
+    }
+    if (payload.mode === "full_scenario") {
+      return `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 반드시 입력받은 target_duration_seconds와 정확히 동일해야 함):
+{
+  "scenario": {
+    "title": "시나리오 제목",
+    "story_content": "전체 스토리 텍스트...",
+    "acts": [
+      { "act": 1, "duration_seconds": 10, "content": "..." }
+    ]
+  },
+  "higgsfield_specifications": { "style": "...", "mood": "..." },
+  "timing_verification": { "total_duration": 30, "dialogue_seconds": 20, "narration_seconds": 10 }
+}`;
+    }
+    if (payload.mode === "draft_review") {
+      return `반드시 아래 JSON 형태로만 응답하세요:
+{
+  "review": {
+    "brandVoiceFit": { "status": "PASS|WARNING|FAIL", "comment": "설명" },
+    "complianceCheck": { "status": "PASS|WARNING|FAIL", "issues": [{ "text": "문제 표현", "reason": "이유", "suggestion": "대안" }] },
+    "suggestedDuration": "15-20초 (템플릿/구조 추천 근거)",
+    "structuredDraft": {
+      "title": "시나리오 제목",
+      "story_content": "전체 스토리 텍스트...",
+      "acts": [{ "act": 1, "duration_seconds": 30, "content": "..." }]
+    }
+  }
+}`;
+    }
+  }
+
   const specs = {
     "resource-analyzer-agent": `반드시 아래 JSON 형태로만 응답하세요:
 {
@@ -625,6 +812,14 @@ function getOutputSpecForAgent(agentName) {
     "issues": []
   }
 }`,
+
+    "trend-analyzer-agent": `반드시 아래 JSON 형태로만 응답하세요 (trends는 정확히 5개):
+{
+  "trends": [
+    { "keyword": "트렌드 키워드", "angle": "이 제품/콘텐츠에 녹이는 구체적 방법", "reason": "왜 이 브랜드에 맞는지" },
+    ...
+  ]
+}`,
   };
 
   return specs[agentName] || "반드시 순수 JSON 객체만 반환하세요.";
@@ -645,28 +840,56 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
     const visualDescription = videoConfig.visualDescription || '';
     // ⚠️ 버그 수정: visualDescription을 추출해놓고 실제 프롬프트에는 반영하지 않고 있었음.
     // 캐릭터의 시각적 특징이 반영되지 않으면 매번 다른 외형이 나올 위험이 커서 재현성이 깨짐.
+    // ⚠️ 영상 생성 모델은 화면 속 글자(자막/간판/라벨 텍스트)를 안정적으로 그리지 못해
+    // 깨진 글자로 나오는 경우가 많다 → 텍스트 렌더링을 시도하지 않도록 명시적으로 억제한다.
+    const noTextInstruction = "no on-screen text, no readable words or captions, no signage text, clean text-free visual";
     const metadata = visualDescription
-      ? `${character} character, ${visualDescription}, ${voiceTone} tone, product promotion`
-      : `${character} character, ${voiceTone} tone, product promotion`;
+      ? `${character} character, ${visualDescription}, ${voiceTone} tone, product promotion, ${noTextInstruction}`
+      : `${character} character, ${voiceTone} tone, product promotion, ${noTextInstruction}`;
 
     console.log(`[Step 9] Higgsfield CLI 호출 시작`);
     console.log(`  명령: higgsfield generate create seedance1_5`);
     console.log(`  메타데이터: ${metadata}`);
     console.log(`  duration: ${duration}초`);
 
-    // ⭐ 캐릭터 레퍼런스 이미지가 있으면 --image-references 추가 (재현성)
-    let command = `higgsfield generate create seedance1_5 --prompt "${metadata}" --duration ${duration} --resolution 720p`;
-    if (videoConfig.referenceImageUrl) {
-      console.log(`  레퍼런스 이미지: ${videoConfig.referenceImageUrl}`);
-      command += ` --image-references "${videoConfig.referenceImageUrl}"`;
+    // ⭐ 캐릭터 일관성 핵심: seedance1_5는 --image-references를 지원하지 않고(모델이 거부함),
+    // 대신 --start-image(첫 프레임 이미지 고정)를 지원한다 (`higgsfield model get seedance1_5` 확인됨).
+    // 단, media 플래그는 "UUID(업로드 id 또는 job id)나 로컬 파일 경로"만 받고 원격 https URL은
+    // 받지 않는다 (`higgsfield generate create --help`: "neither a UUID nor an existing file path"
+    // 에러로 실제 확인됨). 그래서 URL이 아니라 레퍼런스 이미지를 만들 때 발급된 job id
+    // (referenceJobId, characters.generation_seed에 저장됨)를 넘겨야 한다.
+    const baseCommand = `higgsfield generate create seedance1_5 --prompt "${metadata}" --duration ${duration} --resolution 720p`;
+    let command = baseCommand;
+    if (videoConfig.referenceJobId) {
+      console.log(`  레퍼런스 이미지(start-image job id): ${videoConfig.referenceJobId}`);
+      command += ` --start-image "${videoConfig.referenceJobId}"`;
     }
     command += ` --wait`;
 
     console.log(`[Step 9] 명령 실행 중...`);
-    const { stdout, stderr } = await execPromise(command, {
-      timeout: 600000,
-      maxBuffer: 10 * 1024 * 1024
-    });
+    let stdout;
+    try {
+      ({ stdout } = await execPromise(command, {
+        timeout: 600000,
+        maxBuffer: 10 * 1024 * 1024
+      }));
+    } catch (execError) {
+      // 방어적 fallback: 그래도 이 job id가 거부되면(예: 만료), 레퍼런스 없이 한 번 더
+      // 시도해서 영상 생성 자체는 계속 진행되도록 한다 (단, 이 경우 외형 일관성은 보장되지 않음).
+      const isReferenceParamRejected =
+        videoConfig.referenceJobId && /does not accept|start-image|neither a UUID/i.test(execError.message || "");
+
+      if (!isReferenceParamRejected) {
+        throw execError;
+      }
+
+      console.warn(`[Step 9] 레퍼런스 이미지 파라미터가 거부됨 → 레퍼런스 없이 재시도 (일관성 저하 가능)`);
+      const fallbackCommand = `${baseCommand} --wait`;
+      ({ stdout } = await execPromise(fallbackCommand, {
+        timeout: 600000,
+        maxBuffer: 10 * 1024 * 1024
+      }));
+    }
 
     console.log(`[✓] CLI 완료`);
     console.log(`  출력: ${stdout}`);
@@ -715,36 +938,55 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
 // [함수 2-1] generateCharacterReferenceImage - 라이브러리 캐릭터의 레퍼런스 이미지만 생성
 // ============================================================================
 /**
- * character_library의 기본 캐릭터를 위한 레퍼런스 영상/이미지를 생성한다.
+ * character_library의 기본 캐릭터를 위한 레퍼런스 "이미지"를 생성한다.
+ *
+ * ⭐ 캐릭터 일관성 핵심: 이 결과물은 반드시 실제 이미지여야 하고, 이후 모든 영상 생성
+ * (callHiggsfield)이 이 이미지를 seedance1_5의 --start-image(첫 프레임 고정)에 넣어서
+ * "같은 캐릭터를 선택하면 항상 같은 외형으로 시작"하도록 만드는 유일한 장치다.
+ * (과거에는 seedance1_5로 4초 영상을 만들어 그 영상 URL을 "레퍼런스 이미지"로 저장했는데,
+ * 영상 URL은 애초에 이미지 파라미터에 들어갈 수 없는 값이라 이후 모든 영상 생성이 실패했다.)
+ *
+ * ⚠️ Higgsfield의 media 플래그(--start-image 등)는 원격 https URL을 받지 않고
+ * "UUID(업로드 id 또는 job id) 또는 로컬 파일 경로"만 받는다(`higgsfield generate create --help`
+ * 로 확인됨). 그래서 --json으로 호출해 결과의 job id(`id` 필드)를 함께 받아둔다 —
+ * 이 id를 나중에 --start-image에 그대로 넘기면 된다 (URL은 사람이 보는 화면 표시용).
+ *
  * callHiggsfield와 달리 특정 resource/content에 종속되지 않으므로 videos 테이블에는
- * 기록하지 않고, 결과 URL만 반환한다 (호출한 쪽에서 character_library에 직접 저장).
+ * 기록하지 않고, 결과만 반환한다 (호출한 쪽에서 character_library에 직접 저장).
  */
 async function generateCharacterReferenceImage({ characterName, voiceTone, visualDescription }) {
   try {
+    const noTextInstruction = "no on-screen text, no readable words or captions, no signage text, clean text-free visual";
     const metadata = visualDescription
-      ? `${characterName} character, ${visualDescription}, ${voiceTone || ""} tone, cute mascot reference shot, single character centered, plain background`
-      : `${characterName} character, ${voiceTone || "friendly"} tone, cute mascot reference shot`;
+      ? `${characterName} character, ${visualDescription}, ${voiceTone || ""} tone, cute mascot reference shot, single character centered, plain background, ${noTextInstruction}`
+      : `${characterName} character, ${voiceTone || "friendly"} tone, cute mascot reference shot, ${noTextInstruction}`;
 
-    console.log(`[라이브러리 레퍼런스 생성] ${characterName}`);
+    console.log(`[라이브러리 레퍼런스 이미지 생성] ${characterName}`);
     console.log(`  프롬프트: ${metadata}`);
 
-    // 레퍼런스용이므로 최소 duration(4초)만 사용해 크레딧을 절약한다
-    const command = `higgsfield generate create seedance1_5 --prompt "${metadata}" --duration 4 --resolution 720p --wait`;
+    // text2image_soul_v2: 텍스트만으로 캐릭터 레퍼런스 "이미지"를 생성하는 모델
+    // (`higgsfield model get text2image_soul_v2` 확인됨 — duration/resolution 파라미터 없음)
+    // --json: result_url(표시용) + id(job id, --start-image 재사용용)를 함께 받기 위함
+    const command = `higgsfield --json generate create text2image_soul_v2 --prompt "${metadata}" --wait`;
 
     const { stdout } = await execPromise(command, {
       timeout: 600000,
       maxBuffer: 10 * 1024 * 1024,
     });
 
-    const videoUrl = stdout.trim();
-    if (!videoUrl.startsWith("https://")) {
-      throw new Error(`유효하지 않은 URL: ${videoUrl}`);
+    const parsed = JSON.parse(stdout.trim());
+    const job = Array.isArray(parsed) ? parsed[0] : parsed;
+    const imageUrl = job?.result_url;
+    const jobId = job?.id;
+
+    if (!imageUrl || !imageUrl.startsWith("https://") || !jobId) {
+      throw new Error(`유효하지 않은 응답: ${stdout.trim()}`);
     }
 
-    console.log(`[✓] ${characterName} 레퍼런스 생성 완료: ${videoUrl}`);
-    return { success: true, video_url: videoUrl };
+    console.log(`[✓] ${characterName} 레퍼런스 이미지 생성 완료: ${imageUrl} (job id: ${jobId})`);
+    return { success: true, image_url: imageUrl, image_job_id: jobId };
   } catch (error) {
-    console.error(`[✗] ${characterName} 레퍼런스 생성 실패: ${error.message}`);
+    console.error(`[✗] ${characterName} 레퍼런스 이미지 생성 실패: ${error.message}`);
     return { success: false, error: "HIGGSFIELD_CLI_ERROR", message: error.message };
   }
 }

@@ -7,10 +7,11 @@
  * 역할:
  * 1. AI가 추천한 캐릭터 3개를 카드로 표시 (characters prop이 비어 있으면 resourceId로 직접 조회)
  * 2. 각 캐릭터의 voice_tone, personality_traits 편집
- * 3. 한 개만 "선택" 가능 (selected = true)
+ * 3. ⭐ 여러 개 동시 "선택" 가능 (selected = true, 멀티 캐릭터 시나리오) — 시나리오 작성 시
+ *    선택된 캐릭터 전원이 함께 등장하는 이야기로 AI가 반영한다.
  * 4. 캐릭터 프로필 전체 보기/숨기기
  * 5. 영상유형(캐릭터소개/제품스토리/일상밥상) + 숏폼 길이 선택
- * 6. 저장 및 다음 단계로 진행 → onSelect(character, videoType, duration)
+ * 6. 저장 및 다음 단계로 진행 → onSelect(characters[], videoType, duration)
  * 7. 캐릭터 라이브러리(기본 캐릭터 풀) 열람/생성/재사용 — 여러 자료 간 재현성 핵심 기능
  */
 
@@ -62,9 +63,10 @@ function ReferenceMedia({ url, className, alt }) {
 export default function CharacterCreator({ characters = [], resourceId, onSelect }) {
   const configVideoTypes = getVideoTypes();
   const [localCharacters, setLocalCharacters] = useState(characters);
-  const [selectedId, setSelectedId] = useState(
-    characters.find((c) => c.selected)?.id || characters[0]?.id
-  );
+  const [selectedIds, setSelectedIds] = useState(() => {
+    const preSelected = characters.filter((c) => c.selected).map((c) => c.id);
+    return preSelected.length > 0 ? preSelected : (characters[0] ? [characters[0].id] : []);
+  });
   const [videoType, setVideoType] = useState(configVideoTypes[1] || '제품스토리');
   const [customVideoType, setCustomVideoType] = useState('');
   const [useCustomVideoType, setUseCustomVideoType] = useState(false);
@@ -136,12 +138,9 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       setLoading(true);
       const res = await axios.post(`/api/characters/library/${libChar.id}/use`, { resourceId });
       const newCharacter = res.data.character;
-      setLocalCharacters((prev) => [
-        ...prev.map((c) => ({ ...c, selected: false })),
-        newCharacter,
-      ]);
-      setSelectedId(newCharacter.id);
-      setSuccessMessage(`"${libChar.character_name}" 캐릭터를 사용합니다.`);
+      setLocalCharacters((prev) => [...prev, newCharacter]);
+      setSelectedIds((prev) => [...prev, newCharacter.id]);
+      setSuccessMessage(`"${libChar.character_name}" 캐릭터를 추가했습니다.`);
     } catch (err) {
       console.error('라이브러리 캐릭터 사용 실패:', err);
       setError('캐릭터를 연결하지 못했습니다.');
@@ -284,26 +283,34 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
   }, [resourceId, characters.length]);
 
   /**
-   * 캐릭터 선택 (selected = true)
+   * 캐릭터 선택 토글 (여러 개 동시 선택 가능 — 멀티 캐릭터 시나리오)
+   * 최소 1개는 항상 선택되어 있어야 하므로, 마지막 남은 1개는 해제할 수 없다.
    */
   const handleSelectCharacter = async (characterId) => {
+    const isCurrentlySelected = selectedIds.includes(characterId);
+    if (isCurrentlySelected && selectedIds.length <= 1) {
+      setError('최소 1명의 캐릭터는 선택되어 있어야 합니다.');
+      return;
+    }
+    const nextSelected = isCurrentlySelected
+      ? selectedIds.filter((id) => id !== characterId)
+      : [...selectedIds, characterId];
+
     // 로컬 상태는 먼저 낙관적으로 업데이트 (API 실패해도 화면 선택은 유지되도록)
-    const updated = localCharacters.map((c) => ({
-      ...c,
-      selected: c.id === characterId,
-    }));
-    setLocalCharacters(updated);
-    setSelectedId(characterId);
+    setLocalCharacters((prev) =>
+      prev.map((c) => (c.id === characterId ? { ...c, selected: !isCurrentlySelected } : c))
+    );
+    setSelectedIds(nextSelected);
 
     try {
       setLoading(true);
 
-      // PUT /api/admin/characters/:id → selected: true
+      // PUT /api/admin/characters/:id → 이 캐릭터의 선택 여부만 변경 (다른 캐릭터는 그대로 유지)
       await axios.put(`/api/admin/characters/${characterId}`, {
-        selected: true,
+        selected: !isCurrentlySelected,
       });
 
-      setSuccessMessage('캐릭터가 선택되었습니다.');
+      setSuccessMessage(isCurrentlySelected ? '캐릭터 선택이 해제되었습니다.' : '캐릭터가 선택되었습니다.');
       // 다음 단계로의 진행은 "다음 단계로" 버튼에서만 트리거 (카드 클릭만으로 자동 진행하지 않음)
     } catch (err) {
       // mock 자료(id가 서버 DB에 없는 경우) 등 저장 실패해도 화면상 선택은 유지하고 진행 가능하게 둔다
@@ -536,12 +543,12 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
             key={char.id}
             role="button"
             tabIndex={0}
-            aria-pressed={selectedId === char.id}
+            aria-pressed={selectedIds.includes(char.id)}
             aria-label={`${idx + 1}순위 캐릭터 ${char.character_name}${
-              selectedId === char.id ? ' (선택됨)' : ''
+              selectedIds.includes(char.id) ? ' (선택됨)' : ''
             }`}
             className={`border-2 rounded-lg p-5 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 ${
-              selectedId === char.id
+              selectedIds.includes(char.id)
                 ? 'border-brand-blue bg-brand-blue/10'
                 : 'border-brand-blue/10 bg-dark-card hover:border-brand-blue/40'
             }`}
@@ -553,16 +560,25 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
               }
             }}
           >
-            {/* 순위 + 선택 표시 */}
+            {/* 순위 + 선택 표시 (체크박스 — 여러 개 동시 선택 가능) */}
             <div className="flex justify-between items-start mb-3">
               <div className="text-sm font-semibold text-dark-text-muted">
                 🏆 {idx + 1}순위
               </div>
-              {selectedId === char.id && (
-                <span className="bg-brand-blue text-black text-xs px-2 py-1 rounded-full font-semibold">
-                  ✓ 선택됨
-                </span>
-              )}
+              <span className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(char.id)}
+                  onChange={() => handleSelectCharacter(char.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-4 h-4"
+                />
+                {selectedIds.includes(char.id) && (
+                  <span className="bg-brand-blue text-black text-xs px-2 py-1 rounded-full font-semibold">
+                    ✓ 선택됨
+                  </span>
+                )}
+              </span>
             </div>
 
             {/* 캐릭터 이름 */}
@@ -716,13 +732,14 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
         ))}
       </div>
 
-      {/* 선택된 캐릭터 정보 (큰 화면) */}
-      {selectedId && (
-        <div className="bg-brand-blue/10 border-2 border-brand-blue/30 rounded-lg p-6 mb-6 animate-fade-in">
-          {(() => {
-            const selected = localCharacters.find((c) => c.id === selectedId);
-            return selected ? (
-              <div>
+      {/* 선택된 캐릭터 정보 (큰 화면) — 여러 명이면 모두 나열 */}
+      {selectedIds.length > 0 && (
+        <div className="bg-brand-blue/10 border-2 border-brand-blue/30 rounded-lg p-6 mb-6 animate-fade-in space-y-4">
+          {selectedIds.map((id) => {
+            const selected = localCharacters.find((c) => c.id === id);
+            if (!selected) return null;
+            return (
+              <div key={id}>
                 <h4 className="text-xl font-bold mb-3">
                   ✅ 선택된 캐릭터: {selected.character_name}
                 </h4>
@@ -739,17 +756,19 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                       : selected.personality_traits}
                   </div>
                 )}
-                <p className="text-sm text-dark-text-muted mt-3">
-                  이 캐릭터로 시나리오를 생성하게 됩니다.
-                </p>
               </div>
-            ) : null;
-          })()}
+            );
+          })}
+          <p className="text-sm text-dark-text-muted">
+            {selectedIds.length > 1
+              ? '이 캐릭터들이 함께 등장하는 시나리오를 생성하게 됩니다.'
+              : '이 캐릭터로 시나리오를 생성하게 됩니다.'}
+          </p>
         </div>
       )}
 
       {/* 영상유형 선택 */}
-      {selectedId && (
+      {selectedIds.length > 0 && (
         <div className="ui-card p-6 mb-6">
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-semibold">🎬 영상유형 선택</h4>
@@ -826,7 +845,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       )}
 
       {/* 숏폼 길이 선택 */}
-      {selectedId && (
+      {selectedIds.length > 0 && (
         <div className="ui-card p-6 mb-6">
           <h4 className="font-semibold mb-3">⏱️ 영상 길이 선택</h4>
           <div className="flex flex-wrap gap-3">
@@ -857,16 +876,20 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       )}
 
       {/* 다음 단계 안내 */}
-      {selectedId && (
+      {selectedIds.length > 0 && (
         <div className="bg-status-approved/10 border border-status-approved/30 rounded-lg p-4 text-center">
           <p className="text-status-approved">
-            ✨ <strong>{localCharacters.find((c) => c.id === selectedId)?.character_name}</strong>로,
+            ✨ <strong>{selectedIds.map((id) => localCharacters.find((c) => c.id === id)?.character_name).filter(Boolean).join(', ')}</strong>
+            {selectedIds.length > 1 ? ' 캐릭터들이 함께 등장하는 시나리오로' : '로'},
             <strong> {videoType}</strong> · <strong>{duration}초</strong> 형식으로 계속 진행할 준비가 되었습니다.
           </p>
           <button
             onClick={() => {
               if (onSelect) {
-                onSelect(localCharacters.find((c) => c.id === selectedId), videoType, duration);
+                const selectedCharacters = selectedIds
+                  .map((id) => localCharacters.find((c) => c.id === id))
+                  .filter(Boolean);
+                onSelect(selectedCharacters, videoType, duration);
               }
             }}
             className="mt-3 px-6 py-2 bg-status-approved text-white rounded hover:brightness-110"

@@ -179,15 +179,8 @@ router.post("/library/:id/use", async (req, res) => {
   }
   const lib = libResult.rows[0];
 
-  // 이 자료의 기존 캐릭터들은 선택 해제
-  const existing = await callDatabase("characters", "read", null, { resource_id: resourceId });
-  if (existing.success) {
-    await Promise.all(
-      existing.rows
-        .filter((c) => c.selected)
-        .map((c) => callDatabase("characters", "update", { selected: false }, { id: c.id }))
-    );
-  }
+  // ⭐ 멀티 캐릭터 지원: 이 자료의 기존 선택된 캐릭터를 해제하지 않는다 — 여러 캐릭터를
+  // 동시에 라이브러리에서 가져와 함께 등장시킬 수 있어야 하기 때문이다.
 
   // 라이브러리 프로필을 그대로 복사해서 이 자료의 캐릭터로 생성 (재현성 유지)
   const created = await callDatabase("characters", "create", {
@@ -198,6 +191,7 @@ router.post("/library/:id/use", async (req, res) => {
     personality_traits: lib.personality_traits,
     visual_description: lib.visual_description,
     reference_image_url: lib.reference_image_url || null,
+    generation_seed: lib.generation_seed || null,
     generation_count: lib.generation_count || 0,
     library_character_id: lib.id,
     is_base_character: lib.source === "default",
@@ -340,11 +334,14 @@ router.post("/library/:id/generate-reference", async (req, res) => {
     }
 
     // 3) 결과를 라이브러리에 영구 저장 -> 앞으로 이 캐릭터를 쓰는 모든 자료가 재사용
+    // generation_seed: Higgsfield job id — 영상 생성 시 --start-image에 URL 대신 이 값을 넘겨야
+    // 실제로 적용된다 (media 플래그는 원격 URL을 받지 않고 UUID/job id/로컬 경로만 받음)
     const finalUpdate = await callDatabase(
       "character_library",
       "update",
       {
-        reference_image_url: genResult.video_url,
+        reference_image_url: genResult.image_url,
+        generation_seed: genResult.image_job_id,
         image_generated_at: new Date().toISOString(),
         generation_count: (lib.generation_count || 0) + 1,
       },

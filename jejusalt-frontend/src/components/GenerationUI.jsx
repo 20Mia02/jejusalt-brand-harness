@@ -4,44 +4,49 @@
  * 기능4: AI 콘텐츠 생성 + Higgsfield 영상화
  * 담당: 고수아(UI) + 박주미(API)
  *
- * 역할:
- * 1. Step 3 메타데이터 검토 완료 후 "AI 생성" 버튼 클릭
- * 2. POST /api/generate 호출 (Step 5~10)
- * 3. frontend-agent.md 기준 5초 폴링으로 진행률 조회
- * 4. 진행률 바(%) 실시간 표시
- * 5. 완료 시 비디오 URL 표시 및 재생 UI
+ * ⭐ Step5(시나리오) / Step6(제품명) / Step7(카피)는 AI가 초안만 만들고,
+ * 사용자가 검토·수정한 뒤 "확정"해야 다음 단계로 진행된다 (기업 니즈가 최종 결정권을 갖도록).
+ * Step4(캐릭터설계)·Step8(컴플라이언스)·Step9(영상생성)는 지금처럼 자동 진행.
  *
- * 파이프라인 (Step 3 메타데이터 검토 후):
- * Step 4: 캐릭터 추천 (character-generator-agent)
- * Step 5: 캐릭터 상세 설계 (character-designer-agent)
- * Step 6: 120초 시나리오 작성 (shortform-scenario-writer-agent)
- * Step 7: 제품명/콘텐츠명 생성 (naming-generator-agent)
- * Step 8: 마케팅 카피 작성 (product-intro/detail-writer-agent)
- * Step 9: 컴플라이언스 검증 (compliance-reviewer-agent)
- * Step 10: Higgsfield 영상 생성 + 폴링
+ * 파이프라인:
+ * POST /:resourceId/start                              → Step4 실행, 캐릭터 브리프 검토 대기
+ * POST /:resourceId/character/confirm                  → 템플릿 선택 화면으로 이동
+ * POST /:resourceId/scenario/loglines                  → (AI 추천) 로그라인 3개 제안
+ * POST /:resourceId/scenario/generate-from-logline      → 선택한 로그라인으로 전체 시나리오 생성
+ * POST /:resourceId/scenario/draft-review               → (직접 작성) 아이디어 검토 + 구조화 초안
+ * POST /:resourceId/scenario/finalize-draft             → 검토된 초안 확정 저장
+ * POST /:resourceId/scenario/:scenarioId/confirm        → Step6 실행, 영상 제목 검토 대기
+ * POST /:resourceId/naming/confirm                      → Step7 실행, 카피 검토 대기
+ * POST /:resourceId/copy/:contentId/confirm             → Step8~9 실행, 완료
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro', videoType, duration = 120, referenceMaterials = [] }) {
-  // 상태 관리
-  const [generating, setGenerating] = useState(false);
-  const [generationData, setGenerationData] = useState(null);
+  // stage: 'idle' | 'loading' | 'character_review' | 'template_select' | 'logline_review' |
+  //        'draft_review' | 'scenario_review' | 'naming_review' | 'copy_review' | 'done'
+  const [stage, setStage] = useState('idle');
+  const [loadingLabel, setLoadingLabel] = useState('초기화 중...');
   const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState(null);
   const [error, setError] = useState(null);
   const [errorDetails, setErrorDetails] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
-  const [videoUrl, setVideoUrl] = useState(null);
-  const [videoFailed, setVideoFailed] = useState(false);
-  const [videoErrorDetail, setVideoErrorDetail] = useState(null);
   const [failedStep, setFailedStep] = useState(null);
-  // 업로드된 참고자료를 시나리오 작성에 반영할지 여부 (기본: 반영)
+
+  const [characterData, setCharacterData] = useState(null); // { characterBriefs: [{ characterId, character, voice_tone, personality_traits, visual_description }] }
+  const [templateData, setTemplateData] = useState(null); // { templates: [...] }
+  const [loglineData, setLoglineData] = useState(null); // { templateId, loglineOptions }
+  const [draftReviewData, setDraftReviewData] = useState(null); // { userIdea, review }
+  const [scenarioData, setScenarioData] = useState(null); // { scenarioId, scenario, timingVerification }
+  const [namingData, setNamingData] = useState(null); // { namingId, realProductName, contentNameOptions, fallbackContentName }
+  const [copyData, setCopyData] = useState(null); // { contentId, generatedContent }
+  const [finalResult, setFinalResult] = useState(null); // { videoUrl, videoStatus, higgsfieldError, validationStatus, validationScore }
+
   const [useReferenceMaterials, setUseReferenceMaterials] = useState(true);
   const pollingInterval = useRef(null);
 
-  // 성공/실패 배너 자동 소멸 (전 화면 통일 규칙: 성공 2.5초, 에러 4초)
+  // 성공/실패 배너 자동 소멸
   useEffect(() => {
     if (!successMessage) return;
     const timer = setTimeout(() => setSuccessMessage(null), 2500);
@@ -54,102 +59,19 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     return () => clearTimeout(timer);
   }, [error]);
 
-  /**
-   * "AI 생성" 버튼 클릭
-   *
-   * routes/generation.js는 Higgsfield CLI --wait로 완료까지 기다린 뒤
-   * videoUrl/videoStatus를 응답에 바로 담아 반환한다 (higgsfieldId를 별도로 주지 않음).
-   * 이 POST는 1~2분 걸릴 수 있으므로, 응답을 기다리는 동안
-   * GET /api/generate/:resourceId/status(generation_logs 기반 실제 진행률)를 병렬로 폴링해서
-   * 진행률 바에 실제 단계 정보를 보여준다.
-   */
-  const handleGenerate = async () => {
-    if (!resourceId) {
-      setError('자료를 먼저 선택해주세요.');
-      return;
-    }
-
-    setGenerating(true);
-    setError(null);
-    setProgress(0);
-    setCurrentStep('초기화 중...');
-    setVideoFailed(false);
-    setVideoErrorDetail(null);
-
-    startStatusPolling();
-
-    try {
-      // Step 4~9: POST /api/generate/:resourceId/start
-      const res = await axios.post(`/api/generate/${resourceId}/start`, {
-        requestType,
-        videoType,
-        duration,
-        useReferenceMaterials: referenceMaterials.length > 0 ? useReferenceMaterials : undefined,
-      });
-
-      stopStatusPolling();
-
-      if (!res.data.success) {
-        throw new Error(res.data.message || '생성 실패');
-      }
-
-      setGenerationData(res.data);
-      setProgress(100);
-      setGenerating(false);
-
-      if (res.data.videoStatus === 'failed' || res.data.higgsfieldError) {
-        // 콘텐츠(카피)는 생성됐지만 Higgsfield 영상화는 실패한 경우
-        setCurrentStep('⚠️ 콘텐츠는 생성됨 (영상 생성 실패)');
-        setVideoFailed(true);
-        setVideoErrorDetail(res.data.higgsfieldError || '영상 생성에 실패했습니다.');
-        setVideoUrl(null);
-      } else {
-        setCurrentStep('✅ 완료!');
-        setSuccessMessage('영상이 생성되었습니다!');
-        setVideoUrl(res.data.videoUrl);
-      }
-
-      if (onSuccess) {
-        onSuccess(res.data);
-      }
-    } catch (err) {
-      stopStatusPolling();
-      console.error('AI 생성 실패:', err);
-      setError(
-        err.response?.data?.message || err.message || '생성 중 오류가 발생했습니다.'
-      );
-      setGenerating(false);
-    }
-  };
-
-  /**
-   * 생성 진행 중 실제 백엔드 진행률(GET /status)을 3초 간격으로 폴링.
-   * POST /start 응답이 오면(성공/실패 모두) stopStatusPolling으로 정리한다.
-   */
   const startStatusPolling = () => {
     pollingInterval.current = setInterval(async () => {
       try {
         const res = await axios.get(`/api/generate/${resourceId}/status`);
-        const {
-          progress: progressPercent,
-          completedSteps,
-          totalSteps,
-          currentStep: stepName,
-          failureDetails,
-          failureMessage,
-          retiringDetails
-        } = res.data;
+        const { progress: progressPercent, completedSteps, totalSteps, currentStep: stepName, failureDetails, failureMessage } = res.data;
 
-        setProgress((prev) => Math.max(prev, progressPercent || 0, 5));
+        setProgress((prev) => Math.min(100, Math.max(prev, progressPercent || 0, 5)));
+        setLoadingLabel(
+          stepName
+            ? `${stepName} 진행 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`
+            : `AI 생성 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`
+        );
 
-        // 상세한 단계 정보 표시
-        if (stepName) {
-          setCurrentStep(`${stepName} 진행 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`);
-        } else {
-          setCurrentStep(`AI 생성 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`);
-        }
-
-        // 실패 정보 수집
         if (failureDetails && failureDetails.length > 0) {
           const failStep = failureDetails[0];
           setFailedStep(failStep.step);
@@ -159,16 +81,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
             error_code: failStep.error_code,
             attempt: failStep.attempt,
           });
-          // 실패 시 에러 메시지도 업데이트
-          setError(`⚠️ ${failStep.step}에서 실패: ${failureMessage || failStep.error_message}`);
-        }
-
-        // 재시도 중인 단계 정보
-        if (retiringDetails && retiringDetails.length > 0) {
-          console.log('재시도 중:', retiringDetails);
         }
       } catch (err) {
-        // 404 또는 네트워크 오류: 아직 생성이 시작 안 된 상태 → 무시
         if (err.response?.status !== 404) {
           console.warn('상태 폴링 오류:', err.message);
         }
@@ -183,10 +97,272 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     }
   };
 
-  // 언마운트 시 폴링 중지
   useEffect(() => {
     return () => stopStatusPolling();
   }, []);
+
+  const beginLoading = (label) => {
+    setStage('loading');
+    setLoadingLabel(label);
+    setProgress(0);
+    setError(null);
+    setErrorDetails(null);
+    setFailedStep(null);
+    startStatusPolling();
+  };
+
+  // ── Stage 1: 생성 시작 → Step4~5 → 시나리오 검토 ──
+  const handleGenerate = async () => {
+    if (!resourceId) {
+      setError('자료를 먼저 선택해주세요.');
+      return;
+    }
+
+    beginLoading('초기화 중...');
+
+    try {
+      const res = await axios.post(`/api/generate/${resourceId}/start`, {
+        requestType,
+        videoType,
+        duration,
+        useReferenceMaterials: referenceMaterials.length > 0 ? useReferenceMaterials : undefined,
+      });
+
+      stopStatusPolling();
+
+      if (!res.data.success) {
+        throw new Error(res.data.message || '생성 실패');
+      }
+
+      setCharacterData({
+        characterBriefs: res.data.characterBriefs || [],
+      });
+      setStage('character_review');
+    } catch (err) {
+      stopStatusPolling();
+      console.error('AI 생성 실패:', err);
+      setError(err.response?.data?.message || err.message || '생성 중 오류가 발생했습니다.');
+      setStage('idle');
+    }
+  };
+
+  // ── Stage 1.5: 캐릭터 브리프 확정 → 시나리오 스타일 선택 화면 ──
+  const handleConfirmCharacter = async ({ editedBriefs, feedback }) => {
+    beginLoading('다음 단계 준비 중...');
+
+    try {
+      const res = await axios.post(`/api/generate/${resourceId}/character/confirm`, {
+        editedBriefs,
+        feedback,
+      });
+
+      stopStatusPolling();
+
+      if (!res.data.success) {
+        throw new Error(res.data.message || '캐릭터 확정 실패');
+      }
+
+      setTemplateData({ templates: res.data.templates || [] });
+      setStage('template_select');
+    } catch (err) {
+      stopStatusPolling();
+      console.error('캐릭터 확정 실패:', err);
+      setError(err.response?.data?.message || err.message || '캐릭터 확정 중 오류가 발생했습니다.');
+      setStage('character_review');
+    }
+  };
+
+  // ── 템플릿 선택(AI 추천 경로) → 로그라인 3개 제안 ──
+  const handleSelectTemplate = async (templateId) => {
+    beginLoading('스토리 아이디어 구상 중...');
+    try {
+      const res = await axios.post(`/api/generate/${resourceId}/scenario/loglines`, { templateId });
+      stopStatusPolling();
+      if (!res.data.success) throw new Error(res.data.message || '로그라인 생성 실패');
+      setLoglineData({ templateId, loglineOptions: res.data.loglineOptions || [] });
+      setStage('logline_review');
+    } catch (err) {
+      stopStatusPolling();
+      console.error('로그라인 생성 실패:', err);
+      setError(err.response?.data?.message || err.message || '아이디어 구상 중 오류가 발생했습니다.');
+      setStage('template_select');
+    }
+  };
+
+  // ── 로그라인 선택 → 전체 시나리오 생성 ──
+  const handleSelectLogline = async (selectedLogline) => {
+    beginLoading('시나리오 작성 중...');
+    try {
+      const res = await axios.post(`/api/generate/${resourceId}/scenario/generate-from-logline`, {
+        templateId: loglineData.templateId,
+        selectedLogline,
+      });
+      stopStatusPolling();
+      if (!res.data.success) throw new Error(res.data.message || '시나리오 생성 실패');
+      setScenarioData({
+        scenarioId: res.data.scenarioId,
+        scenario: res.data.scenario,
+        timingVerification: res.data.timingVerification,
+      });
+      setStage('scenario_review');
+    } catch (err) {
+      stopStatusPolling();
+      console.error('시나리오 생성 실패:', err);
+      setError(err.response?.data?.message || err.message || '시나리오 생성 중 오류가 발생했습니다.');
+      setStage('logline_review');
+    }
+  };
+
+  // ── 직접 작성 경로: 아이디어 제출/재검토 ──
+  const handleSubmitIdea = async (userIdea) => {
+    beginLoading('아이디어 검토 중...');
+    try {
+      const res = await axios.post(`/api/generate/${resourceId}/scenario/draft-review`, { userIdea });
+      stopStatusPolling();
+      if (!res.data.success) throw new Error(res.data.message || '아이디어 검토 실패');
+      setDraftReviewData({ userIdea, review: res.data.review });
+      setStage('draft_review');
+    } catch (err) {
+      stopStatusPolling();
+      console.error('아이디어 검토 실패:', err);
+      setError(err.response?.data?.message || err.message || '아이디어 검토 중 오류가 발생했습니다.');
+      setStage('draft_review');
+    }
+  };
+
+  // ── 직접 작성 경로: 검토된 초안 확정 ──
+  const handleAcceptDraft = async (structuredDraft) => {
+    beginLoading('시나리오 확정 중...');
+    try {
+      const res = await axios.post(`/api/generate/${resourceId}/scenario/finalize-draft`, { structuredDraft });
+      stopStatusPolling();
+      if (!res.data.success) throw new Error(res.data.message || '시나리오 확정 실패');
+      setScenarioData({
+        scenarioId: res.data.scenarioId,
+        scenario: res.data.scenario,
+        timingVerification: res.data.timingVerification,
+      });
+      setStage('scenario_review');
+    } catch (err) {
+      stopStatusPolling();
+      console.error('시나리오 확정 실패:', err);
+      setError(err.response?.data?.message || err.message || '시나리오 확정 중 오류가 발생했습니다.');
+      setStage('draft_review');
+    }
+  };
+
+  // ── Stage 2: 시나리오 확정 → Step6 → 영상 제목 검토 ──
+  const handleConfirmScenario = async ({ editedStoryContent, editedActs, feedback }) => {
+    beginLoading('제품명/콘텐츠명 생성 중...');
+
+    try {
+      const res = await axios.post(
+        `/api/generate/${resourceId}/scenario/${scenarioData.scenarioId}/confirm`,
+        { editedStoryContent, editedActs, feedback }
+      );
+
+      stopStatusPolling();
+
+      if (!res.data.success) {
+        throw new Error(res.data.message || '시나리오 확정 실패');
+      }
+
+      setNamingData({
+        namingId: res.data.namingId,
+        realProductName: res.data.realProductName,
+        contentNameOptions: res.data.contentNameOptions || [],
+        fallbackContentName: res.data.fallbackContentName,
+      });
+      setStage('naming_review');
+    } catch (err) {
+      stopStatusPolling();
+      console.error('시나리오 확정 실패:', err);
+      setError(err.response?.data?.message || err.message || '시나리오 확정 중 오류가 발생했습니다.');
+      setStage('scenario_review');
+    }
+  };
+
+  // ── Stage 3: 영상 제목 확정 → Step7 → 카피 검토 ──
+  const handleConfirmNaming = async ({ selectedContentName }) => {
+    beginLoading('마케팅 카피 작성 중...');
+
+    try {
+      const res = await axios.post(`/api/generate/${resourceId}/naming/confirm`, {
+        selectedContentName,
+      });
+
+      stopStatusPolling();
+
+      if (!res.data.success) {
+        throw new Error(res.data.message || '제품명 확정 실패');
+      }
+
+      setCopyData({
+        contentId: res.data.contentId,
+        generatedContent: res.data.generatedContent,
+      });
+      setStage('copy_review');
+    } catch (err) {
+      stopStatusPolling();
+      console.error('제품명 확정 실패:', err);
+      setError(err.response?.data?.message || err.message || '제품명 확정 중 오류가 발생했습니다.');
+      setStage('naming_review');
+    }
+  };
+
+  // ── Stage 4: 카피 확정 → Step8~9 → 완료 ──
+  const handleConfirmCopy = async ({ editedContent }) => {
+    beginLoading('컴플라이언스 검증 및 영상 생성 중... (1~2분 소요)');
+
+    try {
+      const res = await axios.post(`/api/generate/${resourceId}/copy/${copyData.contentId}/confirm`, {
+        editedContent,
+      });
+
+      stopStatusPolling();
+
+      if (!res.data.success) {
+        throw new Error(res.data.message || '카피 확정 실패');
+      }
+
+      setFinalResult(res.data);
+      setProgress(100);
+      setStage('done');
+
+      if (res.data.videoUrl) {
+        setSuccessMessage('영상이 생성되었습니다!');
+        if (onSuccess) onSuccess(res.data);
+      }
+    } catch (err) {
+      stopStatusPolling();
+      console.error('카피 확정 실패:', err);
+      setError(err.response?.data?.message || err.message || '카피 확정 중 오류가 발생했습니다.');
+      setStage('copy_review');
+    }
+  };
+
+  const handleRestart = () => {
+    setStage('idle');
+    setCharacterData(null);
+    setTemplateData(null);
+    setLoglineData(null);
+    setDraftReviewData(null);
+    setScenarioData(null);
+    setNamingData(null);
+    setCopyData(null);
+    setFinalResult(null);
+    setProgress(0);
+  };
+
+  const STEP5_SUBSTAGES = ['template_select', 'logline_review', 'draft_review'];
+
+  // 단계 인디케이터 완료 여부를 stage 기준으로 계산
+  const stepDone = {
+    step4: [...STEP5_SUBSTAGES, 'scenario_review', 'naming_review', 'copy_review', 'done'].includes(stage) || (stage === 'loading' && !!characterData),
+    step5: ['naming_review', 'copy_review', 'done'].includes(stage) || (stage === 'loading' && !!scenarioData),
+    step6: ['copy_review', 'done'].includes(stage) || (stage === 'loading' && !!namingData),
+    step7: stage === 'done',
+  };
 
   // ─────────────────────────────────────────────────────
   // UI 렌더링
@@ -194,27 +370,18 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
 
   return (
     <div className="max-w-2xl mx-auto p-6 ui-card animate-fade-in">
-      {/* 제목 */}
       <h2 className="text-2xl font-bold mb-1">🎬 AI 콘텐츠 생성</h2>
       <p className="text-sm text-dark-text-muted mb-6">
         {videoType || '제품스토리'} · {duration}초 숏폼으로 생성됩니다
       </p>
 
-      {/* 에러/성공 메시지 */}
       {error && (
         <div className="bg-status-rejected/10 border border-status-rejected/30 text-status-rejected px-4 py-3 rounded mb-4 animate-fade-in">
           <div className="font-semibold">{error}</div>
           {errorDetails && (
             <div className="text-sm mt-2 space-y-1">
-              <div className="text-status-rejected/80">
-                <strong>Step:</strong> {errorDetails.step}
-              </div>
-              <div className="text-status-rejected/80">
-                <strong>에러 코드:</strong> {errorDetails.error_code || 'UNKNOWN'}
-              </div>
-              <div className="text-status-rejected/80">
-                <strong>재시도 횟수:</strong> {errorDetails.attempt || 0}회
-              </div>
+              <div className="text-status-rejected/80"><strong>Step:</strong> {errorDetails.step}</div>
+              <div className="text-status-rejected/80"><strong>에러 코드:</strong> {errorDetails.error_code || 'UNKNOWN'}</div>
             </div>
           )}
         </div>
@@ -225,16 +392,12 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
         </div>
       )}
 
-      {/* 생성 중 UI */}
-      {generating ? (
+      {stage === 'loading' && (
         <div className="space-y-6">
-          {/* 현재 단계 */}
           <div className="text-center">
-            <div className="text-lg font-semibold mb-2">{currentStep}</div>
+            <div className="text-lg font-semibold mb-2">{loadingLabel}</div>
             <div className="text-3xl font-bold text-brand-blue">{progress}%</div>
           </div>
-
-          {/* 진행률 바 */}
           <div className="space-y-2">
             <div className="w-full bg-dark-chip rounded-full h-4 overflow-hidden">
               <div
@@ -242,207 +405,121 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="text-xs text-dark-text-muted text-center">
-              {progress < 100
-                ? '이 과정은 1~2분 정도 소요됩니다...'
-                : '완료되었습니다!'}
-            </div>
+            <div className="text-xs text-dark-text-muted text-center">잠시만 기다려주세요...</div>
           </div>
-
-          {/* 8단계 진행 인디케이터 (연결선 포함) */}
           <div className="bg-dark-bg rounded-lg p-4 space-y-0 text-sm">
-            <StepItem label="Step 1-3: 자료 분석 & 메타데이터" done={true} isLast={false} />
-            <StepItem label="Step 4: 캐릭터 설계" done={progress > 15} active={progress <= 15} isLast={false} />
-            <StepItem label="Step 5: 시나리오 작성" done={progress > 25} active={progress > 15 && progress <= 25} isLast={false} />
-            <StepItem label="Step 6: 제품명 생성" done={progress > 35} active={progress > 25 && progress <= 35} isLast={false} />
-            <StepItem label="Step 7: 카피 작성" done={progress > 45} active={progress > 35 && progress <= 45} isLast={false} />
-            <StepItem label="Step 8: 컴플라이언스" done={progress > 55} active={progress > 45 && progress <= 55} isLast={false} />
-            <StepItem label="Step 9: 영상 생성" done={progress > 70} active={progress > 55 && progress <= 70} isLast={true} />
+            <StepItem label="Step 4: 캐릭터 상세 설계" done={stepDone.step4} active={!stepDone.step4} isLast={false} />
+            <StepItem label="Step 5: 시나리오 작성" done={stepDone.step5} active={stepDone.step4 && !stepDone.step5} isLast={false} />
+            <StepItem label="Step 6-7: 영상 제목 & 카피 작성" done={stepDone.step6} active={stepDone.step5 && !stepDone.step6} isLast={false} />
+            <StepItem label="Step 8-9: 컴플라이언스 & 영상 생성" done={stepDone.step7} active={stepDone.step6 && !stepDone.step7} isLast={true} />
           </div>
-
-          {/* 실패 정보 표시 */}
           {failedStep && errorDetails && (
             <div className="bg-status-pending/10 border border-status-pending/30 p-4 rounded">
               <div className="font-semibold text-status-pending mb-2">⚠️ 현재 단계 재시도 중</div>
               <div className="text-sm text-dark-text space-y-1">
                 <div><strong>단계:</strong> {errorDetails.step}</div>
                 <div><strong>에러:</strong> {errorDetails.error_message}</div>
-                <div><strong>코드:</strong> {errorDetails.error_code}</div>
-                <div><strong>시도:</strong> {errorDetails.attempt}회 / 3회</div>
-                <div className="text-xs text-status-pending/80 mt-2">
-                  자동으로 재시도 중입니다. 잠시만 기다려주세요...
-                </div>
+                <div className="text-xs text-status-pending/80 mt-2">자동으로 재시도 중입니다. 잠시만 기다려주세요...</div>
               </div>
             </div>
           )}
-
-          {/* 취소 버튼 (진행률 폴링만 중단 — 백엔드 생성 자체는 계속 진행됨) */}
-          <button
-            onClick={() => {
-              setGenerating(false);
-              setProgress(0);
-              setCurrentStep(null);
-              stopStatusPolling();
-            }}
-            className="w-full px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
-          >
-            취소 (폴링만 중단)
-          </button>
         </div>
-      ) : (
+      )}
+
+      {stage === 'character_review' && characterData && (
+        <CharacterReviewPanel characterData={characterData} onConfirm={handleConfirmCharacter} />
+      )}
+
+      {stage === 'template_select' && templateData && (
+        <TemplateSelectPanel
+          templates={templateData.templates}
+          onSelectTemplate={handleSelectTemplate}
+          onSelectDirectWrite={() => { setDraftReviewData({ userIdea: '', review: null }); setStage('draft_review'); }}
+        />
+      )}
+
+      {stage === 'logline_review' && loglineData && (
+        <LoglineReviewPanel
+          loglineOptions={loglineData.loglineOptions}
+          onSelectLogline={handleSelectLogline}
+          onBack={() => setStage('template_select')}
+        />
+      )}
+
+      {stage === 'draft_review' && draftReviewData && (
+        <DraftReviewPanel
+          draftReviewData={draftReviewData}
+          onSubmitIdea={handleSubmitIdea}
+          onAccept={handleAcceptDraft}
+          onBack={() => setStage('template_select')}
+        />
+      )}
+
+      {stage === 'scenario_review' && scenarioData && (
+        <ScenarioReviewPanel
+          resourceId={resourceId}
+          scenarioData={scenarioData}
+          onConfirm={handleConfirmScenario}
+        />
+      )}
+
+      {stage === 'naming_review' && namingData && (
+        <NamingReviewPanel namingData={namingData} onConfirm={handleConfirmNaming} />
+      )}
+
+      {stage === 'copy_review' && copyData && (
+        <CopyReviewPanel resourceId={resourceId} copyData={copyData} onConfirm={handleConfirmCopy} />
+      )}
+
+      {stage === 'done' && finalResult && (
+        <DoneScreen finalResult={finalResult} onRestart={handleRestart} onRetryVideo={handleGenerate} />
+      )}
+
+      {stage === 'idle' && (
         <>
-          {/* 생성 전/후 UI */}
-          {videoFailed ? (
-            // 콘텐츠(카피)는 생성됐지만 Higgsfield 영상화는 실패한 상태
-            <div className="space-y-4">
-              <div className="bg-status-pending/10 p-4 rounded border border-status-pending/30">
-                <div className="text-lg font-bold text-status-pending mb-2">
-                  ⚠️ 콘텐츠는 생성됐지만 영상 생성에 실패했습니다
-                </div>
-                {generationData && (
-                  <div className="text-sm text-dark-text space-y-1 mb-2">
-                    <div>
-                      <strong>검증 상태:</strong> {generationData.validationStatus}
-                    </div>
-                    <div>
-                      <strong>검증 점수:</strong> {generationData.validationScore}/100
-                    </div>
-                  </div>
-                )}
-                <div className="text-sm text-status-pending bg-status-pending/10 rounded p-2 mt-2">
-                  {videoErrorDetail}
-                </div>
-              </div>
-              <button
-                onClick={handleGenerate}
-                className="w-full px-4 py-2 btn-primary"
-              >
-                🔄 영상 다시 생성
-              </button>
+          <div className="bg-brand-blue/10 p-4 rounded mb-4 text-sm">
+            <div className="font-semibold mb-2">📌 이제 시작할 생성 과정</div>
+            <ul className="list-disc list-inside space-y-1 text-dark-text">
+              <li>Step 4: 선택한 캐릭터 상세 설계(말투·성격·외형) <span className="text-brand-blue">(검토/수정 가능)</span></li>
+              <li>Step 5: {duration}초 시나리오 작성 <span className="text-brand-blue">(검토/수정 가능)</span></li>
+              <li>Step 6: 영상 제목 생성 <span className="text-brand-blue">(검토/수정 가능)</span> · 제품명은 그대로 유지</li>
+              <li>Step 7: 마케팅 카피 작성 <span className="text-brand-blue">(검토/수정 가능)</span></li>
+              <li>Step 8: 컴플라이언스 검증 <span className="text-dark-text-muted">(자동)</span></li>
+              <li>Step 9: Higgsfield에서 숏폼 영상 생성 <span className="text-dark-text-muted">(자동)</span></li>
+            </ul>
+          </div>
+
+          {referenceMaterials.length > 0 && (
+            <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4 mb-4 text-sm">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useReferenceMaterials}
+                  onChange={(e) => setUseReferenceMaterials(e.target.checked)}
+                  className="mt-1 w-4 h-4"
+                />
+                <span>
+                  <strong>📎 업로드한 참고자료를 시나리오에 반영할까요?</strong>
+                  <ul className="mt-1 text-dark-text-muted list-disc list-inside">
+                    {referenceMaterials.map((f) => (
+                      <li key={f.filename}>{f.filename}</li>
+                    ))}
+                  </ul>
+                </span>
+              </label>
             </div>
-          ) : videoUrl ? (
-            // 완료 상태: 비디오 표시
-            <div className="space-y-4 animate-fade-in">
-              <div className="bg-status-approved/10 p-4 rounded border border-status-approved/30">
-                <div className="text-lg font-bold text-status-approved mb-2">
-                  ✅ 영상이 생성되었습니다!
-                </div>
-                {generationData && (
-                  <div className="text-sm text-dark-text space-y-1">
-                    <div>
-                      <strong>검증 상태:</strong> {generationData.validationStatus}
-                    </div>
-                    <div>
-                      <strong>검증 점수:</strong> {generationData.validationScore}/100
-                    </div>
-                  </div>
-                )}
-              </div>
+          )}
 
-              {/* 비디오 재생 */}
-              <div className="bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-brand-blue">
-                <video
-                  src={videoUrl}
-                  controls
-                  className="w-full h-full"
-                  onError={() => console.error('비디오 재생 불가')}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              </div>
+          <button
+            onClick={handleGenerate}
+            disabled={!resourceId}
+            className="w-full px-6 py-3 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            🚀 AI 콘텐츠 생성 시작
+          </button>
 
-              {/* 비디오 정보 */}
-              <div className="bg-dark-bg p-4 rounded-lg">
-                <div className="text-sm text-dark-text space-y-2">
-                  <div>
-                    <strong>비디오 URL:</strong>{' '}
-                    <code className="bg-dark-chip px-2 py-1 rounded text-xs break-all">
-                      {videoUrl}
-                    </code>
-                  </div>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(videoUrl);
-                      setSuccessMessage('URL이 복사되었습니다.');
-                    }}
-                    className="text-brand-blue hover:text-brand-blue-dark text-sm"
-                  >
-                    📋 복사
-                  </button>
-                </div>
-              </div>
-
-              {/* 다시 생성 버튼 */}
-              <button
-                onClick={() => {
-                  setVideoUrl(null);
-                  setVideoFailed(false);
-                  setVideoErrorDetail(null);
-                  setGenerationData(null);
-                  setProgress(0);
-                  setCurrentStep(null);
-                }}
-                className="w-full px-4 py-2 btn-primary"
-              >
-                🔄 다시 생성
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* 생성 전: 정보 표시 */}
-              <div className="bg-brand-blue/10 p-4 rounded mb-4 text-sm">
-                <div className="font-semibold mb-2">📌 이제 시작할 생성 과정</div>
-                <ul className="list-disc list-inside space-y-1 text-dark-text">
-                  <li>Step 4: 캐릭터 추천</li>
-                  <li>Step 5: 캐릭터 상세 설계</li>
-                  <li>Step 6: 120초 시나리오 작성</li>
-                  <li>Step 7: 제품명/콘텐츠명 생성</li>
-                  <li>Step 8: 마케팅 카피 작성</li>
-                  <li>Step 9: 컴플라이언스 검증</li>
-                  <li>Step 10: Higgsfield에서 숏폼 영상 생성</li>
-                </ul>
-              </div>
-
-              {/* 참고자료 반영 여부 확인 */}
-              {referenceMaterials.length > 0 && (
-                <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4 mb-4 text-sm">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={useReferenceMaterials}
-                      onChange={(e) => setUseReferenceMaterials(e.target.checked)}
-                      className="mt-1 w-4 h-4"
-                    />
-                    <span>
-                      <strong>📎 업로드한 참고자료를 시나리오에 반영할까요?</strong>
-                      <ul className="mt-1 text-dark-text-muted list-disc list-inside">
-                        {referenceMaterials.map((f) => (
-                          <li key={f.filename}>{f.filename}</li>
-                        ))}
-                      </ul>
-                      <span className="text-xs text-dark-text-muted">
-                        체크하면 AI가 이 파일 내용을 분석해서 시나리오 작성에 반영합니다.
-                      </span>
-                    </span>
-                  </label>
-                </div>
-              )}
-
-              {/* 생성 버튼 */}
-              <button
-                onClick={handleGenerate}
-                disabled={!resourceId}
-                className="w-full px-6 py-3 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                🚀 AI 콘텐츠 생성 시작
-              </button>
-
-              {!resourceId && (
-                <div className="mt-3 text-sm text-dark-text-muted text-center">
-                  자료를 먼저 선택하세요.
-                </div>
-              )}
-            </>
+          {!resourceId && (
+            <div className="mt-3 text-sm text-dark-text-muted text-center">자료를 먼저 선택하세요.</div>
           )}
         </>
       )}
@@ -451,8 +528,714 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
 }
 
 /**
+ * 트렌드 추천 패널 — TimelyAI(LLM) 지식 기반 추천. 실시간 검색이 아님을 항상 명시한다.
+ */
+function TrendPanel({ resourceId, onInsert }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [trends, setTrends] = useState(null);
+  const [disclaimer, setDisclaimer] = useState('');
+  const [fetchError, setFetchError] = useState(null);
+
+  const handleToggle = async () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    if (trends) return; // 이미 불러왔으면 재호출하지 않음
+
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const res = await axios.get(`/api/generate/${resourceId}/trends`);
+      if (res.data.success) {
+        setTrends(res.data.trends || []);
+        setDisclaimer(res.data.disclaimer || '');
+      } else {
+        setFetchError('트렌드 추천을 불러오지 못했습니다.');
+      }
+    } catch (err) {
+      setFetchError('트렌드 추천을 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mb-4">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="text-sm text-brand-blue hover:text-brand-blue-dark font-semibold"
+      >
+        📈 {open ? '트렌드 아이디어 닫기' : 'AI 트렌드 아이디어 보기'}
+      </button>
+
+      {open && (
+        <div className="mt-2 bg-dark-bg rounded-lg p-3 border border-dark-chip animate-fade-in">
+          {loading && <div className="text-sm text-dark-text-muted">불러오는 중...</div>}
+          {fetchError && <div className="text-sm text-status-rejected">{fetchError}</div>}
+          {trends && (
+            <>
+              <div className="text-xs text-dark-text-muted mb-2 italic">{disclaimer}</div>
+              <div className="space-y-2">
+                {trends.map((t, idx) => (
+                  <button
+                    type="button"
+                    key={idx}
+                    onClick={() => onInsert(`[${t.keyword}] ${t.angle}`)}
+                    className="w-full text-left bg-dark-chip hover:brightness-125 rounded p-2 text-sm"
+                    title="클릭하면 편집창에 삽입됩니다"
+                  >
+                    <span className="font-semibold text-brand-blue">#{t.keyword}</span>{' '}
+                    <span className="text-dark-text">{t.angle}</span>
+                    <div className="text-xs text-dark-text-muted mt-0.5">{t.reason}</div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Step4: 캐릭터 브리프(말투/성격/외형) 검토/수정 패널 — 여러 캐릭터가 선택됐으면 전원 표시.
+ * 각 캐릭터를 그대로 사용하거나 개별적으로 수정할 수 있다.
+ */
+function CharacterReviewPanel({ characterData, onConfirm }) {
+  const { characterBriefs } = characterData;
+  const [editingIds, setEditingIds] = useState({});
+  const [drafts, setDrafts] = useState(() => {
+    const initial = {};
+    characterBriefs.forEach((b) => {
+      initial[b.characterId] = {
+        voice_tone: b.voice_tone || "",
+        personality_traits: Array.isArray(b.personality_traits) ? b.personality_traits.join(", ") : (b.personality_traits || ""),
+        visual_description: b.visual_description || "",
+      };
+    });
+    return initial;
+  });
+
+  const toggleEdit = (id) => setEditingIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  const updateDraft = (id, field, value) =>
+    setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+
+  const handleConfirm = () => {
+    const editedBriefs = {};
+    characterBriefs.forEach((b) => {
+      if (editingIds[b.characterId]) {
+        editedBriefs[b.characterId] = {
+          voice_tone: drafts[b.characterId].voice_tone,
+          personality_traits: drafts[b.characterId].personality_traits.split(",").map((t) => t.trim()).filter(Boolean),
+          visual_description: drafts[b.characterId].visual_description,
+        };
+      }
+    });
+    onConfirm({ editedBriefs: Object.keys(editedBriefs).length > 0 ? editedBriefs : undefined });
+  };
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4">
+        <div className="font-semibold mb-1">🎭 Step 4: 캐릭터 상세 설계 검토</div>
+        <div className="text-sm text-dark-text-muted">
+          {characterBriefs.length > 1
+            ? `선택하신 ${characterBriefs.length}명의 캐릭터가 이 브리프를 바탕으로 함께 등장하는 시나리오가 만들어집니다.`
+            : 'AI가 만든 캐릭터 브리프입니다. 그대로 사용하거나 직접 수정할 수 있어요.'}
+        </div>
+      </div>
+
+      {characterBriefs.map((b) => {
+        const isEditing = !!editingIds[b.characterId];
+        const draft = drafts[b.characterId];
+        return (
+          <div key={b.characterId} className="bg-dark-bg rounded-lg p-4 space-y-3">
+            <div className="flex justify-between items-center">
+              <div className="font-semibold">{b.character}</div>
+              <button
+                type="button"
+                onClick={() => toggleEdit(b.characterId)}
+                className="text-xs text-brand-blue hover:text-brand-blue-dark"
+              >
+                {isEditing ? '수정 취소' : '✏️ 수정하기'}
+              </button>
+            </div>
+
+            {!isEditing ? (
+              <div className="text-sm text-dark-text space-y-1">
+                <div><strong>목소리 톤:</strong> {draft.voice_tone}</div>
+                <div><strong>성격:</strong> {draft.personality_traits}</div>
+                <div><strong>외형:</strong> {draft.visual_description}</div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs text-dark-text-muted">목소리 톤</label>
+                  <input
+                    type="text"
+                    value={draft.voice_tone}
+                    onChange={(e) => updateDraft(b.characterId, 'voice_tone', e.target.value)}
+                    className="w-full mt-1 bg-dark-chip rounded p-2 text-sm text-dark-text"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-dark-text-muted">성격 (쉼표로 구분)</label>
+                  <input
+                    type="text"
+                    value={draft.personality_traits}
+                    onChange={(e) => updateDraft(b.characterId, 'personality_traits', e.target.value)}
+                    className="w-full mt-1 bg-dark-chip rounded p-2 text-sm text-dark-text"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-dark-text-muted">외형 묘사</label>
+                  <textarea
+                    value={draft.visual_description}
+                    onChange={(e) => updateDraft(b.characterId, 'visual_description', e.target.value)}
+                    rows={3}
+                    className="w-full mt-1 bg-dark-chip rounded p-2 text-sm text-dark-text"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <button onClick={handleConfirm} className="w-full px-4 py-2 btn-primary">
+        ✅ 확정하고 다음 단계로
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Step5-a: "어떤 스타일로 만들까요?" 템플릿 선택 화면 (AI 추천 경로 진입점)
+ * 10개 숏폼 템플릿 카드 + "직접 작성" 카드(점선 테두리로 구분)
+ */
+function TemplateSelectPanel({ templates, onSelectTemplate, onSelectDirectWrite }) {
+  const [expandedId, setExpandedId] = useState(null);
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4">
+        <div className="font-semibold mb-1">🎨 Step 5: 어떤 스타일로 만들까요?</div>
+        <div className="text-sm text-dark-text-muted">
+          최신 숏폼 트렌드에 맞춘 스타일을 골라주세요. 카드를 클릭하면 예시를 미리 볼 수 있어요.
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {templates.map((t) => {
+          const expanded = expandedId === t.id;
+          return (
+            <div
+              key={t.id}
+              className={`rounded-lg border p-4 cursor-pointer transition ${
+                expanded ? 'border-brand-blue bg-brand-blue/10' : 'border-dark-chip bg-dark-bg hover:border-brand-blue/40'
+              }`}
+              onClick={() => setExpandedId(expanded ? null : t.id)}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">{t.icon}</span>
+                <span className="font-semibold">{t.label}</span>
+              </div>
+              <div className="text-xs text-dark-text-muted">{t.description}</div>
+
+              {expanded && (
+                <div className="mt-3 space-y-2 animate-fade-in">
+                  <div className="text-xs text-dark-text bg-dark-chip rounded p-2">
+                    <strong>예시:</strong> {t.example}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {t.toneKeywords.map((kw) => (
+                      <span key={kw} className="text-xs bg-brand-blue/10 text-brand-blue px-2 py-0.5 rounded-full">
+                        #{kw}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="text-xs text-dark-text-muted">⏱ {t.durationRange}</div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onSelectTemplate(t.id); }}
+                    className="w-full px-3 py-2 btn-primary text-sm"
+                  >
+                    이 스타일로 시작하기
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* 직접 작성 카드 — 점선 테두리로 구분 */}
+        <div
+          className="rounded-lg border-2 border-dashed border-dark-chip p-4 cursor-pointer hover:border-brand-blue/50 transition flex flex-col items-center justify-center text-center"
+          onClick={onSelectDirectWrite}
+        >
+          <div className="text-xl mb-1">✏️</div>
+          <div className="font-semibold">내가 직접 아이디어 낼게요</div>
+          <div className="text-xs text-dark-text-muted mt-1">자유롭게 써주시면 AI가 검토하고 구조화해드려요</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Step5-b: (AI 추천 경로) 로그라인 3개 중 선택
+ */
+function LoglineReviewPanel({ loglineOptions, onSelectLogline, onBack }) {
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4">
+        <div className="font-semibold mb-1">💡 어떤 이야기로 만들까요?</div>
+        <div className="text-sm text-dark-text-muted">마음에 드는 아이디어를 골라주세요. 선택하면 전체 시나리오로 완성됩니다.</div>
+      </div>
+
+      <div className="space-y-3">
+        {loglineOptions.map((opt) => (
+          <button
+            key={opt.id}
+            onClick={() => onSelectLogline(opt)}
+            className="w-full text-left bg-dark-bg hover:border-brand-blue/50 border border-dark-chip rounded-lg p-4 transition"
+          >
+            <div className="font-semibold mb-1">{opt.title}</div>
+            <div className="text-sm text-dark-text-muted">{opt.logline}</div>
+          </button>
+        ))}
+      </div>
+
+      <button onClick={onBack} className="text-sm text-dark-text-muted hover:text-dark-text">
+        ← 스타일 다시 고르기
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Step5-c: (직접 작성 경로) 아이디어 입력 → AI 검토(브랜드보이스/컴플라이언스) → 구조화 초안 확정
+ */
+function DraftReviewPanel({ draftReviewData, onSubmitIdea, onAccept, onBack }) {
+  const [idea, setIdea] = useState(draftReviewData.userIdea || '');
+  const { review } = draftReviewData;
+
+  const statusBadge = (status) => {
+    const map = {
+      PASS: { icon: '✅', className: 'text-status-approved' },
+      WARNING: { icon: '⚠️', className: 'text-status-pending' },
+      FAIL: { icon: '❌', className: 'text-status-rejected' },
+    };
+    return map[status] || map.WARNING;
+  };
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4">
+        <div className="font-semibold mb-1">✏️ 직접 아이디어 작성</div>
+        <div className="text-sm text-dark-text-muted">
+          어떤 이야기를 만들고 싶으세요? (예: 톳소금이가 헬스장에서 전해질 마시는 15초 영상)
+        </div>
+      </div>
+
+      <textarea
+        value={idea}
+        onChange={(e) => setIdea(e.target.value)}
+        rows={4}
+        placeholder="어떤 이야기를 만들고 싶으세요?"
+        className="w-full bg-dark-chip rounded p-3 text-sm text-dark-text"
+      />
+
+      {!review ? (
+        <button
+          onClick={() => onSubmitIdea(idea)}
+          disabled={!idea.trim()}
+          className="w-full px-4 py-2 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          🔍 AI 검토 받기
+        </button>
+      ) : (
+        <div className="space-y-3 animate-fade-in">
+          <div className="bg-dark-bg rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <span className={statusBadge(review.brandVoiceFit?.status).className}>
+                {statusBadge(review.brandVoiceFit?.status).icon} 브랜드 보이스
+              </span>
+              <span className="text-dark-text-muted">{review.brandVoiceFit?.comment}</span>
+            </div>
+            <div className="flex items-start gap-2 text-sm">
+              <span className={statusBadge(review.complianceCheck?.status).className}>
+                {statusBadge(review.complianceCheck?.status).icon} 컴플라이언스
+              </span>
+              {review.complianceCheck?.issues?.length > 0 ? (
+                <div className="text-dark-text-muted space-y-1">
+                  {review.complianceCheck.issues.map((iss, idx) => (
+                    <div key={idx}>
+                      "{iss.text}" — {iss.reason} (제안: {iss.suggestion})
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-dark-text-muted">문제 없음</span>
+              )}
+            </div>
+            <div className="text-sm text-dark-text-muted">
+              ⏱ 추천 길이: {review.suggestedDuration}
+            </div>
+          </div>
+
+          <div className="bg-dark-bg rounded-lg p-4">
+            <div className="text-sm font-semibold mb-2">{review.structuredDraft?.title}</div>
+            <p className="text-sm text-dark-text whitespace-pre-wrap">{review.structuredDraft?.story_content}</p>
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={() => onAccept(review.structuredDraft)} className="flex-1 px-4 py-2 btn-primary">
+              ✅ 이대로 진행
+            </button>
+            <button
+              onClick={() => onSubmitIdea(idea)}
+              className="flex-1 px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
+            >
+              🔄 다시 수정해서 재검토
+            </button>
+          </div>
+        </div>
+      )}
+
+      <button onClick={onBack} className="text-sm text-dark-text-muted hover:text-dark-text">
+        ← 스타일 다시 고르기
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Step5: 시나리오 검토/수정 패널 (MetadataReviewUI.jsx의 확정본+임시편집본 패턴 재사용)
+ */
+function ScenarioReviewPanel({ resourceId, scenarioData, onConfirm }) {
+  const { scenario } = scenarioData;
+  const [editing, setEditing] = useState(false);
+  const [storyContent, setStoryContent] = useState(scenario.story_content || '');
+  const [feedback, setFeedback] = useState('');
+
+  const handleUseAsIs = () => {
+    onConfirm({});
+  };
+
+  const handleConfirmEdit = () => {
+    onConfirm({ editedStoryContent: storyContent, feedback: feedback || undefined });
+  };
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4">
+        <div className="font-semibold mb-1">📝 Step 5: 시나리오 검토</div>
+        <div className="text-sm text-dark-text-muted">AI가 작성한 시나리오입니다. 그대로 사용하거나 직접 수정할 수 있어요.</div>
+      </div>
+
+      <TrendPanel resourceId={resourceId} onInsert={(text) => {
+        setEditing(true);
+        setStoryContent((prev) => `${prev}\n\n${text}`);
+      }} />
+
+      <div className="bg-dark-bg rounded-lg p-4">
+        <div className="text-sm font-semibold mb-2">{scenario.title}</div>
+        {!editing ? (
+          <p className="text-sm text-dark-text whitespace-pre-wrap">{storyContent}</p>
+        ) : (
+          <textarea
+            value={storyContent}
+            onChange={(e) => setStoryContent(e.target.value)}
+            rows={8}
+            className="w-full bg-dark-chip rounded p-3 text-sm text-dark-text"
+          />
+        )}
+      </div>
+
+      {editing && (
+        <div>
+          <label className="text-xs text-dark-text-muted">피드백 메모 (선택)</label>
+          <input
+            type="text"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder="예: 도입부를 더 짧게 해달라고 요청했음"
+            className="w-full mt-1 bg-dark-chip rounded p-2 text-sm text-dark-text"
+          />
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        {!editing ? (
+          <>
+            <button onClick={handleUseAsIs} className="flex-1 px-4 py-2 btn-primary">
+              ✅ AI 초안 그대로 사용
+            </button>
+            <button
+              onClick={() => setEditing(true)}
+              className="flex-1 px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
+            >
+              ✏️ 수정하겠습니다
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={handleConfirmEdit} className="flex-1 px-4 py-2 btn-primary">
+              ✅ 수정 확정하고 다음 단계로
+            </button>
+            <button
+              onClick={() => { setEditing(false); setStoryContent(scenario.story_content || ''); }}
+              className="flex-1 px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
+            >
+              취소
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Step6: 영상 제목(콘텐츠명) 검토 패널
+ *
+ * ⭐ 제품명은 여기서 다루지 않는다 — Step1에서 입력한 실제 제품명은 절대 바뀌지 않으며,
+ * 참고용으로만 보여준다. 이 단계에서 정하는 것은 오직 "이 시나리오/카피에 붙일 영상 제목"뿐이다.
+ */
+function NamingReviewPanel({ namingData, onConfirm }) {
+  const { realProductName, contentNameOptions, fallbackContentName } = namingData;
+
+  const [selectedContent, setSelectedContent] = useState(contentNameOptions[0]?.name || fallbackContentName || '');
+  const [customContent, setCustomContent] = useState('');
+  const [useCustomContent, setUseCustomContent] = useState(false);
+
+  const handleConfirm = () => {
+    onConfirm({
+      selectedContentName: useCustomContent ? customContent : selectedContent,
+    });
+  };
+
+  const isValid = useCustomContent ? customContent.trim() : selectedContent;
+
+  return (
+    <div className="space-y-5 animate-fade-in">
+      <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4">
+        <div className="font-semibold mb-1">🏷️ Step 6: 영상 제목 검토</div>
+        <div className="text-sm text-dark-text-muted">
+          제품명(<strong className="text-dark-text">{realProductName}</strong>)은 그대로 유지됩니다.
+          여기서는 이 시나리오/카피에 붙일 <strong className="text-dark-text">영상 제목</strong>만 고르거나 직접 입력하세요.
+        </div>
+      </div>
+
+      <NameOptionGroup
+        title="영상 제목"
+        options={contentNameOptions}
+        selected={selectedContent}
+        onSelect={(name) => { setSelectedContent(name); setUseCustomContent(false); }}
+        useCustom={useCustomContent}
+        customValue={customContent}
+        onCustomChange={setCustomContent}
+        onUseCustom={() => setUseCustomContent(true)}
+      />
+
+      <button
+        onClick={handleConfirm}
+        disabled={!isValid}
+        className="w-full px-4 py-2 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        ✅ 확정하고 다음 단계로
+      </button>
+    </div>
+  );
+}
+
+function NameOptionGroup({ title, options, selected, onSelect, useCustom, customValue, onCustomChange, onUseCustom }) {
+  return (
+    <div>
+      <div className="text-sm font-semibold mb-2">{title}</div>
+      <div className="space-y-2">
+        {options.map((opt, idx) => (
+          <label
+            key={idx}
+            className={`flex items-start gap-2 p-3 rounded-lg cursor-pointer border ${
+              !useCustom && selected === opt.name ? 'border-brand-blue bg-brand-blue/10' : 'border-dark-chip bg-dark-bg'
+            }`}
+          >
+            <input
+              type="radio"
+              checked={!useCustom && selected === opt.name}
+              onChange={() => onSelect(opt.name)}
+              className="mt-1"
+            />
+            <span className="text-sm">
+              <span className="font-semibold text-dark-text">{opt.name}</span>{' '}
+              <span className="text-xs text-dark-text-muted">({opt.score}점)</span>
+              <div className="text-xs text-dark-text-muted">{opt.meaning}</div>
+            </span>
+          </label>
+        ))}
+        <label
+          className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer border ${
+            useCustom ? 'border-brand-blue bg-brand-blue/10' : 'border-dark-chip bg-dark-bg'
+          }`}
+        >
+          <input type="radio" checked={useCustom} onChange={onUseCustom} />
+          <input
+            type="text"
+            value={customValue}
+            onChange={(e) => { onCustomChange(e.target.value); onUseCustom(); }}
+            placeholder="직접 입력..."
+            className="flex-1 bg-transparent text-sm text-dark-text outline-none"
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Step7: 카피 검토/수정 패널
+ */
+function CopyReviewPanel({ resourceId, copyData, onConfirm }) {
+  const [editing, setEditing] = useState(false);
+  const [content, setContent] = useState(copyData.generatedContent || '');
+
+  const handleUseAsIs = () => onConfirm({});
+  const handleConfirmEdit = () => onConfirm({ editedContent: content });
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="bg-brand-blue/10 border border-brand-blue/30 rounded-lg p-4">
+        <div className="font-semibold mb-1">✍️ Step 7: 카피 검토</div>
+        <div className="text-sm text-dark-text-muted">
+          숏폼 영상을 올릴 때 <strong className="text-dark-text">영상 아래 상세 설명(캡션)</strong>으로 바로 붙여넣을 수 있는 카피예요.
+          AI 초안을 그대로 쓰거나, 브랜드 톤에 맞게 직접 다듬어보세요.
+        </div>
+      </div>
+
+      <TrendPanel resourceId={resourceId} onInsert={(text) => {
+        setEditing(true);
+        setContent((prev) => `${prev}\n\n${text}`);
+      }} />
+
+      <div className="bg-dark-bg rounded-lg p-4">
+        {!editing ? (
+          <p className="text-sm text-dark-text whitespace-pre-wrap">{content}</p>
+        ) : (
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={8}
+            className="w-full bg-dark-chip rounded p-3 text-sm text-dark-text"
+          />
+        )}
+      </div>
+
+      <div className="flex gap-3">
+        {!editing ? (
+          <>
+            <button onClick={handleUseAsIs} className="flex-1 px-4 py-2 btn-primary">
+              ✅ AI 초안 그대로 사용
+            </button>
+            <button
+              onClick={() => setEditing(true)}
+              className="flex-1 px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
+            >
+              ✏️ 수정하겠습니다
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={handleConfirmEdit} className="flex-1 px-4 py-2 btn-primary">
+              ✅ 수정 확정하고 영상 생성
+            </button>
+            <button
+              onClick={() => { setEditing(false); setContent(copyData.generatedContent || ''); }}
+              className="flex-1 px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
+            >
+              취소
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 완료 화면 (기존 videoUrl 표시 로직 유지)
+ */
+function DoneScreen({ finalResult, onRestart, onRetryVideo }) {
+  const { videoUrl, validationStatus, validationScore, higgsfieldError } = finalResult;
+  const videoFailed = !videoUrl;
+
+  if (videoFailed) {
+    return (
+      <div className="space-y-4 animate-fade-in">
+        <div className="bg-status-pending/10 p-4 rounded border border-status-pending/30">
+          <div className="text-lg font-bold text-status-pending mb-2">
+            ⚠️ 콘텐츠는 생성됐지만 영상 생성에 실패했습니다
+          </div>
+          <div className="text-sm text-dark-text space-y-1 mb-2">
+            <div><strong>검증 상태:</strong> {validationStatus}</div>
+            <div><strong>검증 점수:</strong> {validationScore}/100</div>
+          </div>
+          <div className="text-sm text-status-pending bg-status-pending/10 rounded p-2 mt-2">
+            {higgsfieldError || '영상 생성에 실패했습니다.'}
+          </div>
+        </div>
+        <button onClick={onRetryVideo} className="w-full px-4 py-2 btn-primary">
+          🔄 처음부터 다시 생성
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="bg-status-approved/10 p-4 rounded border border-status-approved/30">
+        <div className="text-lg font-bold text-status-approved mb-2">✅ 영상이 생성되었습니다!</div>
+        <div className="text-sm text-dark-text space-y-1">
+          <div><strong>검증 상태:</strong> {validationStatus}</div>
+          <div><strong>검증 점수:</strong> {validationScore}/100</div>
+        </div>
+      </div>
+
+      <div className="bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-brand-blue">
+        <video src={videoUrl} controls className="w-full h-full" onError={() => console.error('비디오 재생 불가')}>
+          Your browser does not support the video tag.
+        </video>
+      </div>
+
+      <div className="bg-dark-bg p-4 rounded-lg">
+        <div className="text-sm text-dark-text space-y-2">
+          <div>
+            <strong>비디오 URL:</strong>{' '}
+            <code className="bg-dark-chip px-2 py-1 rounded text-xs break-all">{videoUrl}</code>
+          </div>
+          <button
+            onClick={() => navigator.clipboard.writeText(videoUrl)}
+            className="text-brand-blue hover:text-brand-blue-dark text-sm"
+          >
+            📋 복사
+          </button>
+        </div>
+      </div>
+
+      <button onClick={onRestart} className="w-full px-4 py-2 btn-primary">
+        🔄 다시 생성
+      </button>
+    </div>
+  );
+}
+
+/**
  * 단계별 체크리스트 항목 (연결선 포함 타임라인)
- * done: 완료(#00AEEF + 흰 체크) / active: 진행 중(#00AEEF + 로딩 애니메이션) / 그 외: 미진행(#1F3A52)
  */
 function StepItem({ label, done, active, isLast }) {
   return (
@@ -460,11 +1243,7 @@ function StepItem({ label, done, active, isLast }) {
       <div className="flex flex-col items-center">
         <div
           className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-            done
-              ? 'step-circle-done'
-              : active
-              ? 'bg-brand-blue text-white'
-              : 'bg-dark-chip text-dark-text-muted'
+            done ? 'step-circle-done' : active ? 'bg-brand-blue text-white' : 'bg-dark-chip text-dark-text-muted'
           }`}
         >
           {done ? '✓' : active ? (
@@ -473,9 +1252,7 @@ function StepItem({ label, done, active, isLast }) {
             '-'
           )}
         </div>
-        {!isLast && (
-          <div className={`w-0.5 flex-1 min-h-[14px] ${done ? 'bg-brand-blue' : 'bg-dark-chip'}`} />
-        )}
+        {!isLast && <div className={`w-0.5 flex-1 min-h-[14px] ${done ? 'bg-brand-blue' : 'bg-dark-chip'}`} />}
       </div>
       <span
         className={`pb-3 text-sm ${

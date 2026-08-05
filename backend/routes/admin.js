@@ -83,14 +83,17 @@ router.put("/resources/:id", async (req, res) => {
 // PUT /api/admin/characters/:id — 캐릭터 선택 변경 / 내용 편집
 //
 // 두 가지 용도:
-//  (a) selected: true 로 넘기면 → 같은 resource_id의 다른 캐릭터는 자동으로 selected: false 처리
+//  (a) selected: true/false 로 넘기면 → 이 캐릭터의 선택 여부만 바뀐다
+//      ⭐ 여러 캐릭터가 한 자료에 동시에 selected: true일 수 있다 (멀티 캐릭터 시나리오 지원).
+//         다른 캐릭터를 자동으로 해제하지 않으므로, 단일 선택이 필요한 화면에서는
+//         프론트에서 명시적으로 이전 선택을 selected: false로 먼저 보내야 한다.
 //  (b) name/description/reason 등을 직접 수정
 // ─────────────────────────────────────────────
 router.put("/characters/:id", async (req, res) => {
   const { id } = req.params;
   const { character_name, character_profile, reason, score, selected, voice_tone, personality_traits, edited_by } = req.body;
 
-  // 캐릭터가 존재하는지 + resource_id 확인 (다른 캐릭터 selected 해제할 때 필요)
+  // 캐릭터가 존재하는지 확인
   const existing = await callDatabase("characters", "read", null, { id });
   if (!existing.success || existing.rows.length === 0) {
     return res.status(404).json({
@@ -98,7 +101,6 @@ router.put("/characters/:id", async (req, res) => {
       message: "해당 캐릭터를 찾을 수 없습니다.",
     });
   }
-  const resourceId = existing.rows[0].resource_id;
 
   const updateData = {};
   if (character_name !== undefined) updateData.character_name = character_name;
@@ -118,27 +120,6 @@ router.put("/characters/:id", async (req, res) => {
       success: false,
       message: "수정할 항목이 없습니다.",
     });
-  }
-
-  // ── selected: true로 바꾸는 경우 → 같은 resource의 다른 캐릭터는 false로 ──
-  if (selected === true) {
-    const others = await callDatabase("characters", "read", null, {
-      resource_id: resourceId,
-    });
-    if (others.success) {
-      const otherIds = others.rows.filter((c) => c.id !== id).map((c) => c.id);
-      // Promise.all로 동시 실행 (race condition 방지)
-      await Promise.all(
-        otherIds.map((otherId) =>
-          callDatabase(
-            "characters",
-            "update",
-            { selected: false },
-            { id: otherId }
-          )
-        )
-      );
-    }
   }
 
   const result = await callDatabase("characters", "update", updateData, { id });
