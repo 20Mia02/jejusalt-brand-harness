@@ -37,6 +37,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const [videoFailed, setVideoFailed] = useState(false);
   const [videoErrorDetail, setVideoErrorDetail] = useState(null);
   const [failedStep, setFailedStep] = useState(null);
+  // 🆕 생성 영상 QA 결과 (post-generation-qa-agent, 멘토링 피드백 3)
+  const [qaResult, setQaResult] = useState(null);
   // 업로드된 참고자료를 시나리오 작성에 반영할지 여부 (기본: 반영)
   const [useReferenceMaterials, setUseReferenceMaterials] = useState(true);
   const pollingInterval = useRef(null);
@@ -75,6 +77,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     setCurrentStep('초기화 중...');
     setVideoFailed(false);
     setVideoErrorDetail(null);
+    setQaResult(null);
 
     startStatusPolling();
 
@@ -108,6 +111,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
         setSuccessMessage('영상이 생성되었습니다!');
         setVideoUrl(res.data.videoUrl);
       }
+
+      setQaResult(res.data.qaResult || null);
 
       if (onSuccess) {
         onSuccess(res.data);
@@ -371,6 +376,49 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                   </button>
                 </div>
               </div>
+
+              {/* 🆕 생성 영상 QA 결과 (post-generation-qa-agent) */}
+              {qaResult && (
+                <div className="bg-dark-bg p-4 rounded-lg border border-brand-blue/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <strong className="text-sm">🔍 생성 영상 품질 검증</strong>
+                    <span className="text-sm text-dark-text-muted">
+                      종합 점수: {qaResult.overall_score}/100
+                    </span>
+                  </div>
+
+                  {!qaResult.qa_passed && (
+                    <div className="bg-status-rejected/10 border border-status-rejected/30 text-status-rejected px-3 py-2 rounded mb-3 text-sm">
+                      ⚠️ 품질 검증 실패 — 재생성을 권장합니다.
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    {(qaResult.qa_checks || []).map((check) => (
+                      <div
+                        key={check.check_id}
+                        className="flex items-center justify-between text-xs bg-dark-chip rounded px-3 py-2"
+                      >
+                        <span>{check.check_id}</span>
+                        <span className="text-dark-text-muted flex-1 mx-3 truncate">
+                          {check.details}
+                        </span>
+                        <span
+                          className={`status-badge ${
+                            check.result === 'pass'
+                              ? 'status-approved'
+                              : check.result === 'warning'
+                              ? 'status-pending'
+                              : 'status-rejected'
+                          }`}
+                        >
+                          {check.result}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* 다시 생성 버튼 */}
               <button
