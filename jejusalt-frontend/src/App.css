@@ -1,0 +1,239 @@
+/* 제주소금 컬러 팔레트 */
+:root {
+  /* Core Colors */
+  --color-primary-blue: #00AEEF;
+  --color-primary-black: #000000;
+  --color-primary-white: #FFFFFF;
+
+  /* Natural Extensions */
+  --color-ocean-deep: #003D7A;
+  --color-wave-white: #E6F7FF;
+  --color-salt-cream: #FFFEF9;
+  --color-salt-gray: #F5F5F5;
+  --color-lava-black: #1A1A1A;
+  --color-volcanic-gray: #5A5A5A;
+  --color-hallasan-green: #2D7A3E;
+  --color-earth-brown: #8B6F47;
+  --color-sandy-beige: #E8D4B8;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  background-color: var(--color-primary-white);
+  color: var(--color-primary-black);
+  line-height: 1.6;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== MAIN CONTENT ===== */
+.app-main {
+  flex: 1;
+  padding: 40px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ===== WORLD-CLASS HEADER DESIGN ===== */
+.app-header {
+  background: linear-gradient(135deg, #000000 0%, #0a1a2e 50%, #003d7a 100%);
+  color: var(--color-primary-white);
+  padding: 0;
+  text-align: center;
+  border-bottom: 8px solid var(--color-primary-blue);
+  position: relative;
+  overflow: hidden;
+  min-height: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.app-header::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  right: -15%;
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, rgba(0, 174, 239, 0.25) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: pulse 6s ease-in-out infinite;
+  filter: blur(40px);
+}
+
+.app-header::after {
+  content: "";
+  position: absolute;
+  bottom: -40%;
+  left: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(45, 122, 62, 0.2) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: pulse 7s ease-in-out infinite 1.5s;
+  filter: blur(40px);
+}
+
+.app-header-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 80px;
+  flex-wrap: nowrap;
+  max-width: 1200px;
+  width: 100%;
+  padding: 0 60px;
+}
+
+.logo-section {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.app-header-nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.app-header-nav a {
+  color: var(--color-wave-white);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.app-header-nav a:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-header-nav a.active {
+  background-color: var(--color-primary-blue);
+  border-color: var(--color-primary-blue);
+  color: var(--color-primary-black);
+}
+
+.logo-icon {
+  width: 220px;
+  height: 220px;
+  animation: float 3.5s ease-in-out infinite;
+  filter: drop-shadow(0 12px 30px rgba(0, 174, 239, 0.4));
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.1), transparent);
+  border-radius: 50%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.header-text {
+  text-align: left;
+  flex: 1;
+  min-width: 350px;
+}
+
+.header-text-korean {
+  font-size: 48px;
+  font-weight: 900;
+  margin-bottom: 16px;
+  letter-spacing: 0.05em;
+  text-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  line-height: 1.2;
+  background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-header h1 {
+  font-size: 64px;
+  font-weight: 900;
+  margin-bottom: 24px;
+  letter-spacing: 0.015em;
+  text-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  line-height: 1.1;
+  background: linear-gradient(135deg, var(--color-primary-white) 0%, var(--color-wave-white) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-divider {
+  width: 120px;
+  height: 6px;
+  background: linear-gradient(90deg, var(--color-primary-blue) 0%, var(--color-hallasan-green) 50%, var(--color-sandy-beige) 100%);
+  border-radius: 3px;
+  box-shadow: 0 6px 16px rgba(0, 174, 239, 0.4);
+}
+
+.header-subtitle {
+  font-size: 18px;
+  color: var(--color-wave-white);
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  margin-top: 20px;
+  opacity: 0.95;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-header-content {
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  
+  .logo-icon {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .app-header h1 {
+    font-size: 48px;
+  }
+  
+  .header-text-korean {
+    font-size: 36px;
+  }
+}
