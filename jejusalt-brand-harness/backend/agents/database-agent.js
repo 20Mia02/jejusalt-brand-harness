@@ -1,0 +1,320 @@
+/**
+ * backend/agents/database-agent.js
+ * 제주소금 AI 콘텐츠 생성 엔진 - 데이터베이스 에이전트
+ * 
+ * 역할:
+ * 1. Supabase CRUD 작업 (callDatabase)
+ * 2. 자료 필터링 조회 (getResourcesByFilter)
+ * 3. FK 관계 검증 및 데이터 일관성 관리
+ * 
+ * 의존성: @supabase/supabase-js
+ * 환경변수: SUPABASE_URL, SUPABASE_SERVICE_KEY
+ *   ⚠️ api-integration-plan-v4.md 원칙: "서버는 service_role 키 사용, anon key는 미사용"
+ *   서버(백엔드)에서는 RLS를 우회해야 하므로 반드시 SERVICE_KEY를 사용한다.
+ *   (SUPABASE_ANON_KEY는 프론트엔드 전용 — 여기서 쓰면 RLS 정책에 막혀 쓰기가 실패할 수 있음)
+ */
+
+const { createClient } = require("@supabase/supabase-js");
+
+// Supabase 클라이언트 초기화 (service_role 키 사용 — 서버 전용)
+if (!process.env.SUPABASE_SERVICE_KEY) {
+  console.warn(
+    "⚠️ SUPABASE_SERVICE_KEY가 .env에 없습니다. RLS가 켜져 있으면 쓰기 작업이 실패할 수 있습니다."
+  );
+}
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY // 폴백(임시): SERVICE_KEY 없으면 ANON_KEY로 동작은 하되 경고 출력
+);
+
+// ============================================================================
+// [함수 1] callDatabase - 일반 CRUD 작업
+// ============================================================================
+/**
+ * Supabase 데이터베이스 CRUD 작업 (CREATE, READ, UPDATE, DELETE)
+ * 
+ * @param {string} table - 테이블 이름 (예: "resources", "characters", "contents", "videos")
+ * @param {string} operation - "create" | "read" | "update" | "delete"
+ * @param {object} data - 저장/수정할 데이터
+ * @param {object} filter - WHERE 조건 (read/update/delete 시 필요)
+ * @returns {object} {success, rows, error}
+ */
+async function callDatabase(table, operation, data, filter) {
+  try {
+    // ========== CREATE (INSERT) ==========
+    if (operation === "create") {
+      if (!data) {
+        throw new Error("INSERT 작업에 data가 필요합니다");
+      }
+      if (!Array.isArray(data)) {
+        data = [data];
+      }
+      
+      console.log(`[DB] INSERT into ${table}: ${data.length}개 row`);
+      
+      const { data: result, error } = await supabase
+        .from(table)
+        .insert(data)
+        .select();
+      
+      if (error) {
+        console.error(`  [FK 오류?] ${error.message}`);
+        return { success: false, error: "FK_OR_CONSTRAINT_VIOLATION", message: error.message };
+      }
+      
+      console.log(`  [✓] ${result.length}개 row 생성됨`);
+      return { success: true, rows: result || [] };
+    }
+    
+    // ========== READ (SELECT) ==========
+    if (operation === "read") {
+      let query = supabase.from(table).select("*");
+      
+      // filter 적용
+      if (filter) {
+        Object.entries(filter).forEach(([key, value]) => {
+          if (Array.isArray(value)) {
+            // IN 쿼리 (예: status in ('completed', 'pending'))
+            query = query.in(key, value);
+          } else {
+            // 단순 equals
+            query = query.eq(key, value);
+          }
+        });
+      }
+      
+      // 최신순 정렬
+      query = query.order("created_at", { ascending: false });
+      
+      const { data: result, error } = await query;
+      
+      if (error) {
+        console.error(`[DB] SELECT 실패: ${error.message}`);
+        return { success: false, error: "NOT_FOUND", message: error.message };
+      }
+      
+      console.log(`[DB] SELECT from ${table}: ${result.length}개 row`);
+      return { success: true, rows: result || [] };
+    }
+    
+    // ========== UPDATE ==========
+    if (operation === "update") {
+      if (!filter || Object.keys(filter).length === 0) {
+        throw new Error("UPDATE는 filter(WHERE 조건)이 필수입니다");
+      }
+      
+      console.log(`[DB] UPDATE ${table} WHERE ${JSON.stringify(filter)}`);
+      
+      let query = supabase.from(table).update(data);
+      
+      // filter 적용
+      Object.entries(filter).forEach(([key, value]) => {
+        query = query.eq(key, value);
+      });
+      
+      const { data: result, error } = await query.select();
+      
+      if (error) {
+        console.error(`  [오류] ${error.message}`);
+        return { success: false, error: "UPDATE_FAILED", message: error.message };
+      }
+      
+      console.log(`  [✓] ${result.length}개 row 업데이트됨`);
+      return { success: true, rows: result || [] };
+    }
+    
+    // ========== DELETE ==========
+    if (operation === "delete") {
+      if (!filter || Object.keys(filter).length === 0) {
+        throw new Error("DELETE는 filter(WHERE 조건)이 필수입니다");
+      }
+      
+      console.log(`[DB] DELETE from ${table} WHERE ${JSON.stringify(filter)}`);
+      
+      let query = supabase.from(table).delete();
+      
+      // filter 적용
+      Object.entries(filter).forEach(([key, value]) => {
+        query = query.eq(key, value);
+      });
+      
+      const { data: result, error } = await query.select();
+      
+      if (error) {
+        console.error(`  [오류] ${error.message}`);
+        return { success: false, error: "DELETE_FAILED", message: error.message };
+      }
+      
+      console.log(`  [✓] ${result.length}개 row 삭제됨`);
+      return { success: true, rows: result || [] };
+    }
+    
+    return { success: false, error: "INVALID_OPERATION", message: "CREATE/READ/UPDATE/DELETE 중 하나를 선택하세요" };
+    
+  } catch (error) {
+    console.error(`[DB] 예외: ${error.message}`);
+    return { success: false, error: "DB_ERROR", message: error.message };
+  }
+}
+
+// ============================================================================
+// [함수 2] getResourcesByFilter - 자료 필터링 조회
+// ============================================================================
+/**
+ * 자료를 카테고리/나이대로 필터링해서 조회
+ * 
+ * @param {object} filters - {categories: [...], ageGroups: [...], targets: [...], focus: [...], status: '...'}
+ * @returns {object} {success, rows, total}
+ */
+async function getResourcesByFilter(filters = {}) {
+  try {
+    const { categories, ageGroups, targets, focus, status } = filters;
+
+    console.log(`[DB] 자료 필터링 조회: ${JSON.stringify(filters)}`);
+
+    // ✅ 필터가 하나도 없으면 빈 배열 반환 (필터 선택 후에만 결과 표시)
+    const hasCategories = categories && categories.length > 0;
+    const hasAgeGroups = ageGroups && ageGroups.length > 0;
+    const hasTargets = targets && targets.length > 0;
+    const hasFocus = focus && focus.length > 0;
+
+    if (!hasCategories && !hasAgeGroups && !hasTargets && !hasFocus) {
+      console.log(`  [✓] 필터 미선택: 빈 결과 반환`);
+      return { success: true, rows: [], total: 0 };
+    }
+
+    let query = supabase.from("resources").select("*");
+
+    // status는 항상 'completed'로만 필터링
+    query = query.eq("status", "completed");
+    
+    // metadata JSONB 필터링 (categories)
+    if (categories && categories.length > 0) {
+      // PostgreSQL @> (contains) 연산자 사용
+      // metadata->categories 배열이 특정 값을 포함하는지 확인
+      categories.forEach((cat) => {
+        query = query.filter("metadata->categories", "contains", cat);
+      });
+    }
+
+    // metadata JSONB 필터링 (ageGroups)
+    if (ageGroups && ageGroups.length > 0) {
+      // metadata->ageGroups 배열이 특정 값을 포함하는지 확인
+      ageGroups.forEach((age) => {
+        query = query.filter("metadata->ageGroups", "contains", age);
+      });
+    }
+
+    // metadata JSONB 필터링 (targets)
+    if (targets && targets.length > 0) {
+      // metadata->targets 배열이 특정 값을 포함하는지 확인
+      targets.forEach((target) => {
+        query = query.filter("metadata->targets", "contains", target);
+      });
+    }
+
+    // metadata JSONB 필터링 (focus / 강조점)
+    if (focus && focus.length > 0) {
+      // metadata->focus 배열이 특정 값을 포함하는지 확인
+      focus.forEach((f) => {
+        query = query.filter("metadata->focus", "contains", f);
+      });
+    }
+
+    // 최신순 정렬
+    query = query.order("created_at", { ascending: false });
+    
+    const { data: result, error } = await query;
+    
+    if (error) {
+      console.error(`  [오류] ${error.message}`);
+      return { success: false, error: "FILTER_FAILED", message: error.message };
+    }
+    
+    console.log(`  [✓] ${result.length}개 자료 조회됨`);
+    return { success: true, rows: result || [], total: result.length };
+    
+  } catch (error) {
+    console.error(`[DB] 필터링 조회 예외: ${error.message}`);
+    return { success: false, error: "DB_ERROR", message: error.message };
+  }
+}
+
+// ============================================================================
+// [헬퍼 함수] getCharactersByResourceId
+// ============================================================================
+/**
+ * 특정 자료의 캐릭터들 조회
+ */
+async function getCharactersByResourceId(resourceId) {
+  return callDatabase("characters", "read", null, { resource_id: resourceId });
+}
+
+// ============================================================================
+// [헬퍼 함수] getSelectedCharacter
+// ============================================================================
+/**
+ * 특정 자료에서 selected=true인 캐릭터 조회
+ */
+async function getSelectedCharacter(resourceId) {
+  const result = await callDatabase("characters", "read", null, { resource_id: resourceId, selected: true });
+  return result.rows?.[0] || null;
+}
+
+// ============================================================================
+// [헬퍼 함수] getVideoByResourceId
+// ============================================================================
+/**
+ * 특정 자료의 최신 영상 조회
+ */
+async function getVideoByResourceId(resourceId) {
+  const result = await callDatabase("videos", "read", null, { resource_id: resourceId });
+  return result.rows?.[0] || null;
+}
+
+// ============================================================================
+// [헬퍼 함수] checkFK
+// ============================================================================
+/**
+ * FK 참조 무결성 확인 (디버깅용)
+ * @param {string} table - 참조하는 테이블
+ * @param {string} fkColumn - FK 컬럼명
+ * @param {string} refTable - 참조 테이블
+ * @param {string} id - 참조값
+ */
+async function checkFK(table, fkColumn, refTable, id) {
+  try {
+    const { data: refExists } = await supabase
+      .from(refTable)
+      .select("id")
+      .eq("id", id)
+      .limit(1);
+    
+    if (!refExists || refExists.length === 0) {
+      console.error(
+        `[FK 실패] ${table}.${fkColumn} = ${id}는 ${refTable}.id에 존재하지 않음`
+      );
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`[FK 검사 오류] ${error.message}`);
+    return false;
+  }
+}
+
+// ============================================================================
+// [Export]
+// ============================================================================
+
+module.exports = {
+  callDatabase,
+  getResourcesByFilter,
+  getCharactersByResourceId,
+  getSelectedCharacter,
+  getVideoByResourceId,
+  checkFK,
+  supabase, // 필요시 직접 사용용
+};
