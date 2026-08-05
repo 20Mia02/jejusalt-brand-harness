@@ -20,25 +20,62 @@
 
 const express = require("express");
 const router = express.Router();
+const path = require("path");
 
 const { callAgent, generateCharacterReferenceImage } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
 
+// v3 설계 시스템 config 로드
+let config = {};
+try {
+  config = require(path.join(__dirname, "../../config.json"));
+} catch (err) {
+  console.warn("⚠️  config.json을 찾을 수 없습니다. 기본값 사용:", err.message);
+  config = { characters: [] };
+}
+
 // ─────────────────────────────────────────────
 // GET /api/characters/library — 전체 라이브러리 조회
+// v3 설계 시스템: config.json의 캐릭터를 기본값으로 포함
 // ─────────────────────────────────────────────
 router.get("/library", async (req, res) => {
-  const result = await callDatabase("character_library", "read", null, {});
+  try {
+    // 1단계: config.json의 v3 기본 캐릭터 로드
+    const baseCharacters = config.characters || [];
 
-  if (!result.success) {
+    // 2단계: 데이터베이스에서 추가 캐릭터 조회
+    const result = await callDatabase("character_library", "read", null, {});
+
+    let additionalCharacters = [];
+    if (result.success && result.rows) {
+      // 중복 제거: config의 캐릭터와 다른 것들만 추가
+      const baseIds = new Set(baseCharacters.map(c => c.id || c.name));
+      additionalCharacters = result.rows.filter(
+        c => !baseIds.has(c.id || c.name)
+      );
+    }
+
+    // 3단계: 기본 캐릭터 + 추가 캐릭터 합치기
+    const allCharacters = [...baseCharacters, ...additionalCharacters];
+
+    return res.json({
+      success: true,
+      characters: allCharacters,
+      designSystemVersion: config.brand?.designSystemVersion || "v3",
+      stats: {
+        baseCharacters: baseCharacters.length,
+        additionalCharacters: additionalCharacters.length,
+        total: allCharacters.length
+      }
+    });
+  } catch (error) {
+    console.error("캐릭터 라이브러리 조회 오류:", error);
     return res.status(500).json({
       success: false,
       message: "캐릭터 라이브러리 조회에 실패했습니다.",
-      detail: result,
+      detail: error.message,
     });
   }
-
-  return res.json({ success: true, characters: result.rows });
 });
 
 // ─────────────────────────────────────────────
@@ -209,6 +246,53 @@ router.post("/library/:id/use", async (req, res) => {
   }
 
   return res.status(201).json({ success: true, character: created.rows[0] });
+});
+
+// ─────────────────────────────────────────────
+// GET /api/characters/library/:id — 특정 캐릭터 상세 조회
+// v3 설계 시스템: config.json의 캐릭터 우선 반환
+// ─────────────────────────────────────────────
+router.get("/library/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // 1단계: config.json에서 찾기
+    const configCharacter = config.characters?.find(
+      c => String(c.id) === String(id) || c.name === id
+    );
+
+    if (configCharacter) {
+      return res.json({
+        success: true,
+        character: configCharacter,
+        source: "config-v3",
+        designSystemVersion: config.brand?.designSystemVersion || "v3"
+      });
+    }
+
+    // 2단계: 데이터베이스에서 찾기
+    const result = await callDatabase("character_library", "read", null, { id });
+
+    if (!result.success || !result.rows || result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "해당 캐릭터를 찾을 수 없습니다.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      character: result.rows[0],
+      source: "database"
+    });
+  } catch (error) {
+    console.error("캐릭터 조회 오류:", error);
+    return res.status(500).json({
+      success: false,
+      message: "캐릭터 조회에 실패했습니다.",
+      detail: error.message,
+    });
+  }
 });
 
 // ─────────────────────────────────────────────
