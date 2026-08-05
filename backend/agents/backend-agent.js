@@ -203,97 +203,6 @@ async function callTimelyAIAgent(agentName, payload) {
 // ============================================================================
 
 function getMockResponseForAgent(agentName, payload) {
-  const { getConfig } = require("../utils/config-loader");
-  const brand = getConfig().brand || {};
-  const styleGuideline = brand.characterStyleGuideline || "귀엽고 매력적인 인형(마스코트) 같은 스타일";
-  const commonMotif =
-    brand.characterCommonMotif ||
-    "알 모양의 동글동글한 몸통, 이마 위 작은 육각형 소금 결정 브로치, 단순한 점 눈";
-
-  // character-creator-agent는 사용자가 입력한 이름/방향성에 따라 매번 결과가 달라져야 하므로
-  // (라이브러리 신규 캐릭터 생성 데모가 실제로 반영되는 것처럼 보이도록) 정적 맵 대신 payload 기반으로 생성
-  if (agentName === "character-creator-agent") {
-    const SURPRISE_NAME_POOL = ["몽글이", "포동이", "동글이", "말랑이", "복숭이", "토실이", "새콤이", "부들이"];
-    const characterName =
-      payload?.characterName ||
-      (payload?.surprise
-        ? SURPRISE_NAME_POOL[Math.floor(Math.random() * SURPRISE_NAME_POOL.length)]
-        : "새 캐릭터");
-    const direction = payload?.direction || "";
-    return {
-      brief: {
-        character: characterName,
-        voice_tone: direction ? `${direction}에 어울리는 톤` : "친근하고 신뢰감 있는 톤",
-        personality_traits: direction
-          ? direction.split(/[,\s]+/).filter((w) => w.length > 1).slice(0, 4)
-          : ["친근함", "신뢰감"],
-        // ⭐ 브랜드 가이드라인 + 시그니처 공통 요소를 모든 캐릭터 외형 묘사에 항상 반영
-        visual_description: direction
-          ? `${direction} 컨셉을 반영한 ${styleGuideline}. 공통 요소: ${commonMotif}`
-          : `${styleGuideline}, 브랜드 톤에 맞는 표준적인 외형. 공통 요소: ${commonMotif}`,
-      },
-    };
-  }
-
-  // character-recommender-agent: 제품 metadata와 라이브러리 목록을 바탕으로
-  // "새로 만들지 않고" 기존 라이브러리 중 3개를 골라 추천한다 (재현성 핵심).
-  // 실제 매칭 로직: focus/role/tone_trait 텍스트 겹침이 많은 순으로 정렬 (결정론적).
-  if (agentName === "character-recommender-agent") {
-    const library = payload?.libraryCharacters || [];
-    const focusText = (payload?.metadata?.focus || []).join(" ");
-
-    const scored = library.map((c) => {
-      const haystack = `${c.role || ""} ${c.tone_trait || ""}`;
-      let score = 70;
-      focusText.split(/\s+/).forEach((kw) => {
-        if (kw && haystack.includes(kw)) score += 10;
-      });
-      return { id: c.id, name: c.name, score: Math.min(score, 95) };
-    });
-
-    scored.sort((a, b) => b.score - a.score);
-    const top3 = scored.slice(0, 3);
-
-    return {
-      recommendations: top3.map((c, idx) => ({
-        id: c.id,
-        name: c.name,
-        score: c.score - idx, // 동점 방지용 미세 조정
-        reason:
-          idx === 0
-            ? "제품의 핵심 강조점과 가장 잘 맞는 기본 캐릭터"
-            : "브랜드 라이브러리 내 대체 추천 캐릭터",
-      })),
-    };
-  }
-
-  // shortform-scenario-writer-agent도 참고자료(referenceMaterials)가 있으면
-  // 데모에서 실제로 반영되는 것처럼 보이도록 payload 기반으로 스토리 텍스트에 반영한다.
-  if (agentName === "shortform-scenario-writer-agent" && payload?.referenceMaterials?.length > 0) {
-    const fileNames = payload.referenceMaterials.map((f) => f.filename).join(", ");
-    const excerpt = payload.referenceMaterials[0]?.content?.slice(0, 80) || "";
-    return {
-      scenario: {
-        title: "제주소금으로 시작하는 건강한 하루",
-        story_content: `[참고자료 반영: ${fileNames}] ${excerpt}... 이 내용을 바탕으로 아침 밥상에 제주소금을 올리는 장면으로 시작합니다.`,
-        acts: [
-          { act: 1, duration_seconds: 40, content: `아침 오프닝 (참고자료: ${fileNames} 반영)` },
-          { act: 2, duration_seconds: 50, content: "제품 소개" },
-          { act: 3, duration_seconds: 30, content: "클로징" },
-        ],
-      },
-      higgsfield_specifications: {
-        style: "전문적이고 세련된",
-        mood: "신뢰감 있고 따뜻함",
-      },
-      timing_verification: {
-        total_duration: 120,
-        dialogue_seconds: 60,
-        narration_seconds: 60,
-      },
-    };
-  }
-
   const mockData = {
     "resource-analyzer-agent": {
       metadata: {
@@ -334,26 +243,35 @@ function getMockResponseForAgent(agentName, payload) {
         visual_description: "파란색 옷, 밝은 눈빛, 활발한 표정"
       }
     },
-    "shortform-scenario-writer-agent": {
-      scenario: {
-        title: "제주소금으로 시작하는 건강한 하루",
-        story_content: "아침 밥상에 제주소금을...",
-        acts: [
-          { act: 1, duration_seconds: 40, content: "아침 오프닝" },
-          { act: 2, duration_seconds: 50, content: "제품 소개" },
-          { act: 3, duration_seconds: 30, content: "클로징" }
-        ]
-      },
-      higgsfield_specifications: {
-        style: "전문적이고 세련된",
-        mood: "신뢰감 있고 따뜻함"
-      },
-      timing_verification: {
-        total_duration: 120,
-        dialogue_seconds: 60,
-        narration_seconds: 60
-      }
-    },
+    "shortform-scenario-writer-agent": (() => {
+      const targetDuration = payload?.target_duration_seconds || 120;
+      // 길이에 비례해 3개 Act로 분배 (40:50:30 비율 유지)
+      const act1 = Math.round(targetDuration * (40 / 120));
+      const act2 = Math.round(targetDuration * (50 / 120));
+      const act3 = targetDuration - act1 - act2;
+      // ⚠️ timing_verification은 scenario의 하위가 아니라 응답 최상위(scenario와 형제)여야
+      // getOutputSpecForAgent의 실제 출력 스펙 및 generation.js의 읽기 코드(scenarioResult.data.timing_verification)와 일치한다.
+      return {
+        scenario: {
+          title: "제주소금으로 시작하는 건강한 하루",
+          story_content: "아침 밥상에 제주소금을...",
+          acts: [
+            { act: 1, duration_seconds: act1, content: "아침 오프닝" },
+            { act: 2, duration_seconds: act2, content: "제품 소개" },
+            { act: 3, duration_seconds: act3, content: "클로징" }
+          ]
+        },
+        higgsfield_specifications: {
+          style: "전문적이고 세련된",
+          mood: "신뢰감 있고 따뜻함"
+        },
+        timing_verification: {
+          total_duration: targetDuration,
+          dialogue_seconds: Math.round(targetDuration / 2),
+          narration_seconds: targetDuration - Math.round(targetDuration / 2)
+        }
+      };
+    })(),
     "naming-generator-agent": {
       product_name_options: [
         { name: "제주 청염", score: 90, meaning: "청정한 제주의 소금" },
@@ -381,6 +299,10 @@ function getMockResponseForAgent(agentName, payload) {
     }
   };
 
+  // ⚠️ callTimelyAIAgent의 실제(비-mock) 경로는 파싱된 JSON을 그대로 반환하므로
+  // (예: {characters:[...]} ), mock도 동일하게 순수 데이터 객체만 반환해야 한다.
+  // 과거에는 {success, data, attempt}로 한 겹 더 감싸서 callAgent가 이를 다시 감싸
+  // response.data.characters가 아니라 response.data.data.characters가 되는 버그가 있었다.
   return mockData[agentName] || { message: "Mock response" };
 }
 
@@ -399,14 +321,20 @@ function getSystemPromptForAgent(agentName) {
 제품: ${brand.nameKorean || "제주소금"}
 브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
 
+사업 우선순위: ${(brand.categories || []).join(" > ") || "뷰티 > 헬스케어 > 식품"} 순으로 사업을 확장 중이므로, 제품이 여러 카테고리에 걸칠 경우 우선순위가 높은 카테고리를 먼저 배열에 넣으세요.
+
 제공된 제품명, 설명, 키워드를 기반으로:
-- 상품 카테고리 (${(brand.categories || []).join(", ") || "식품, 뷰티, 웰스케어"})
+- 상품 카테고리 (${(brand.categories || []).join(", ") || "식품, 뷰티, 헬스케어"})
 - 타겟 연령대 (${(brand.targetAges || []).join(", ") || "20~30대, 40~60대, 60대+"})
 - 타겟 고객층 (${(brand.targetAudience || []).join(", ") || "개인, 가족, 단체"})
 - 마케팅 포커스 (${(brand.focus || []).join(", ") || "신뢰, 기술, 건강"})
 - 신뢰도 점수 (0~100)
 
-를 분석하여 반환하세요.`,
+를 분석하여 반환하세요.
+
+입력에 trendKeywords(요즘 SNS/뉴스 트렌드 키워드)가 있다면, "기술 중심"이 아닌 "소비자가 지금 원하는 것" 중심으로
+마케팅 포커스를 트렌드에 맞게 조정하세요 (예: 트렌드가 "저속노화"라면 포커스에 "저속노화/동안" 관련 가치를 반영).
+입력에 customStyle(사용자가 원하는 톤/문구)이 있다면 focus나 카테고리 판단에 참고하되, 브랜드의 absoluteNos는 절대 위반하지 마세요.`,
 
     "character-generator-agent": `당신은 ${brand.nameKorean || "제주소금"} 제품 마케팅을 위한 캐릭터 3개를 추천하는 AI 에이전트입니다.
 브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
@@ -429,52 +357,19 @@ function getSystemPromptForAgent(agentName) {
 - 시각적 묘사 (의상, 표정, 외형)
 - 피해야 할 표현: ${(brand.absoluteNos || []).join(", ") || "의료표현, 과장"}`,
 
-    "character-creator-agent": `당신은 사용자가 입력한 방향성(direction)을 바탕으로 완전히 새로운 캐릭터를 설계하는 AI 에이전트입니다.
-브랜드: ${brand.nameKorean || "제주소금"}
-브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
-⭐ 브랜드 캐릭터 스타일 가이드라인(반드시 반영): ${brand.characterStyleGuideline || "귀엽고 매력적인 인형(마스코트) 같은 스타일"}
-
-⭐⭐ 브랜드 시그니처 공통 요소 (모든 캐릭터가 반드시 공유해야 함 — "같은 회사 캐릭터"라는 것이 한눈에 느껴지도록):
-${brand.characterCommonMotif || "알(egg) 모양의 동글동글한 몸통, 이마 위에 작은 육각형 소금 결정 모양 브로치, 단순한 검은 점 눈동자에 흰색 하이라이트 하나"}
-색상과 소품은 캐릭터마다 다르게 하되, 위 공통 요소는 절대 빠뜨리지 마세요.
-
-사용자가 입력한 캐릭터 이름과 방향성 설명을 최대한 반영해서:
-- 음성 톤 설명
-- 성격 특성 (배열)
-- 시각적 묘사 (의상, 표정, 외형) — 반드시 위 스타일 가이드라인과 브랜드 시그니처 공통 요소를 모두 반영해서 작성
-을 작성하세요. 이 캐릭터는 이후 여러 자료(제품)에서 재사용되는 "기본 캐릭터"로 라이브러리에 저장되므로,
-한 번 정해지면 계속 일관되게 재사용될 수 있도록 구체적이고 명확하게 작성하세요.
-
-🚫🚫 매우 중요 (저작권/표절 방지 — 반드시 지킬 것):
-실제로 존재하는 유명 캐릭터(카카오프렌즈의 라이언·어피치·무지·네오, 라인프렌즈의 브라운·코니,
-산리오의 헬로키티·쿠로미, 뽀로로, 미니언즈, 디즈니/픽사, 포켓몬, 짱구, 펭수 등)를 절대 떠올리게
-해서는 안 됩니다. 구체적으로 다음을 금지합니다:
-- 특정 동물(곰, 토끼, 사자, 펭귄, 고양이 등)을 그대로 형상화하는 디자인
-- 얼굴 없이 단순 원통형 몸통에 짧은 팔다리만 있는 구조(라이언/코니 스타일)
-- 노란색 피부에 파란 멜빵바지(미니언즈 연상)
-- 그 외 "어디서 본 것 같은" 조합
-대신 이 브랜드만의 고유한 정체성(제주/소금/용암/바다/화산 등 브랜드 세계관)에서 나온 독창적인
-형태와 색을 만들어내세요. 목표는 "널리 사랑받는 마스코트 수준의 매력과 완성도"이되, 완전히
-새로운 창작물이어야 합니다.`,
-
-    "character-recommender-agent": `당신은 제품 정보에 가장 잘 맞는 캐릭터를 "기존 캐릭터 라이브러리 중에서만" 골라 추천하는 AI 에이전트입니다.
-브랜드: ${brand.nameKorean || "제주소금"}
-
-⭐ 매우 중요: 새로운 캐릭터를 만들지 마세요. 입력으로 제공되는 libraryCharacters 목록에 있는
-캐릭터의 id/name만 사용해서 정확히 3개를 골라 순위를 매기세요 (목록에 없는 이름을 만들어내면 안 됩니다).
-같은 캐릭터가 여러 제품에서 반복 사용되어야 브랜드 전체의 캐릭터 일관성이 유지됩니다.`,
-
-    "shortform-scenario-writer-agent": `당신은 120초 영상 시나리오를 작성하는 AI 에이전트입니다.
+    "shortform-scenario-writer-agent": `당신은 숏폼 영상 시나리오를 작성하는 AI 에이전트입니다.
+입력의 target_duration_seconds(초)에 맞춰 정확히 그 길이의 시나리오를 작성하세요 (기본값 120초).
+짧은 길이(15~30초)일수록 Act 수를 줄이고 핵심 메시지에 집중하며, 긴 길이(60~120초)일수록 기승전결을 갖추세요.
 다음을 포함하세요:
 - 시나리오 제목
 - 전체 스토리 텍스트
-- Act 분할 (각 Act는 지속시간 초 포함)
+- Act 분할 (각 Act는 지속시간 초 포함, 합계가 target_duration_seconds와 정확히 일치)
 - 영상 스타일 & 분위기 (Higgsfield 스펙)
-- 타이밍 검증 (정확히 120초, 대사/나레이션 시간)
+- 타이밍 검증 (total_duration은 반드시 target_duration_seconds와 동일, 대사/나레이션 시간)`,
 
-만약 입력에 referenceMaterials(참고자료)가 포함되어 있다면, 그 내용을 반드시 스토리와 대사에 반영하세요.`,
-
-    "naming-generator-agent": `당신은 제품명과 콘텐츠명 각 3개를 생성하는 AI 에이전트입니다.
+    "naming-generator-agent": `당신은 ${brand.nameKorean || "제주소금"}의 제품명과 콘텐츠명 각 3개를 생성하는 AI 에이전트입니다.
+브랜드 핵심 소재/컨셉: 용암해수, 미네랄, 전해질 — 3개 후보 중 최소 1개 이상은 이 소재들 중 하나에서 착안한 이름을 포함하세요
+(예: "용암미네랄", "전해수 담은" 등 소재를 은유/조합한 이름. 소재명을 그대로 나열하지 말고 자연스러운 제품명으로 가공하세요).
 각각 정확히 3개씩, 각 항목마다:
 - 이름
 - 점수 (90~80)
@@ -483,10 +378,22 @@ ${brand.characterCommonMotif || "알(egg) 모양의 동글동글한 몸통, 이�
 을 포함하세요.`,
 
     "product-intro-writer-agent": `당신은 제품 소개 카피를 작성하는 AI 에이전트입니다.
-제품명, 설명, 캐릭터를 기반으로 매력적이고 설득력 있는 소개글을 작성하세요.`,
+제품명, 설명, 캐릭터를 기반으로 매력적이고 설득력 있는 소개글을 작성하세요.
+입력에 trendKeywords가 있으면 해당 트렌드 언어/관심사를 자연스럽게 녹여내고,
+customStyle(사용자가 원하는 톤/문구)이 있으면 최대한 반영하되 브랜드 절대 금지 표현은 지키세요.
+
+⭐ 브랜드 보이스 일관성: 입력의 approvedExamples는 과거에 마케팅팀이 실제로 승인한 카피 예시들입니다.
+반드시 이 예시들의 문장 길이, 어투, 어휘 선택 패턴을 참고해서 브랜드 보이스가 매번 일관되게 유지되도록 작성하세요
+(내용을 그대로 베끼지 말고 "같은 브랜드가 쓴 글처럼" 톤만 맞추세요).`,
 
     "product-detail-page-writer-agent": `당신은 상세페이지 카피를 작성하는 AI 에이전트입니다.
-제품의 상세한 혜택, 사용법, 특징을 강조하는 긴 형식의 카피를 작성하세요.`,
+제품의 상세한 혜택, 사용법, 특징을 강조하는 긴 형식의 카피를 작성하세요.
+입력에 trendKeywords가 있으면 해당 트렌드 언어/관심사를 자연스럽게 녹여내고,
+customStyle(사용자가 원하는 톤/문구)이 있으면 최대한 반영하되 브랜드 절대 금지 표현은 지키세요.
+
+⭐ 브랜드 보이스 일관성: 입력의 approvedExamples는 과거에 마케팅팀이 실제로 승인한 카피 예시들입니다.
+반드시 이 예시들의 문장 길이, 어투, 어휘 선택 패턴을 참고해서 브랜드 보이스가 매번 일관되게 유지되도록 작성하세요
+(내용을 그대로 베끼지 말고 "같은 브랜드가 쓴 글처럼" 톤만 맞추세요).`,
 
     "compliance-reviewer-agent": `당신은 ${brand.nameKorean || "제주소금"} 제품의 마케팅 콘텐츠를 검증하는 AI 에이전트입니다.
 
@@ -537,26 +444,7 @@ function getOutputSpecForAgent(agentName) {
   }
 }`,
 
-    "character-creator-agent": `반드시 아래 JSON 형태로만 응답하세요:
-{
-  "brief": {
-    "character": "캐릭터명",
-    "voice_tone": "방향성을 반영한 톤",
-    "personality_traits": ["특성1", "특성2", "특성3"],
-    "visual_description": "방향성을 반영한 시각적 묘사..."
-  }
-}`,
-
-    "character-recommender-agent": `반드시 아래 JSON 형태로만 응답하세요 (recommendations는 정확히 3개, id/name은 입력받은 libraryCharacters 목록에서만 선택):
-{
-  "recommendations": [
-    { "id": "라이브러리 캐릭터 id", "name": "캐릭터명", "score": 90, "reason": "추천 이유" },
-    { "id": "라이브러리 캐릭터 id", "name": "캐릭터명", "score": 85, "reason": "추천 이유" },
-    { "id": "라이브러리 캐릭터 id", "name": "캐릭터명", "score": 80, "reason": "추천 이유" }
-  ]
-}`,
-
-    "shortform-scenario-writer-agent": `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 정확히 120):
+    "shortform-scenario-writer-agent": `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 반드시 입력받은 target_duration_seconds와 정확히 동일해야 함):
 {
   "scenario": {
     "title": "시나리오 제목",
@@ -617,17 +505,14 @@ function getOutputSpecForAgent(agentName) {
 
 async function callHiggsfield(videoConfig, resourceId, contentId) {
   try {
-    const duration = videoConfig.duration === 120 ? 8 : 4;
+    // Higgsfield CLI는 4초 또는 8초 클립만 지원 → 선택된 시나리오 길이(15/30/60/120초)를 가까운 값으로 매핑
+    const duration = (videoConfig.duration || 120) > 30 ? 8 : 4;
 
     // ✅ 메타데이터 기반 프롬프트 생성 (텍스트 제거)
     const character = videoConfig.character || 'woman';
     const voiceTone = videoConfig.voiceTone || 'professional';
     const visualDescription = videoConfig.visualDescription || '';
-    // ⚠️ 버그 수정: visualDescription을 추출해놓고 실제 프롬프트에는 반영하지 않고 있었음.
-    // 캐릭터의 시각적 특징이 반영되지 않으면 매번 다른 외형이 나올 위험이 커서 재현성이 깨짐.
-    const metadata = visualDescription
-      ? `${character} character, ${visualDescription}, ${voiceTone} tone, product promotion`
-      : `${character} character, ${voiceTone} tone, product promotion`;
+    const metadata = `${character} character, ${voiceTone} tone, product promotion`;
 
     console.log(`[Step 9] Higgsfield CLI 호출 시작`);
     console.log(`  명령: higgsfield generate create seedance1_5`);
@@ -688,44 +573,6 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
       message: error.message,
       statusCode: error.code,
     };
-  }
-}
-
-// ============================================================================
-// [함수 2-1] generateCharacterReferenceImage - 라이브러리 캐릭터의 레퍼런스 이미지만 생성
-// ============================================================================
-/**
- * character_library의 기본 캐릭터를 위한 레퍼런스 영상/이미지를 생성한다.
- * callHiggsfield와 달리 특정 resource/content에 종속되지 않으므로 videos 테이블에는
- * 기록하지 않고, 결과 URL만 반환한다 (호출한 쪽에서 character_library에 직접 저장).
- */
-async function generateCharacterReferenceImage({ characterName, voiceTone, visualDescription }) {
-  try {
-    const metadata = visualDescription
-      ? `${characterName} character, ${visualDescription}, ${voiceTone || ""} tone, cute mascot reference shot, single character centered, plain background`
-      : `${characterName} character, ${voiceTone || "friendly"} tone, cute mascot reference shot`;
-
-    console.log(`[라이브러리 레퍼런스 생성] ${characterName}`);
-    console.log(`  프롬프트: ${metadata}`);
-
-    // 레퍼런스용이므로 최소 duration(4초)만 사용해 크레딧을 절약한다
-    const command = `higgsfield generate create seedance1_5 --prompt "${metadata}" --duration 4 --resolution 720p --wait`;
-
-    const { stdout } = await execPromise(command, {
-      timeout: 600000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-
-    const videoUrl = stdout.trim();
-    if (!videoUrl.startsWith("https://")) {
-      throw new Error(`유효하지 않은 URL: ${videoUrl}`);
-    }
-
-    console.log(`[✓] ${characterName} 레퍼런스 생성 완료: ${videoUrl}`);
-    return { success: true, video_url: videoUrl };
-  } catch (error) {
-    console.error(`[✗] ${characterName} 레퍼런스 생성 실패: ${error.message}`);
-    return { success: false, error: "HIGGSFIELD_CLI_ERROR", message: error.message };
   }
 }
 
@@ -848,5 +695,4 @@ module.exports = {
   callAgent,
   callHiggsfield,
   pollHiggsfield,
-  generateCharacterReferenceImage,
 };
