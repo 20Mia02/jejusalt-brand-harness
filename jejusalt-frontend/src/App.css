@@ -25,9 +25,10 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-  background-color: #0a1117;
-  color: #e8f0f7;
+  background-color: var(--color-dark-bg);
+  color: var(--color-dark-text);
   line-height: 1.6;
+  transition: background-color 0.2s var(--ease-standard), color 0.2s var(--ease-standard);
 }
 
 .app {
@@ -88,6 +89,17 @@ body {
   border-radius: 50%;
   animation: pulse 7s ease-in-out infinite 1.5s;
   filter: blur(40px);
+}
+
+html.light .app-header {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+html.light .app-header::before,
+html.light .app-header::after {
+  opacity: 0.5;
 }
 
 .app-header-content {
@@ -212,6 +224,92 @@ body {
   opacity: 0.95;
 }
 
+/* 라이트 모드: 흰 배경 위에서 흰 글자 텍스트클립/네비 스타일은 보이지 않으므로 어두운 톤으로 전환 */
+html.light .header-text-korean {
+  background: linear-gradient(135deg, #1e293b 0%, #003d7a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+}
+
+html.light .app-header h1 {
+  background: linear-gradient(135deg, #1e293b 0%, #003d7a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+}
+
+html.light .header-subtitle {
+  color: #334155;
+}
+
+html.light .app-header-nav a {
+  color: #1e293b;
+  border-color: #e2e8f0;
+}
+
+html.light .app-header-nav a:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+html.light .app-header-nav a.active {
+  color: #000000;
+}
+
+/* ===== 테마 토글 버튼 (헤더 우상단) ===== */
+.theme-toggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+}
+
+.theme-toggle-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  background-color: var(--color-dark-card);
+  border: 1px solid var(--color-primary-blue);
+  color: var(--color-dark-text);
+  transition: filter 0.2s var(--ease-standard), border-width 0.15s var(--ease-standard);
+}
+
+.theme-toggle-btn:hover {
+  filter: brightness(1.1);
+}
+
+.theme-toggle-btn.is-active {
+  border-width: 2px;
+  background-color: rgba(0, 174, 239, 0.25);
+}
+
+html.light .theme-toggle-btn {
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+html.light .theme-toggle-btn.is-active {
+  border-color: var(--color-primary-blue);
+  background-color: rgba(0, 174, 239, 0.15);
+}
+
+@media (max-width: 480px) {
+  .theme-toggle {
+    top: 12px;
+    right: 12px;
+  }
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 0.5;
@@ -284,7 +382,8 @@ body {
 
 .step-indicator-circle.step-done {
   background-color: var(--color-primary-blue);
-  color: #fff;
+  /* WCAG AA: #00AEEF 배경에 흰 글자는 2.6:1로 미달, 검은 글자는 8:1 이상 */
+  color: #000;
   border: 2px solid var(--color-primary-blue);
 }
 
@@ -313,6 +412,25 @@ body {
 
 .step-indicator-line.step-done {
   background-color: var(--color-primary-blue);
+}
+
+/* 라이트 모드: 흰 배경 위에서는 rgba(255,255,255,...) 계열이 안 보이므로 짙은 중립색으로 전환 */
+html.light .step-indicator-circle.step-pending {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  border: 2px solid #e2e8f0;
+}
+
+html.light .step-indicator-label {
+  color: #64748b;
+}
+
+html.light .step-indicator-label.step-active {
+  color: #1e293b;
+}
+
+html.light .step-indicator-line {
+  background-color: #cbd5e1;
 }
 
 @media (max-width: 640px) {

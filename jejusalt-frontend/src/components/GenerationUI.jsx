@@ -433,14 +433,14 @@ function StepItem({ label, done, active, isLast }) {
         <div
           className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
             done
-              ? 'bg-brand-blue text-white'
+              ? 'step-circle-done'
               : active
               ? 'bg-brand-blue text-white'
               : 'bg-dark-chip text-dark-text-muted'
           }`}
         >
           {done ? '✓' : active ? (
-            <span className="block w-2.5 h-2.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            <span className="step-circle-spinner block w-2.5 h-2.5 rounded-full border-2 border-t-transparent animate-spin" />
           ) : (
             '-'
           )}

@@ -19,6 +19,32 @@ const STEP_LABELS = {
 
 const STEP_ORDER = ['filter', 'metadata', 'character', 'generation'];
 
+// 라이트/다크 테마 토글: localStorage에 'theme'로 저장, 기본값 'dark'
+function ThemeToggle({ theme, setTheme }) {
+  const options = [
+    { value: 'light', icon: '☀️', label: '라이트 모드로 전환' },
+    { value: 'dark', icon: '🌙', label: '다크 모드로 전환' },
+  ];
+
+  return (
+    <div className="theme-toggle" role="group" aria-label="테마 선택">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => setTheme(opt.value)}
+          aria-pressed={theme === opt.value}
+          aria-label={opt.label}
+          title={opt.label}
+          className={`theme-toggle-btn ${theme === opt.value ? 'is-active' : ''}`}
+        >
+          {opt.icon}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // 글로벌 스텝 인디케이터: 현재 진행 단계를 1-2-3-4로 시각화 (관리자 모드에서는 숨김)
 function StepIndicator({ currentStep }) {
   const currentIdx = STEP_ORDER.indexOf(currentStep);
@@ -125,6 +151,14 @@ function App() {
   const [currentStep, setCurrentStep] = useState('filter');
   const [brandName, setBrandName] = useState('제주도 라바 씨솔트');
   const [brandNameEn, setBrandNameEn] = useState('JEJU LAVA SEA SALT');
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+
+  // 테마 변경 시 <html>에 클래스 반영 + localStorage 저장 (새로고침/다른 페이지 이동에도 유지)
+  useEffect(() => {
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     // 서버에서 config 로드
@@ -147,6 +181,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
+        <ThemeToggle theme={theme} setTheme={setTheme} />
         <div className="app-header-content">
           <div className="logo-section">
             <div className="logo-badge">

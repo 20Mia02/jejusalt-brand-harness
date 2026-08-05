@@ -71,6 +71,21 @@
   animation: modal-in 0.3s var(--ease-standard);
 }
 
+/* ============================================================
+   라이트/다크 테마 토글
+   - 기본(@theme)값은 다크 모드를 그대로 유지 (기존 상태 보존)
+   - html.light가 붙으면 같은 변수들을 라이트 값으로 override
+   - 이 파일에 정의된 규칙은 unlayered라서 @theme(레이어드)보다 항상 우선 적용됨
+   ============================================================ */
+html.light {
+  --color-dark-bg: #f8fafc;
+  --color-dark-card: #ffffff;
+  --color-dark-chip: #f1f5f9;
+  --color-dark-text: #1e293b;
+  --color-dark-text-muted: #64748b;
+  --shadow-glow: 0 0 12px rgba(0, 174, 239, 0.2);
+}
+
 :root {
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   font: 18px/145% var(--sans);
@@ -87,6 +102,9 @@
 
 body {
   margin: 0;
+  background-color: var(--color-dark-bg);
+  color: var(--color-dark-text);
+  transition: background-color 0.2s var(--ease-standard), color 0.2s var(--ease-standard);
 }
 
 #root {
@@ -150,6 +168,10 @@ button:disabled,
   color: var(--color-dark-text);
 }
 
+html.light .input-field {
+  border-color: #e2e8f0;
+}
+
 .input-field::placeholder {
   color: var(--color-dark-text-muted);
 }
@@ -163,7 +185,12 @@ button:disabled,
 /* Primary 버튼 (그라데이션) */
 .btn-primary {
   background: linear-gradient(135deg, #00aeef, #0088cc);
-  color: #ffffff;
+  /* WCAG AA: 흰 글자는 밝은 쪽 끝(#00AEEF)에서 대비비 2.6:1로 기준(4.5:1) 미달.
+     검은 글자는 그라데이션 양쪽 끝 모두에서 7:1 이상 확보됨.
+     현재 앱은 라이트/다크 테마 전환 기능이 없는 단일 다크 UI라서 prefers-color-scheme
+     기반 dark: 분기는 추가하지 않음 — OS가 다크 모드인 방문자에게만 흰 글자가 다시
+     적용되어 이 버그가 재발하기 때문. 실제 라이트/다크 토글이 생기면 그때 분리할 것. */
+  color: #000000;
   border-radius: 8px;
   font-weight: 700;
 }
@@ -171,6 +198,10 @@ button:disabled,
 .btn-primary:hover:not(:disabled) {
   filter: brightness(1.1);
   box-shadow: 0 8px 16px rgba(0, 174, 239, 0.4);
+}
+
+html.light .btn-primary:hover:not(:disabled) {
+  box-shadow: 0 8px 16px rgba(0, 174, 239, 0.2);
 }
 
 .btn-primary:active:not(:disabled) {
@@ -182,7 +213,12 @@ button:disabled,
   background-color: var(--color-dark-chip);
   border: 1px solid rgba(0, 174, 239, 0.3);
   border-radius: 9999px;
-  color: var(--color-dark-text);
+  color: var(--color-dark-text-muted);
+}
+
+html.light .filter-chip {
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 .filter-chip:hover {
@@ -193,6 +229,11 @@ button:disabled,
   background-color: var(--color-brand-blue);
   border-color: var(--color-brand-blue);
   color: #000000;
+}
+
+html.light .filter-chip.is-selected {
+  background-color: #e0f2fe;
+  color: #1e293b;
 }
 
 /* sr-only 체크박스가 키보드 포커스를 받으면 부모 칩에 포커스 링 표시 (접근성 유지) */
@@ -224,6 +265,22 @@ button:disabled,
   color: var(--color-status-rejected);
 }
 
+/* 라이트 모드: 옅은 배경 위 색상 텍스트 대신 진한 중립색으로 대비 확보 */
+html.light .status-badge.status-pending {
+  background-color: rgba(255, 165, 0, 0.15);
+  color: #92400e;
+}
+
+html.light .status-badge.status-approved {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #065f46;
+}
+
+html.light .status-badge.status-rejected {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #991b1b;
+}
+
 /* 결과/콘텐츠 카드 (좌측 강조 보더) */
 .result-card {
   background-color: var(--color-dark-card);
@@ -236,4 +293,34 @@ button:disabled,
 .result-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-xl);
+}
+
+html.light .result-card {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+html.light .result-card:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* 8단계 진행 인디케이터의 "완료" 원 — 다크/라이트에서 배경색 자체가 다름 */
+.step-circle-done {
+  background-color: var(--color-brand-blue);
+  color: #000000;
+}
+
+html.light .step-circle-done {
+  background-color: #e0f2fe;
+  color: #1e293b;
+}
+
+/* 진행 중 스피너 링 — 다크: 흰 링 / 라이트: 브랜드 블루 링 */
+.step-circle-spinner {
+  border-color: #ffffff;
+  border-top-color: transparent;
+}
+
+html.light .step-circle-spinner {
+  border-color: var(--color-brand-blue);
+  border-top-color: transparent;
 }
