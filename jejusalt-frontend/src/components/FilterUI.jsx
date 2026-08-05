@@ -219,7 +219,7 @@ export default function FilterUI({ onResourceCreated }) {
         <img
           src="/assets/logo/jeju-salt-logo.png"
           alt="제주소금 JEJU LAVA SEA SALT 로고"
-          className="h-20 w-auto"
+          className="h-20 w-auto filter-logo"
         />
       </div>
 

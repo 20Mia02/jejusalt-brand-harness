@@ -171,11 +171,6 @@ html.light .app-header::after {
   width: 100%;
   height: auto;
   display: block;
-  filter: brightness(0) invert(1);
-}
-
-html.light .logo-image {
-  filter: none;
 }
 
 .header-text {
@@ -518,4 +513,13 @@ html.light .step-indicator-line {
     left: calc(50% + 16px);
     right: calc(-50% + 16px);
   }
+}
+
+/* FilterUI 하단 로고: 다크모드에서 흰색으로 표시 */
+.filter-logo {
+  filter: brightness(0) invert(1);
+}
+
+html.light .filter-logo {
+  filter: none;
 }
