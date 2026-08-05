@@ -22,12 +22,14 @@ function MainFlow({ currentStep, setCurrentStep }) {
   const [metadata, setMetadata] = useState(null);
   const [initialMetadata, setInitialMetadata] = useState(null);
   const [characters, setCharacters] = useState(null);
+  const [referenceMaterials, setReferenceMaterials] = useState([]);
   const [videoType, setVideoType] = useState('제품스토리');
 
-  const handleResourceCreated = (newResourceId, createdMetadata, createdCharacters) => {
+  const handleResourceCreated = (newResourceId, createdMetadata, createdCharacters, createdReferenceMaterials) => {
     setResourceId(newResourceId);
     setInitialMetadata(createdMetadata || null);
     setCharacters(createdCharacters || null);
+    setReferenceMaterials(createdReferenceMaterials || []);
     setCurrentStep('metadata');
   };
 
@@ -75,6 +77,7 @@ function MainFlow({ currentStep, setCurrentStep }) {
           onSuccess={handleGenerationComplete}
           requestType="intro"
           videoType={videoType}
+          referenceMaterials={referenceMaterials}
         />
       )}
     </main>

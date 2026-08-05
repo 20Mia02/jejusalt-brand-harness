@@ -87,7 +87,16 @@ function getDefaultConfig() {
     generation: {
       videoDefaultDuration: 120,
       videoDefaultResolution: "720p",
-      videoTypes: ["캐릭터소개", "제품스토리", "일상밥상"],
+      videoTypes: [
+        "캐릭터소개",
+        "제품스토리",
+        "일상밥상",
+        "브랜드스토리",
+        "사용법",
+        "고객후기",
+        "이벤트/프로모션",
+        "비하인드",
+      ],
       retryAttempts: 3,
       retryBackoffMs: 1000,
     },

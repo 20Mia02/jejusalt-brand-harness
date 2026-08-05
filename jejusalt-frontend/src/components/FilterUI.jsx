@@ -22,6 +22,29 @@ export default function FilterUI({ onResourceCreated }) {
     keywords: "",
   });
 
+  // 추가 참고자료 (예: 기업자료_요약.md) — 시나리오 작성 시 반영됨
+  const [referenceMaterials, setReferenceMaterials] = useState([]);
+  const fileInputRef = React.useRef(null);
+
+  const handleReferenceFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setReferenceMaterials((prev) => [
+          ...prev,
+          { filename: file.name, content: String(reader.result || "") },
+        ]);
+      };
+      reader.readAsText(file);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleRemoveReferenceFile = (filename) => {
+    setReferenceMaterials((prev) => prev.filter((f) => f.filename !== filename));
+  };
+
   useEffect(() => {
     loadMetadata();
   }, []);
@@ -86,6 +109,7 @@ export default function FilterUI({ onResourceCreated }) {
         keywords: inputForm.keywords
           ? inputForm.keywords.split(",").map((k) => k.trim())
           : [],
+        referenceMaterials,
       });
 
       if (response.data.success) {
@@ -97,7 +121,8 @@ export default function FilterUI({ onResourceCreated }) {
             onResourceCreated(
               response.data.resourceId,
               response.data.metadata,
-              response.data.characters
+              response.data.characters,
+              response.data.referenceMaterials
             );
           }
         }, 500);
@@ -262,6 +287,44 @@ export default function FilterUI({ onResourceCreated }) {
                 className="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-gray-500 mt-1">쉼표로 구분해서 입력하세요</p>
+            </div>
+
+            {/* 추가 참고자료 (선택) */}
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                📎 추가 참고자료 (선택사항)
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".md,.txt"
+                multiple
+                onChange={handleReferenceFileSelect}
+                className="w-full text-sm border rounded px-3 py-2"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                기업자료_요약.md 등 .md/.txt 파일을 올리면 AI가 내용을 분석해서 시나리오 작성에 반영합니다.
+              </p>
+
+              {referenceMaterials.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {referenceMaterials.map((f) => (
+                    <li
+                      key={f.filename}
+                      className="flex items-center justify-between text-sm bg-blue-50 border border-blue-200 rounded px-3 py-1"
+                    >
+                      <span>📄 {f.filename}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveReferenceFile(f.filename)}
+                        className="text-red-600 hover:text-red-800 text-xs"
+                      >
+                        제거
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             {/* 제출 버튼 */}

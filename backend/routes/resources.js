@@ -28,7 +28,7 @@ const { callDatabase } = require("../agents/database-agent"); // database-agent.
 // POST /api/resources — 자료 업로드 + 분석 (Step 1~2)
 // ─────────────────────────────────────────────
 router.post("/", async (req, res) => {
-  const { productName, productInfo, keywords } = req.body;
+  const { productName, productInfo, keywords, referenceMaterials } = req.body;
 
   // ── 0. 입력 유효성 검증 ──────────────────────────
   if (!productName || !productInfo) {
@@ -50,59 +50,6 @@ router.post("/", async (req, res) => {
     });
   }
 
-  // ── MOCK MODE: 개발 환경에서 DB 연결 없이 테스트 ──
-  const isMockMode = process.env.NODE_ENV === "development" &&
-    (!process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes("your-project"));
-
-  if (isMockMode) {
-    console.log("[Mock Mode] 자료 저장 API 응답");
-    const resourceId = "mock-" + Date.now();
-    const keywordsArray = keywords
-      ? Array.isArray(keywords) ? keywords : String(keywords).split(",").map(k => k.trim())
-      : [];
-
-    return res.status(201).json({
-      success: true,
-      resourceId,
-      metadata: {
-        categories: ["식품", "뷰티"],
-        ageGroups: ["20~30대", "40~60대"],
-        targets: ["개인", "가족"],
-        focus: ["신뢰", "건강"],
-        confidence: 85
-      },
-      characters: [
-        {
-          id: "mock-char-1",
-          resource_id: resourceId,
-          character_name: "결이",
-          character_profile: "당찬 소년, 도전적이고 에너지 넘침",
-          reason: "타겟층의 긍정적 이미지 대표",
-          score: 90,
-          selected: true
-        },
-        {
-          id: "mock-char-2",
-          resource_id: resourceId,
-          character_name: "용암이",
-          character_profile: "따뜨한 아버지, 신뢰감과 보호본능",
-          reason: "제품의 신뢰성 강조",
-          score: 85,
-          selected: false
-        },
-        {
-          id: "mock-char-3",
-          resource_id: resourceId,
-          character_name: "해수",
-          character_profile: "자유로운 영혼, 경쾌함과 순수함",
-          reason: "자연스러운 제품 특성",
-          score: 80,
-          selected: false
-        }
-      ]
-    });
-  }
-
   // 키워드 문자열/배열 모두 허용 (resource-analyzer-agent.md 규칙과 동일)
   const keywordsArray = keywords
     ? Array.isArray(keywords)
@@ -113,6 +60,11 @@ router.post("/", async (req, res) => {
           .filter((k) => k.length > 0)
     : [];
 
+  // 추가 참고자료 (기업자료_요약.md 등) — [{filename, content}] 형태로 업로드됨
+  const referenceMaterialsArray = Array.isArray(referenceMaterials)
+    ? referenceMaterials.filter((f) => f && f.content && f.content.trim().length > 0)
+    : [];
+
   let resourceId;
 
   try {
@@ -121,23 +73,8 @@ router.post("/", async (req, res) => {
       product_name: productName,
       product_info: productInfo,
       keywords: keywordsArray,
+      reference_materials: referenceMaterialsArray,
       status: "analyzing",
-    }).catch(err => {
-      // Mock 모드: DB 연결 실패 시 테스트용 데이터 반환
-      if (process.env.NODE_ENV === "development" && err.message.includes("fetch")) {
-        console.warn("[Mock Mode] DB 연결 실패, 테스트 데이터 반환");
-        return {
-          success: true,
-          rows: [{
-            id: "mock-" + Date.now(),
-            product_name: productName,
-            product_info: productInfo,
-            keywords: keywordsArray,
-            status: "analyzing"
-          }]
-        };
-      }
-      throw err;
     });
 
     if (!created.success) {
@@ -241,6 +178,7 @@ router.post("/", async (req, res) => {
       resourceId,
       metadata,
       characters: savedCharacters.rows, // DB에 저장된 형태로 반환 (id 포함)
+      referenceMaterials: referenceMaterialsArray, // 업로드된 참고자료 (있으면 파일명만 프론트에서 확인용으로 사용)
     });
   } catch (error) {
     // 예상치 못한 에러 → resources를 failed로 표시 (resourceId가 있을 때만)

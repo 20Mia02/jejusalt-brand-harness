@@ -203,6 +203,52 @@ async function callTimelyAIAgent(agentName, payload) {
 // ============================================================================
 
 function getMockResponseForAgent(agentName, payload) {
+  // character-creator-agent는 사용자가 입력한 이름/방향성에 따라 매번 결과가 달라져야 하므로
+  // (라이브러리 신규 캐릭터 생성 데모가 실제로 반영되는 것처럼 보이도록) 정적 맵 대신 payload 기반으로 생성
+  if (agentName === "character-creator-agent") {
+    const characterName = payload?.characterName || "새 캐릭터";
+    const direction = payload?.direction || "";
+    return {
+      brief: {
+        character: characterName,
+        voice_tone: direction ? `${direction}에 어울리는 톤` : "친근하고 신뢰감 있는 톤",
+        personality_traits: direction
+          ? direction.split(/[,\s]+/).filter((w) => w.length > 1).slice(0, 4)
+          : ["친근함", "신뢰감"],
+        visual_description: direction
+          ? `${direction} 컨셉을 반영한 외형과 표정`
+          : "브랜드 톤에 맞는 표준적인 외형",
+      },
+    };
+  }
+
+  // shortform-scenario-writer-agent도 참고자료(referenceMaterials)가 있으면
+  // 데모에서 실제로 반영되는 것처럼 보이도록 payload 기반으로 스토리 텍스트에 반영한다.
+  if (agentName === "shortform-scenario-writer-agent" && payload?.referenceMaterials?.length > 0) {
+    const fileNames = payload.referenceMaterials.map((f) => f.filename).join(", ");
+    const excerpt = payload.referenceMaterials[0]?.content?.slice(0, 80) || "";
+    return {
+      scenario: {
+        title: "제주소금으로 시작하는 건강한 하루",
+        story_content: `[참고자료 반영: ${fileNames}] ${excerpt}... 이 내용을 바탕으로 아침 밥상에 제주소금을 올리는 장면으로 시작합니다.`,
+        acts: [
+          { act: 1, duration_seconds: 40, content: `아침 오프닝 (참고자료: ${fileNames} 반영)` },
+          { act: 2, duration_seconds: 50, content: "제품 소개" },
+          { act: 3, duration_seconds: 30, content: "클로징" },
+        ],
+      },
+      higgsfield_specifications: {
+        style: "전문적이고 세련된",
+        mood: "신뢰감 있고 따뜻함",
+      },
+      timing_verification: {
+        total_duration: 120,
+        dialogue_seconds: 60,
+        narration_seconds: 60,
+      },
+    };
+  }
+
   const mockData = {
     "resource-analyzer-agent": {
       metadata: {
@@ -251,8 +297,16 @@ function getMockResponseForAgent(agentName, payload) {
           { act: 1, duration_seconds: 40, content: "아침 오프닝" },
           { act: 2, duration_seconds: 50, content: "제품 소개" },
           { act: 3, duration_seconds: 30, content: "클로징" }
-        ],
-        timing_verification: { total_duration: 120 }
+        ]
+      },
+      higgsfield_specifications: {
+        style: "전문적이고 세련된",
+        mood: "신뢰감 있고 따뜻함"
+      },
+      timing_verification: {
+        total_duration: 120,
+        dialogue_seconds: 60,
+        narration_seconds: 60
       }
     },
     "naming-generator-agent": {
@@ -282,12 +336,7 @@ function getMockResponseForAgent(agentName, payload) {
     }
   };
 
-  const data = mockData[agentName] || { message: "Mock response" };
-  return {
-    success: true,
-    data: data,
-    attempt: 1
-  };
+  return mockData[agentName] || { message: "Mock response" };
 }
 
 // ============================================================================
@@ -335,13 +384,26 @@ function getSystemPromptForAgent(agentName) {
 - 시각적 묘사 (의상, 표정, 외형)
 - 피해야 할 표현: ${(brand.absoluteNos || []).join(", ") || "의료표현, 과장"}`,
 
+    "character-creator-agent": `당신은 사용자가 입력한 방향성(direction)을 바탕으로 완전히 새로운 캐릭터를 설계하는 AI 에이전트입니다.
+브랜드: ${brand.nameKorean || "제주소금"}
+브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
+
+사용자가 입력한 캐릭터 이름과 방향성 설명을 최대한 반영해서:
+- 음성 톤 설명
+- 성격 특성 (배열)
+- 시각적 묘사 (의상, 표정, 외형)
+을 작성하세요. 이 캐릭터는 이후 여러 자료(제품)에서 재사용되는 "기본 캐릭터"로 라이브러리에 저장되므로,
+한 번 정해지면 계속 일관되게 재사용될 수 있도록 구체적이고 명확하게 작성하세요.`,
+
     "shortform-scenario-writer-agent": `당신은 120초 영상 시나리오를 작성하는 AI 에이전트입니다.
 다음을 포함하세요:
 - 시나리오 제목
 - 전체 스토리 텍스트
 - Act 분할 (각 Act는 지속시간 초 포함)
 - 영상 스타일 & 분위기 (Higgsfield 스펙)
-- 타이밍 검증 (정확히 120초, 대사/나레이션 시간)`,
+- 타이밍 검증 (정확히 120초, 대사/나레이션 시간)
+
+만약 입력에 referenceMaterials(참고자료)가 포함되어 있다면, 그 내용을 반드시 스토리와 대사에 반영하세요.`,
 
     "naming-generator-agent": `당신은 제품명과 콘텐츠명 각 3개를 생성하는 AI 에이전트입니다.
 각각 정확히 3개씩, 각 항목마다:
@@ -403,6 +465,16 @@ function getOutputSpecForAgent(agentName) {
     "voice_tone": "따뜻하고 신뢰감 있는 톤",
     "personality_traits": ["특성1", "특성2", "특성3"],
     "visual_description": "시각적 묘사..."
+  }
+}`,
+
+    "character-creator-agent": `반드시 아래 JSON 형태로만 응답하세요:
+{
+  "brief": {
+    "character": "캐릭터명",
+    "voice_tone": "방향성을 반영한 톤",
+    "personality_traits": ["특성1", "특성2", "특성3"],
+    "visual_description": "방향성을 반영한 시각적 묘사..."
   }
 }`,
 

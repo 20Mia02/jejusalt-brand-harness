@@ -24,17 +24,144 @@ const getVideoTypes = () => {
 };
 
 export default function CharacterCreator({ characters = [], resourceId, onSelect }) {
-  const videoTypes = getVideoTypes();
+  const configVideoTypes = getVideoTypes();
   const [localCharacters, setLocalCharacters] = useState(characters);
   const [selectedId, setSelectedId] = useState(
     characters.find((c) => c.selected)?.id || characters[0]?.id
   );
-  const [videoType, setVideoType] = useState(videoTypes[1] || '제품스토리');
+  const [videoType, setVideoType] = useState(configVideoTypes[1] || '제품스토리');
+  const [customVideoType, setCustomVideoType] = useState('');
+  const [useCustomVideoType, setUseCustomVideoType] = useState(false);
+  const [recommendingVideoType, setRecommendingVideoType] = useState(false);
+  const [videoTypeRecommendation, setVideoTypeRecommendation] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  // ── 캐릭터 라이브러리 (기본 캐릭터 풀) ──
+  const [library, setLibrary] = useState([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newCharName, setNewCharName] = useState('');
+  const [newCharDirection, setNewCharDirection] = useState('');
+  const [creatingCharacter, setCreatingCharacter] = useState(false);
+  const [deleteConfirmLibId, setDeleteConfirmLibId] = useState(null);
+
+  useEffect(() => {
+    loadLibrary();
+  }, []);
+
+  const loadLibrary = async () => {
+    try {
+      setLibraryLoading(true);
+      const res = await axios.get('/api/characters/library');
+      setLibrary(res.data.characters || []);
+    } catch (err) {
+      console.error('캐릭터 라이브러리 로드 실패:', err);
+    } finally {
+      setLibraryLoading(false);
+    }
+  };
+
+  /**
+   * 라이브러리 캐릭터를 이 자료에 연결 → 그대로 선택 상태로 전환
+   * (레퍼런스 이미지/프로필을 그대로 복사해서 재현성 유지)
+   */
+  const handleUseLibraryCharacter = async (libChar) => {
+    if (!resourceId) {
+      setError('자료가 준비되지 않았습니다.');
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await axios.post(`/api/characters/library/${libChar.id}/use`, { resourceId });
+      const newCharacter = res.data.character;
+      setLocalCharacters((prev) => [
+        ...prev.map((c) => ({ ...c, selected: false })),
+        newCharacter,
+      ]);
+      setSelectedId(newCharacter.id);
+      setSuccessMessage(`"${libChar.character_name}" 캐릭터를 사용합니다.`);
+      setTimeout(() => setSuccessMessage(null), 2000);
+    } catch (err) {
+      console.error('라이브러리 캐릭터 사용 실패:', err);
+      setError('캐릭터를 연결하지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * 방향성 입력 → AI로 새 캐릭터 생성 → 라이브러리에 영구 추가
+   */
+  const handleCreateLibraryCharacter = async () => {
+    if (!newCharName.trim()) {
+      setError('캐릭터 이름을 입력해주세요.');
+      return;
+    }
+    if (!newCharDirection.trim() || newCharDirection.trim().length < 5) {
+      setError('원하는 방향성을 5자 이상 입력해주세요. (예: 유쾌하고 젊은 20대 여성)');
+      return;
+    }
+
+    try {
+      setCreatingCharacter(true);
+      setError(null);
+      const res = await axios.post('/api/characters/library', {
+        characterName: newCharName.trim(),
+        direction: newCharDirection.trim(),
+        useAI: true,
+      });
+      setLibrary((prev) => [...prev, res.data.character]);
+      setNewCharName('');
+      setNewCharDirection('');
+      setShowCreateForm(false);
+      setSuccessMessage(`"${res.data.character.character_name}" 캐릭터가 라이브러리에 추가되었습니다.`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      console.error('캐릭터 생성 실패:', err);
+      setError(err.response?.data?.message || '캐릭터 생성에 실패했습니다.');
+    } finally {
+      setCreatingCharacter(false);
+    }
+  };
+
+  /**
+   * 라이브러리에서 캐릭터 삭제 (기본 캐릭터 포함)
+   */
+  const handleDeleteLibraryCharacter = async (libId) => {
+    try {
+      await axios.delete(`/api/characters/library/${libId}`);
+      setLibrary((prev) => prev.filter((c) => c.id !== libId));
+      setDeleteConfirmLibId(null);
+      setSuccessMessage('캐릭터가 라이브러리에서 삭제되었습니다.');
+      setTimeout(() => setSuccessMessage(null), 2000);
+    } catch (err) {
+      console.error('라이브러리 캐릭터 삭제 실패:', err);
+      setError('삭제에 실패했습니다.');
+    }
+  };
+
+  /**
+   * 규칙 기반 영상유형 추천 (결정론적 — 같은 자료엔 항상 같은 추천)
+   */
+  const handleRecommendVideoType = async () => {
+    if (!resourceId) return;
+    try {
+      setRecommendingVideoType(true);
+      const res = await axios.get(`/api/generate/${resourceId}/recommend-video-type`);
+      setVideoTypeRecommendation(res.data);
+      setUseCustomVideoType(false);
+      setVideoType(res.data.recommended);
+    } catch (err) {
+      console.error('영상유형 추천 실패:', err);
+      setError('영상유형 추천에 실패했습니다.');
+    } finally {
+      setRecommendingVideoType(false);
+    }
+  };
 
   // characters prop이 비어 있으면 resourceId로 직접 조회 (App.jsx가 캐릭터를 안 넘겨줘도 동작)
   useEffect(() => {
@@ -146,6 +273,108 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
           {successMessage}
         </div>
       )}
+
+      {/* ── 캐릭터 라이브러리 (기본 캐릭터 풀) ── */}
+      <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-lg font-bold">📚 캐릭터 라이브러리 (기본 캐릭터)</h3>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            {showCreateForm ? '✕ 닫기' : '+ 새 캐릭터 만들기'}
+          </button>
+        </div>
+        <p className="text-sm text-gray-600 mb-4">
+          여러 자료에서 재사용 가능한 기본 캐릭터입니다. 마음에 드는 캐릭터를 선택해서 바로 사용하거나,
+          원하는 방향성을 입력해 AI로 새로 만들어 라이브러리에 추가할 수 있습니다.
+        </p>
+
+        {showCreateForm && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4 space-y-3">
+            <div>
+              <label className="block text-sm font-semibold mb-1">캐릭터 이름</label>
+              <input
+                type="text"
+                value={newCharName}
+                onChange={(e) => setNewCharName(e.target.value)}
+                placeholder="예: 소한"
+                className="w-full px-3 py-2 border rounded text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-1">원하는 방향성</label>
+              <textarea
+                value={newCharDirection}
+                onChange={(e) => setNewCharDirection(e.target.value)}
+                placeholder="예: 유쾌하고 젊은 20대 여성, 신뢰감 있는 아저씨 등 원하는 캐릭터의 느낌을 설명해주세요"
+                className="w-full px-3 py-2 border rounded text-sm h-20"
+              />
+            </div>
+            <button
+              onClick={handleCreateLibraryCharacter}
+              disabled={creatingCharacter}
+              className="w-full px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {creatingCharacter ? '🤖 AI가 캐릭터를 만들고 있습니다...' : '🤖 AI로 캐릭터 생성 & 라이브러리에 추가'}
+            </button>
+          </div>
+        )}
+
+        {libraryLoading ? (
+          <p className="text-sm text-gray-500">라이브러리 불러오는 중...</p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {library.map((libChar) => (
+              <div
+                key={libChar.id}
+                className="border rounded-lg p-3 hover:border-blue-400 transition relative group"
+              >
+                <div className="font-semibold text-sm mb-1">
+                  {libChar.character_name}
+                  {libChar.source === 'default' && (
+                    <span className="ml-1 text-xs bg-yellow-100 text-yellow-800 px-1 rounded">기본</span>
+                  )}
+                  {libChar.source === 'ai_generated' && (
+                    <span className="ml-1 text-xs bg-purple-100 text-purple-800 px-1 rounded">AI생성</span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 mb-2 line-clamp-2">
+                  {libChar.character_profile || libChar.role || '-'}
+                </div>
+                {libChar.generation_count > 0 && (
+                  <div className="text-xs text-green-600 mb-2">✓ {libChar.generation_count}회 생성됨</div>
+                )}
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => handleUseLibraryCharacter(libChar)}
+                    disabled={!resourceId || loading}
+                    className="flex-1 text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    이 캐릭터 사용
+                  </button>
+                  {deleteConfirmLibId === libChar.id ? (
+                    <button
+                      onClick={() => handleDeleteLibraryCharacter(libChar.id)}
+                      className="text-xs px-2 py-1 bg-red-600 text-white rounded"
+                    >
+                      확인?
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setDeleteConfirmLibId(libChar.id)}
+                      className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-red-100"
+                      title="라이브러리에서 삭제"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 캐릭터 카드 그리드 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -360,13 +589,29 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       {/* 영상유형 선택 */}
       {selectedId && (
         <div className="bg-white shadow rounded-lg p-6 mb-6">
-          <h4 className="font-semibold mb-3">🎬 영상유형 선택</h4>
-          <div className="flex flex-wrap gap-3">
-            {videoTypes.map((type) => (
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="font-semibold">🎬 영상유형 선택</h4>
+            <button
+              onClick={handleRecommendVideoType}
+              disabled={recommendingVideoType || !resourceId}
+              className="text-sm px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {recommendingVideoType ? '분석 중...' : '🤖 AI 추천 받기'}
+            </button>
+          </div>
+
+          {videoTypeRecommendation && (
+            <div className="bg-purple-50 border border-purple-200 rounded p-2 mb-3 text-sm text-purple-800">
+              추천: <strong>{videoTypeRecommendation.recommended}</strong> — {videoTypeRecommendation.reason}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3 mb-3">
+            {configVideoTypes.map((type) => (
               <label
                 key={type}
                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition ${
-                  videoType === type
+                  !useCustomVideoType && videoType === type
                     ? 'border-blue-600 bg-blue-50 text-blue-700'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -374,14 +619,47 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                 <input
                   type="radio"
                   name="videoType"
-                  checked={videoType === type}
-                  onChange={() => setVideoType(type)}
+                  checked={!useCustomVideoType && videoType === type}
+                  onChange={() => {
+                    setUseCustomVideoType(false);
+                    setVideoType(type);
+                  }}
                   className="w-4 h-4"
                 />
                 <span>{type}</span>
               </label>
             ))}
           </div>
+
+          {/* 직접 입력 */}
+          <label
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition ${
+              useCustomVideoType ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <input
+              type="radio"
+              name="videoType"
+              checked={useCustomVideoType}
+              onChange={() => {
+                setUseCustomVideoType(true);
+                if (customVideoType) setVideoType(customVideoType);
+              }}
+              className="w-4 h-4"
+            />
+            <span>직접 입력:</span>
+            <input
+              type="text"
+              value={customVideoType}
+              onChange={(e) => {
+                setCustomVideoType(e.target.value);
+                if (useCustomVideoType) setVideoType(e.target.value);
+              }}
+              onFocus={() => setUseCustomVideoType(true)}
+              placeholder="예: 창립자 인터뷰, 언박싱"
+              className="flex-1 px-2 py-1 border rounded text-sm"
+            />
+          </label>
         </div>
       )}
 
