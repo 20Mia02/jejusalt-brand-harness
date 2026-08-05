@@ -40,8 +40,31 @@ try {
 // ─────────────────────────────────────────────
 router.get("/library", async (req, res) => {
   try {
-    // 1단계: config.json의 v3 기본 캐릭터 로드
-    const baseCharacters = config.characters || [];
+    // 1단계: config.json의 v3 기본 캐릭터 로드 및 필드 변환
+    const baseCharacters = (config.characters || []).map(char => ({
+      // database 필드명으로 변환
+      id: char.id,
+      character_name: char.name,
+      character_profile: char.visualIdentity,
+      voice_tone: char.toneTrait || "",
+      personality_traits: char.role ? [char.role] : [],
+      is_base_character: true,
+      generation_count: char.generation_count || 0,
+
+      // v3 설계 데이터 포함 (프론트엔드에서 표시 가능하도록)
+      gender: char.gender,
+      ageGroup: char.ageGroup,
+      type: char.type,
+      role: char.role,
+      toneTrait: char.toneTrait,
+      bodyStructure: char.bodyStructure,
+      genderExpression: char.genderExpression,
+      animationNotes: char.animationNotes,
+      symbolism: char.symbolism,
+      visualIdentity: char.visualIdentity,
+      higgsfieldPrompt: char.higgsfieldPrompt,
+      reference_image_url: char.reference_image_url,
+    }));
 
     // 2단계: 데이터베이스에서 추가 캐릭터 조회
     const result = await callDatabase("character_library", "read", null, {});
@@ -49,9 +72,9 @@ router.get("/library", async (req, res) => {
     let additionalCharacters = [];
     if (result.success && result.rows) {
       // 중복 제거: config의 캐릭터와 다른 것들만 추가
-      const baseIds = new Set(baseCharacters.map(c => c.id || c.name));
+      const baseIds = new Set(baseCharacters.map(c => c.id || c.character_name));
       additionalCharacters = result.rows.filter(
-        c => !baseIds.has(c.id || c.name)
+        c => !baseIds.has(c.id || c.character_name)
       );
     }
 

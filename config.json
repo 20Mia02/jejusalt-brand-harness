@@ -1,6 +1,8 @@
 {
   "brand": {
     "name": "제주 라바 씨솔트",
+    "nameKorean": "제주도 라바 씨솔트",
+    "nameEnglish": "JEJU LAVA SEA SALT",
     "englishName": "Jeju Lava Sea Salt",
     "description": "40만 년의 화산 역사를 담은 제주 프리미엄 소금",
     "values": ["신뢰", "건강", "기술", "전통"],
