@@ -362,7 +362,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h4 className="font-semibold mb-3">🎬 영상유형 선택</h4>
           <div className="flex flex-wrap gap-3">
-            {VIDEO_TYPES.map((type) => (
+            {videoTypes.map((type) => (
               <label
                 key={type}
                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition ${
