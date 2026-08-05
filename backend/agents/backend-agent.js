@@ -77,16 +77,19 @@ async function callAgent(agentName, payload, context = {}) {
         `[✗] ${agentName} 실패 (시도 ${attempt}): ${error.message}`
       );
 
-      // 마지막 시도면 기록
-      if (attempt >= maxAttempts && resourceId) {
-        await callDatabase("generation_logs", "create", {
-          resource_id: resourceId,
-          step: step || agentName,
-          status: "fail",
-          error_message: error.message,
-          attempt,
-        });
-      }
+      // 매 시도마다 실패 기록 (재시도 이력 추적)
+      await callDatabase("generation_logs", "create", {
+        resource_id: resourceId,
+        step: step || agentName,
+        status: attempt >= maxAttempts ? "fail" : "retrying",
+        error_message: error.message,
+        error_code: error.code || "UNKNOWN",
+        error_stack: error.stack || "",
+        attempt,
+        total_attempts: maxAttempts,
+        retry_delay_ms: attempt < maxAttempts ? Math.pow(2, attempt) * 1000 : 0,
+        timestamp: new Date(),
+      }).catch(e => console.error("[로그 저장 실패]", e));
 
       // 지수백오프: 1초, 2초, 4초 대기
       if (attempt < maxAttempts) {
@@ -194,32 +197,45 @@ async function callTimelyAIAgent(agentName, payload) {
 // ============================================================================
 
 function getSystemPromptForAgent(agentName) {
+  // config.json에서 브랜드 정보 로드
+  const { getConfig } = require("../utils/config-loader");
+  const config = getConfig();
+  const brand = config.brand || {};
+
   const prompts = {
     "resource-analyzer-agent": `당신은 제품 정보를 분석하는 AI 에이전트입니다.
+제품: ${brand.nameKorean || "제주소금"}
+브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
+
 제공된 제품명, 설명, 키워드를 기반으로:
-- 상품 카테고리 (식품, 뷰티, 패션 등)
-- 타겟 연령대 (10대, 20대, 30대, 40대, 50대+)
-- 타겟 고객층 (가족, 직장인, 학생 등)
-- 마케팅 포커스 (건강, 친환경, 프리미엄 등)
+- 상품 카테고리 (${(brand.categories || []).join(", ") || "식품, 뷰티, 웰스케어"})
+- 타겟 연령대 (${(brand.targetAges || []).join(", ") || "20~30대, 40~60대, 60대+"})
+- 타겟 고객층 (${(brand.targetAudience || []).join(", ") || "개인, 가족, 단체"})
+- 마케팅 포커스 (${(brand.focus || []).join(", ") || "신뢰, 기술, 건강"})
 - 신뢰도 점수 (0~100)
 
 를 분석하여 반환하세요.`,
 
-    "character-generator-agent": `당신은 제품 마케팅을 위한 캐릭터 3개를 추천하는 AI 에이전트입니다.
-각 캐릭터마다:
+    "character-generator-agent": `당신은 ${brand.nameKorean || "제주소금"} 제품 마케팅을 위한 캐릭터 3개를 추천하는 AI 에이전트입니다.
+브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
+각 캐릭터는 다음을 포함해야 합니다:
 - 이름
 - 설명 (외형, 성격, 역할)
 - 추천 이유
 - 점수 (90~80)
 
-를 포함하여 정확히 3개를 생성하세요.`,
+정확히 3개를 생성하세요.`,
 
     "character-designer-agent": `당신은 선택된 캐릭터를 상세 설계하는 AI 에이전트입니다.
+브랜드: ${brand.nameKorean || "제주소금"}
+브랜드 톤: ${brand.voiceTone || "정직하고 따뜻함"}
+
 다음을 포함한 완전한 캐릭터 브리프를 작성하세요:
 - 캐릭터명
-- 음성 톤 설명 (따뜻함, 신뢰감, 에너지 등)
+- 음성 톤 설명 (예: ${brand.voiceTone || "정직함, 신뢰감, 친근함"})
 - 성격 특성 (배열)
-- 시각적 묘사 (의상, 표정, 외형)`,
+- 시각적 묘사 (의상, 표정, 외형)
+- 피해야 할 표현: ${(brand.absoluteNos || []).join(", ") || "의료표현, 과장"}`,
 
     "shortform-scenario-writer-agent": `당신은 120초 영상 시나리오를 작성하는 AI 에이전트입니다.
 다음을 포함하세요:
@@ -243,7 +259,12 @@ function getSystemPromptForAgent(agentName) {
     "product-detail-page-writer-agent": `당신은 상세페이지 카피를 작성하는 AI 에이전트입니다.
 제품의 상세한 혜택, 사용법, 특징을 강조하는 긴 형식의 카피를 작성하세요.`,
 
-    "compliance-reviewer-agent": `당신은 제품 마케팅 콘텐츠를 검증하는 AI 에이전트입니다.
+    "compliance-reviewer-agent": `당신은 ${brand.nameKorean || "제주소금"} 제품의 마케팅 콘텐츠를 검증하는 AI 에이전트입니다.
+
+검증 기준:
+- 피해야 할 표현: ${(brand.absoluteNos || []).join(", ") || "의료표현, 과도한 유행어"}
+- 필수 포함 가치: ${(brand.toneValues || []).join(", ") || "정직함, 신뢰성"}
+
 제공된 카피를 검토하고:
 - 승인 여부 (APPROVED / REJECTED)
 - 신뢰도 점수 (0~100)

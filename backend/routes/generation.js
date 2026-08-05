@@ -440,7 +440,29 @@ router.get("/:resourceId/status", async (req, res) => {
     const logs = logsResult.rows;
     const currentStep = logs[0];
     const successCount = logs.filter((l) => l.status === "success").length;
-    const totalSteps = 10; // Step 1~9 + Higgsfield
+    const failureCount = logs.filter((l) => l.status === "fail").length;
+    const retryingCount = logs.filter((l) => l.status === "retrying").length;
+    const totalSteps = 9; // Step 1~9
+
+    // 실패 단계 상세 정보 수집
+    const failedSteps = logs
+      .filter((l) => l.status === "fail")
+      .map((l) => ({
+        step: l.step,
+        error_message: l.error_message || "상세정보 없음",
+        error_code: l.error_code || "UNKNOWN",
+        attempt: l.attempt || 0,
+        timestamp: l.created_at,
+      }));
+
+    // 재시도 중인 단계
+    const retiringSteps = logs
+      .filter((l) => l.status === "retrying")
+      .map((l) => ({
+        step: l.step,
+        attempt: l.attempt || 0,
+        next_retry_in_ms: l.retry_delay_ms || 0,
+      }));
 
     return res.json({
       success: true,
@@ -449,8 +471,19 @@ router.get("/:resourceId/status", async (req, res) => {
       currentStatus: currentStep.status,
       progress: Math.round((successCount / totalSteps) * 100),
       completedSteps: successCount,
+      failedSteps: failureCount,
+      retiringSteps: retryingCount,
       totalSteps,
       lastUpdate: currentStep.created_at,
+      // 에러 상세 정보
+      ...(failureCount > 0 && {
+        failureDetails: failedSteps,
+        failureMessage: failedSteps[0]?.error_message || "알 수 없는 오류",
+      }),
+      // 재시도 진행 상황
+      ...(retryingCount > 0 && {
+        retryingDetails: retiringSteps,
+      }),
     });
   } catch (error) {
     console.error("[GET /api/generate/:resourceId/status] 예외:", error);
@@ -517,6 +550,58 @@ router.get("/:resourceId/result", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "결과 조회 중 오류가 발생했습니다",
+      resourceId,
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// GET /api/generate/:resourceId/logs
+// 생성 이력 조회 (AdminMode용)
+// ─────────────────────────────────────────────────────
+router.get("/:resourceId/logs", async (req, res) => {
+  const { resourceId } = req.params;
+
+  try {
+    const logsResult = await callDatabase("generation_logs", "read", null, {
+      resource_id: resourceId,
+    });
+
+    if (!logsResult.success) {
+      return res.json({
+        success: true,
+        logs: [],
+        message: "생성 이력이 없습니다",
+      });
+    }
+
+    const logs = logsResult.rows || [];
+
+    // 단계별로 그룹화
+    const grouped = {};
+    logs.forEach((log) => {
+      if (!grouped[log.step]) {
+        grouped[log.step] = [];
+      }
+      grouped[log.step].push(log);
+    });
+
+    return res.json({
+      success: true,
+      logs: logs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
+      grouped,
+      summary: {
+        total: logs.length,
+        success: logs.filter((l) => l.status === "success").length,
+        failed: logs.filter((l) => l.status === "fail").length,
+        retrying: logs.filter((l) => l.status === "retrying").length,
+      },
+    });
+  } catch (error) {
+    console.error("[GET /api/generate/:resourceId/logs] 예외:", error);
+    return res.status(500).json({
+      success: false,
+      message: "생성 이력 조회 중 오류가 발생했습니다",
       resourceId,
     });
   }
