@@ -90,12 +90,12 @@ export default function FilterUI({ onResourceCreated }) {
 
       if (response.data.success) {
         setSuccessMessage("자료가 입력되었습니다. 메타데이터를 검토해주세요.");
-        // 1.5초 후 메타데이터 검토 단계로 이동
+        // 메타데이터 검토 단계로 즉시 이동
         setTimeout(() => {
           if (onResourceCreated) {
             onResourceCreated(response.data.resourceId);
           }
-        }, 1500);
+        }, 500);  // 지연 시간 단축 (UI 피드백 표시용)
       }
     } catch (err) {
       console.error("자료 입력 실패:", err);
