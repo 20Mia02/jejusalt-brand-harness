@@ -31,7 +31,6 @@ router.post("/", async (req, res) => {
   const { productName, productInfo, keywords } = req.body;
 
   // ── 0. 입력 유효성 검증 ──────────────────────────
-  // resource-analyzer-agent.md에 명시된 조건과 동일하게 맞춤
   if (!productName || !productInfo) {
     return res.status(400).json({
       success: false,
@@ -48,6 +47,59 @@ router.post("/", async (req, res) => {
     return res.status(400).json({
       success: false,
       message: "제품 정보가 너무 짧습니다. 더 상세히 입력해주세요. (최소 30자)",
+    });
+  }
+
+  // ── MOCK MODE: 개발 환경에서 DB 연결 없이 테스트 ──
+  const isMockMode = process.env.NODE_ENV === "development" &&
+    (!process.env.SUPABASE_URL || process.env.SUPABASE_URL.includes("your-project"));
+
+  if (isMockMode) {
+    console.log("[Mock Mode] 자료 저장 API 응답");
+    const resourceId = "mock-" + Date.now();
+    const keywordsArray = keywords
+      ? Array.isArray(keywords) ? keywords : String(keywords).split(",").map(k => k.trim())
+      : [];
+
+    return res.status(201).json({
+      success: true,
+      resourceId,
+      metadata: {
+        categories: ["식품", "뷰티"],
+        ageGroups: ["20~30대", "40~60대"],
+        targets: ["개인", "가족"],
+        focus: ["신뢰", "건강"],
+        confidence: 85
+      },
+      characters: [
+        {
+          id: "mock-char-1",
+          resource_id: resourceId,
+          character_name: "결이",
+          character_profile: "당찬 소년, 도전적이고 에너지 넘침",
+          reason: "타겟층의 긍정적 이미지 대표",
+          score: 90,
+          selected: true
+        },
+        {
+          id: "mock-char-2",
+          resource_id: resourceId,
+          character_name: "용암이",
+          character_profile: "따뜨한 아버지, 신뢰감과 보호본능",
+          reason: "제품의 신뢰성 강조",
+          score: 85,
+          selected: false
+        },
+        {
+          id: "mock-char-3",
+          resource_id: resourceId,
+          character_name: "해수",
+          character_profile: "자유로운 영혼, 경쾌함과 순수함",
+          reason: "자연스러운 제품 특성",
+          score: 80,
+          selected: false
+        }
+      ]
     });
   }
 
@@ -70,6 +122,22 @@ router.post("/", async (req, res) => {
       product_info: productInfo,
       keywords: keywordsArray,
       status: "analyzing",
+    }).catch(err => {
+      // Mock 모드: DB 연결 실패 시 테스트용 데이터 반환
+      if (process.env.NODE_ENV === "development" && err.message.includes("fetch")) {
+        console.warn("[Mock Mode] DB 연결 실패, 테스트 데이터 반환");
+        return {
+          success: true,
+          rows: [{
+            id: "mock-" + Date.now(),
+            product_name: productName,
+            product_info: productInfo,
+            keywords: keywordsArray,
+            status: "analyzing"
+          }]
+        };
+      }
+      throw err;
     });
 
     if (!created.success) {

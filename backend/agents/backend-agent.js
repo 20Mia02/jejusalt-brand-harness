@@ -124,6 +124,12 @@ async function callTimelyAIAgent(agentName, payload) {
   const apiKey = process.env.TIMELY_AI_API_KEY;
   const baseURL = "https://hello.timelygpt.co.kr/api/v2/chat/bridge/openai";
 
+  // Mock 모드: 테스트용 더미 응답 반환
+  if (apiKey && (apiKey.includes("your_") || apiKey === "dummy" || apiKey === "tgpt_sk_your_api_key_here")) {
+    console.warn(`[Mock Mode] ${agentName} - 테스트 더미 응답 반환`);
+    return getMockResponseForAgent(agentName, payload);
+  }
+
   if (!apiKey) {
     throw new Error("TIMELY_AI_API_KEY 환경변수가 설정되지 않았습니다. .env 파일을 확인하세요.");
   }
@@ -190,6 +196,98 @@ async function callTimelyAIAgent(agentName, payload) {
 
     throw error;
   }
+}
+
+// ============================================================================
+// [Mock 응답 제공자]
+// ============================================================================
+
+function getMockResponseForAgent(agentName, payload) {
+  const mockData = {
+    "resource-analyzer-agent": {
+      metadata: {
+        categories: ["식품", "뷰티"],
+        ageGroups: ["20~30대", "40~60대"],
+        targets: ["개인", "가족"],
+        focus: ["신뢰", "건강"],
+        confidence: 85
+      }
+    },
+    "character-generator-agent": {
+      characters: [
+        {
+          name: "결이",
+          description: "당찬 소년, 도전적이고 에너지 넘침",
+          reason: "타겟층의 긍정적 이미지 대표",
+          score: 90
+        },
+        {
+          name: "용암이",
+          description: "따뜻한 아버지, 신뢰감과 보호본능",
+          reason: "제품의 신뢰성 강조",
+          score: 85
+        },
+        {
+          name: "해수",
+          description: "자유로운 영혼, 경쾌함과 순수함",
+          reason: "자연스러운 제품 특성",
+          score: 80
+        }
+      ]
+    },
+    "character-designer-agent": {
+      brief: {
+        character: "결이",
+        voice_tone: "밝고 도전적인 톤, 에너지 있는 어린이 목소리",
+        personality_traits: ["도전적", "긍정적", "친근한"],
+        visual_description: "파란색 옷, 밝은 눈빛, 활발한 표정"
+      }
+    },
+    "shortform-scenario-writer-agent": {
+      scenario: {
+        title: "제주소금으로 시작하는 건강한 하루",
+        story_content: "아침 밥상에 제주소금을...",
+        acts: [
+          { act: 1, duration_seconds: 40, content: "아침 오프닝" },
+          { act: 2, duration_seconds: 50, content: "제품 소개" },
+          { act: 3, duration_seconds: 30, content: "클로징" }
+        ],
+        timing_verification: { total_duration: 120 }
+      }
+    },
+    "naming-generator-agent": {
+      product_name_options: [
+        { name: "제주 청염", score: 90, meaning: "청정한 제주의 소금" },
+        { name: "해바람 소금", score: 85, meaning: "바다바람을 담은" },
+        { name: "제주 자연", score: 80, meaning: "자연 그대로" }
+      ],
+      content_name_options: [
+        { name: "제주의 선물", score: 90, meaning: "자연의 축복" },
+        { name: "바다의 정성", score: 85, meaning: "정성 어린" },
+        { name: "소금 이야기", score: 80, meaning: "스토리텔링" }
+      ]
+    },
+    "product-intro-writer-agent": {
+      content: "제주의 청정 해역에서 자연 그대로 채취한 제주소금입니다. 70년의 전통과 기술이 담겨있습니다."
+    },
+    "product-detail-page-writer-agent": {
+      content: "제주소금은 세 가지 특징을 가지고 있습니다: 1. 순수함 2. 건강함 3. 신뢰성"
+    },
+    "compliance-reviewer-agent": {
+      validation: {
+        status: "APPROVED",
+        score: 90,
+        issues: []
+      }
+    }
+  };
+
+  const data = mockData[agentName] || { message: "Mock response" };
+  return {
+    success: true,
+    data: data,
+    attempt: 1
+  };
 }
 
 // ============================================================================
