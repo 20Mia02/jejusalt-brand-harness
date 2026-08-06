@@ -5,6 +5,7 @@ import GenerationUI from "./components/GenerationUI"
 import MetadataReviewUI from "./components/MetadataReviewUI"
 import CharacterCreator from "./components/CharacterCreator"
 import AdminMode from "./components/AdminMode"
+import OceanBackground from "./components/OceanBackground"
 import "./App.css"
 
 // Config 전역 상태
@@ -183,6 +184,7 @@ function App() {
 
   return (
     <div className="app">
+      <OceanBackground theme={theme} />
       <header className="app-header">
         <ThemeToggle theme={theme} setTheme={setTheme} />
         <div className="app-header-content">
