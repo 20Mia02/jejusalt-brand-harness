@@ -1315,6 +1315,40 @@ async function generateCharacterReferenceImage({ characterName, voiceTone, visua
 }
 
 // ============================================================================
+// [함수 2-2] generateImageFromPrompt - 완성된 프롬프트 그대로 이미지 생성
+// (character-refinement-agent의 자동 개선 루프가 사용: higgsfieldPromptTemplate이나
+// improvedPrompt를 이미 완성된 문장으로 가지고 있으므로, generateCharacterReferenceImage처럼
+// characterName/voiceTone을 덧붙여 감싸지 않고 그대로 전달한다)
+// ============================================================================
+async function generateImageFromPrompt(fullPrompt) {
+  try {
+    const sanitizeForShell = (s) => String(s || "").replace(/["'`$\\;|&<>%^()\n\r]/g, " ").replace(/\s+/g, " ").trim();
+    const safePrompt = sanitizeForShell(fullPrompt);
+    const command = `higgsfield --json generate create text2image_soul_v2 --prompt "${safePrompt}" --wait`;
+
+    const { stdout } = await execPromise(command, {
+      timeout: 600000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+
+    const parsed = JSON.parse(stdout.trim());
+    const job = Array.isArray(parsed) ? parsed[0] : parsed;
+    const imageUrl = job?.result_url;
+    const jobId = job?.id;
+
+    if (!imageUrl || !imageUrl.startsWith("https://") || !jobId) {
+      throw new Error(`유효하지 않은 응답: ${stdout.trim()}`);
+    }
+
+    console.log(`[✓] 이미지 생성 완료: ${imageUrl} (job id: ${jobId})`);
+    return { success: true, image_url: imageUrl, image_job_id: jobId };
+  } catch (error) {
+    console.error(`[✗] 이미지 생성 실패: ${error.message}`);
+    return { success: false, error: "HIGGSFIELD_CLI_ERROR", message: error.message };
+  }
+}
+
+// ============================================================================
 // [함수 3] pollHiggsfield - Higgsfield 진행률 5초 폴링
 // ============================================================================
 
@@ -1434,6 +1468,7 @@ module.exports = {
   callHiggsfield,
   pollHiggsfield,
   generateCharacterReferenceImage,
+  generateImageFromPrompt,
   evaluateComplianceContent,
   getComplianceRulesForCategory,
 };

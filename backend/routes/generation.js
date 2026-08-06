@@ -26,6 +26,13 @@ const { callAgent, callHiggsfield, getComplianceRulesForCategory } = require("..
 const { callDatabase } = require("../agents/database-agent");
 const { getGenerationConfig } = require("../utils/config-loader");
 const scenarioTemplates = require("../config/scenario-templates.json");
+const { refineCharacterImage } = require("../agents/character-refinement-agent");
+const {
+  getCharacterReferenceData,
+  addVersionToPrompt,
+  updateCharacterVersion,
+  nextVersion,
+} = require("../services/character-consistency");
 
 // ─────────────────────────────────────────────────────
 // GET /api/generate/:resourceId/recommend-video-type
@@ -1517,6 +1524,170 @@ router.post("/:resourceId/retry-from/:step", async (req, res) => {
       message: "재시도 중 오류가 발생했습니다",
       resourceId,
     });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// POST /api/generate/character
+//
+// CHARACTER_GENERATION_SYSTEM_PROMPT.md 스펙: 캐릭터별 중앙 설정(characters.json)을
+// 기준으로 "귀여움/디테일/일관성"을 AI가 직접 평가해서 기준(85점) 미달이면
+// 자동으로 개선된 프롬프트로 재시도(최대 3회)하고, 확정된 결과를 버전으로 기록한다.
+//
+// ⚠️ 비용 최적화: 문서는 재시도마다 영상을 생성하는 것으로 되어 있으나, 영상 생성은
+// 회당 비용/시간이 크다. 재시도는 훨씬 저렴한 레퍼런스 "이미지" 생성을 대상으로 돌리고,
+// 확정된 레퍼런스 이미지를 영상 생성 1회에 재사용한다 — 이미 확정된 버전이 있으면
+// (forceRefine이 없는 한) 재평가 없이 그 버전을 그대로 재사용해 일관성을 지킨다.
+//
+// body: { characterId, resourceId?, versionOverride?, videoType?, duration?, forceRefine? }
+// ─────────────────────────────────────────────────────
+router.post("/character", async (req, res) => {
+  const { characterId, resourceId, versionOverride, videoType, duration, forceRefine } = req.body || {};
+
+  if (!characterId) {
+    return res.status(400).json({ success: false, message: "characterId가 필요합니다" });
+  }
+
+  try {
+    const refData = getCharacterReferenceData(characterId, versionOverride);
+    if (!refData.success) {
+      return res.status(404).json({ success: false, message: refData.message });
+    }
+    const character = refData.character;
+
+    let referenceImageUrl = refData.referenceImageUrl;
+    let referenceJobId = null;
+    let currentVersion = refData.version;
+    let latestEvaluation = null;
+    let attempts = [];
+
+    const needsRefinement = forceRefine || !currentVersion || !referenceImageUrl;
+
+    if (needsRefinement) {
+      console.log(`[character-refinement] ${character.name} 캐릭터 리파인 시작 (기존 버전: ${currentVersion || "없음"})`);
+      const promptWithVersion = currentVersion
+        ? addVersionToPrompt(character.higgsfieldPromptTemplate, character.id, currentVersion)
+        : character.higgsfieldPromptTemplate;
+
+      const refined = await refineCharacterImage({
+        characterConfig: { ...character, higgsfieldPromptTemplate: promptWithVersion },
+      });
+      attempts = refined.attempts;
+
+      if (!refined.final) {
+        return res.status(502).json({
+          success: false,
+          message: "캐릭터 이미지 생성에 반복적으로 실패했습니다",
+          attempts,
+        });
+      }
+
+      latestEvaluation = refined.final.evaluation;
+      referenceImageUrl = refined.final.genResult.image_url;
+      referenceJobId = refined.final.genResult.image_job_id;
+
+      const bumpMajor = forceRefine === "major";
+      currentVersion = nextVersion(currentVersion, bumpMajor);
+      updateCharacterVersion(
+        character.id,
+        currentVersion,
+        latestEvaluation?.feedback?.cutenessStrengths || "자동 리파인",
+        referenceImageUrl,
+        latestEvaluation?.scores
+      );
+    }
+
+    // 영상까지 요청된 경우, 확정된 레퍼런스 이미지를 --start-image로 재사용해서 1회만 생성한다.
+    let videoResult = null;
+    if (resourceId && videoType) {
+      videoResult = await callHiggsfield(
+        {
+          character: character.name,
+          generatedContent: character.description,
+          voiceTone: (character.personalityKeywords || []).join(", "),
+          visualDescription: character.higgsfieldPromptTemplate,
+          referenceJobId,
+          duration: duration || 15,
+        },
+        resourceId,
+        null
+      );
+    }
+
+    const finalData = getCharacterReferenceData(character.id);
+    const cuteness = latestEvaluation?.scores?.cutenessScore;
+    const overall = latestEvaluation?.scores?.overallScore;
+
+    return res.status(201).json({
+      success: true,
+      characterId: character.id,
+      characterName: character.name,
+      currentVersion: finalData.character.currentVersion,
+      referenceImageUrl: finalData.character.referenceImageUrl,
+      videoUrl: videoResult?.success ? videoResult.data.video_url : null,
+      higgsfieldError: videoResult && !videoResult.success ? videoResult.message : null,
+      cutenessMessage:
+        cuteness == null
+          ? "기존 확정 버전을 그대로 사용했습니다 (일관성 유지)"
+          : cuteness >= 85
+          ? "정말 귀여워요! 누구나 사랑할 만한 매력이 있어요 ❤️"
+          : "귀여움 기준에 아직 못 미쳐서 다음 개선이 필요해요",
+      overallScore: overall ?? null,
+      refinementFeedback: latestEvaluation
+        ? {
+            cutenessScore: latestEvaluation.scores?.cutenessScore,
+            cutenessDetails: latestEvaluation.feedback?.cutenessStrengths,
+            detailScore: latestEvaluation.scores?.detailScore,
+            detailDetails: latestEvaluation.feedback?.detailStrengths,
+            consistencyScore: latestEvaluation.scores?.consistencyScore,
+            consistencyDetails: latestEvaluation.feedback?.consistencyStrengths,
+          }
+        : null,
+      attempts: attempts.map((a) => ({
+        attempt: a.attempt,
+        imageUrl: a.imageUrl,
+        scores: a.scores,
+      })),
+      versionHistory: finalData.character.versionHistory,
+      nextVersionSuggestion:
+        latestEvaluation?.recommendedChanges?.length
+          ? `${nextVersion(currentVersion)} (${latestEvaluation.recommendedChanges[0]})`
+          : null,
+    });
+  } catch (error) {
+    console.error("[POST /api/generate/character] 예외 발생:", error);
+    return res.status(500).json({ success: false, message: "캐릭터 생성/평가 중 오류가 발생했습니다" });
+  }
+});
+
+// ─────────────────────────────────────────────────────
+// GET /api/generate/character/:characterId
+// 캐릭터의 버전 이력(캐릭터 진화 보기) 조회
+// ─────────────────────────────────────────────────────
+router.get("/character/:characterId", async (req, res) => {
+  const refData = getCharacterReferenceData(req.params.characterId, req.query.version);
+  if (!refData.success) {
+    return res.status(404).json({ success: false, message: refData.message });
+  }
+  return res.json({
+    success: true,
+    character: refData.character,
+    version: refData.version,
+    referenceImageUrl: refData.referenceImageUrl,
+  });
+});
+
+// ─────────────────────────────────────────────────────
+// GET /api/generate/characters
+// 캐릭터 라이브러리 전체(중앙 설정) 조회 — 캐릭터 선택 화면용
+// ─────────────────────────────────────────────────────
+router.get("/characters", async (req, res) => {
+  const { loadCharactersFile } = require("../services/character-consistency");
+  try {
+    const data = loadCharactersFile();
+    return res.json({ success: true, characters: data.characters });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "캐릭터 목록 조회에 실패했습니다" });
   }
 });
 
