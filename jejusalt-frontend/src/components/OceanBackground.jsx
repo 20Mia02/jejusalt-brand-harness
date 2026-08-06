@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import '../styles/OceanBackground.css';
 
 export default function OceanBackground({ theme }) {
   const canvasRef = useRef(null);

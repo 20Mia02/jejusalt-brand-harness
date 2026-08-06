@@ -79,7 +79,7 @@ function StepIndicator({ currentStep }) {
   );
 }
 
-function MainFlow({ currentStep, setCurrentStep }) {
+function MainFlow({ currentStep, setCurrentStep, theme }) {
   const [resourceId, setResourceId] = useState(null);
   const [metadata, setMetadata] = useState(null);
   const [initialMetadata, setInitialMetadata] = useState(null);
@@ -118,6 +118,7 @@ function MainFlow({ currentStep, setCurrentStep }) {
 
   return (
     <main className="app-main">
+      <OceanBackground theme={theme} />
       {currentStep === 'filter' && (
         <FilterUI onResourceCreated={handleResourceCreated} />
       )}
@@ -186,7 +187,6 @@ function App() {
 
   return (
     <div className="app">
-      <OceanBackground theme={theme} />
       <header className="app-header">
         <ThemeToggle theme={theme} setTheme={setTheme} />
         <div className="app-header-content">
@@ -220,7 +220,7 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={<MainFlow currentStep={currentStep} setCurrentStep={setCurrentStep} />}
+          element={<MainFlow currentStep={currentStep} setCurrentStep={setCurrentStep} theme={theme} />}
         />
         <Route path="/characters" element={<CharacterGallery />} />
         <Route path="/admin" element={<AdminMode />} />
