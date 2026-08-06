@@ -4,7 +4,6 @@ import FilterUI from "./components/FilterUI"
 import GenerationUI from "./components/GenerationUI"
 import MetadataReviewUI from "./components/MetadataReviewUI"
 import CharacterCreator from "./components/CharacterCreator"
-import CharacterGallery from "./components/CharacterGallery"
 import AdminMode from "./components/AdminMode"
 import OceanBackground from "./components/OceanBackground"
 import "./App.css"
@@ -79,7 +78,7 @@ function StepIndicator({ currentStep }) {
   );
 }
 
-function MainFlow({ currentStep, setCurrentStep, theme }) {
+function MainFlow({ currentStep, setCurrentStep }) {
   const [resourceId, setResourceId] = useState(null);
   const [metadata, setMetadata] = useState(null);
   const [initialMetadata, setInitialMetadata] = useState(null);
@@ -118,7 +117,6 @@ function MainFlow({ currentStep, setCurrentStep, theme }) {
 
   return (
     <main className="app-main">
-      <OceanBackground theme={theme} />
       {currentStep === 'filter' && (
         <FilterUI onResourceCreated={handleResourceCreated} />
       )}
@@ -154,7 +152,6 @@ function MainFlow({ currentStep, setCurrentStep, theme }) {
 function App() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
-  const isGallery = location.pathname.startsWith('/characters');
   const [currentStep, setCurrentStep] = useState('filter');
   const [brandName, setBrandName] = useState('제주도 라바 씨솔트');
   const [brandNameEn, setBrandNameEn] = useState('JEJU LAVA SEA SALT');
@@ -187,6 +184,7 @@ function App() {
 
   return (
     <div className="app">
+      <OceanBackground theme={theme} />
       <header className="app-header">
         <ThemeToggle theme={theme} setTheme={setTheme} />
         <div className="app-header-content">
@@ -205,24 +203,22 @@ function App() {
             <h1>{brandNameEn.split(' ').slice(0, -2).join(' ')}<br/>{brandNameEn.split(' ').slice(-2).join(' ')}</h1>
             <div className="header-divider"></div>
             <nav className="app-header-nav">
-              <Link to="/" className={!isAdmin && !isGallery ? 'active' : ''}>메인</Link>
-              <Link to="/characters" className={isGallery ? 'active' : ''}>🎭 캐릭터 갤러리</Link>
+              <Link to="/" className={!isAdmin ? 'active' : ''}>메인</Link>
               <Link to="/admin" className={isAdmin ? 'active' : ''}>관리자 모드</Link>
             </nav>
             <p className="header-subtitle">
-              {isAdmin ? '관리자 모드' : isGallery ? '캐릭터 갤러리' : STEP_LABELS[currentStep]}
+              {isAdmin ? '관리자 모드' : STEP_LABELS[currentStep]}
             </p>
           </div>
         </div>
-        {!isAdmin && !isGallery && <StepIndicator currentStep={currentStep} />}
+        {!isAdmin && <StepIndicator currentStep={currentStep} />}
       </header>
 
       <Routes>
         <Route
           path="/"
-          element={<MainFlow currentStep={currentStep} setCurrentStep={setCurrentStep} theme={theme} />}
+          element={<MainFlow currentStep={currentStep} setCurrentStep={setCurrentStep} />}
         />
-        <Route path="/characters" element={<CharacterGallery />} />
         <Route path="/admin" element={<AdminMode />} />
       </Routes>
     </div>
