@@ -33,6 +33,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const [errorDetails, setErrorDetails] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [failedStep, setFailedStep] = useState(null);
+  const [showTimeMessage, setShowTimeMessage] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(null);
 
   const [characterData, setCharacterData] = useState(null); // { characterBriefs: [{ characterId, character, voice_tone, personality_traits, visual_description }] }
   const [templateData, setTemplateData] = useState(null); // { templates: [...] }
@@ -47,6 +49,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   // 업로드된 참고자료를 시나리오 작성에 반영할지 여부 (기본: 반영)
   const [useReferenceMaterials, setUseReferenceMaterials] = useState(true);
   const pollingInterval = useRef(null);
+  const messageToggleInterval = useRef(null);
 
   // 성공/실패 배너 자동 소멸
   useEffect(() => {
@@ -81,6 +84,12 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   };
 
   const startStatusPolling = () => {
+    // 남은 시간과 기존 문구 번갈아 표시 (2초 간격)
+    setShowTimeMessage(false);
+    messageToggleInterval.current = setInterval(() => {
+      setShowTimeMessage((prev) => !prev);
+    }, 2000);
+
     pollingInterval.current = setInterval(async () => {
       try {
         const res = await axios.get(`/api/generate/${resourceId}/status`);
@@ -94,9 +103,11 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
           // 보여주고, 실제 완료(progress:100)가 오면 그 값이 그대로 이긴다.
           const elapsedMs = inProgressStep.elapsed_ms || 0;
           const estimatedMs = inProgressStep.step === 'higgsfield-video' ? 5 * 60 * 1000 : 60 * 1000;
+          const remainingMs = Math.max(0, estimatedMs - elapsedMs);
           const base = progressPercent || 0;
           const synthetic = Math.min(98, base + (98 - base) * Math.min(1, elapsedMs / estimatedMs));
           setProgress((prev) => Math.min(100, Math.max(prev, synthetic, 5)));
+          setRemainingTime(remainingMs);
           setLoadingLabel(
             `🎬 ${STEP_LABELS[inProgressStep.step] || inProgressStep.step} 진행 중... ` +
               `(경과 ${formatElapsed(elapsedMs)}${inProgressStep.step === 'higgsfield-video' ? ', 평균 3~8분 소요' : ''})`
@@ -133,6 +144,10 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       clearInterval(pollingInterval.current);
       pollingInterval.current = null;
     }
+    if (messageToggleInterval.current) {
+      clearInterval(messageToggleInterval.current);
+      messageToggleInterval.current = null;
+    }
   };
 
   useEffect(() => {
@@ -146,6 +161,12 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     setError(null);
     setErrorDetails(null);
     setFailedStep(null);
+    // 단계에 따라 예상 남은 시간 설정
+    if (label.includes('영상') || label.includes('컴플라이언스')) {
+      setRemainingTime(5 * 60 * 1000); // 5분
+    } else {
+      setRemainingTime(60 * 1000); // 1분
+    }
     startStatusPolling();
   };
 
@@ -453,7 +474,19 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="text-xs text-dark-text-muted text-center">잠시만 기다려주세요...</div>
+            <div className="text-xs text-dark-text-muted text-center">
+              {showTimeMessage ? (
+                remainingTime ? (
+                  <>
+                    ⏱️ 남은 시간: <strong>{Math.ceil(remainingTime / 1000)}초</strong>
+                  </>
+                ) : (
+                  '거의 다 됐습니다...'
+                )
+              ) : (
+                '잠시만 기다려주세요...'
+              )}
+            </div>
           </div>
           <div className="bg-dark-bg rounded-lg p-4 space-y-0 text-sm">
             <StepItem label="Step 4: 캐릭터 상세 설계" done={stepDone.step4} active={!stepDone.step4} isLast={false} />
