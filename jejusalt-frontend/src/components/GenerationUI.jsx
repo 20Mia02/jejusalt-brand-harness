@@ -61,18 +61,54 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     return () => clearTimeout(timer);
   }, [error]);
 
+  // step 이름 → 사용자에게 보여줄 한글 라벨. "higgsfield-video"는 가장 오래 걸리는(최대 10분)
+  // 구간이라 별도로 경과 시간을 붙여서 "멈춘 것처럼" 보이지 않게 한다.
+  const STEP_LABELS = {
+    'trend-analyzer': '자료 분석',
+    'character-designer': '캐릭터 설계',
+    'shortform-scenario-writer': '시나리오 작성',
+    'naming-generator': '제목/제품명 생성',
+    'compliance-reviewer': '컴플라이언스 검증',
+    'higgsfield-video': 'AI 영상 생성',
+    'post-generation-qa': '생성 영상 품질 검증',
+  };
+
+  const formatElapsed = (ms) => {
+    const totalSec = Math.floor(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return `${min}:${String(sec).padStart(2, '0')}`;
+  };
+
   const startStatusPolling = () => {
     pollingInterval.current = setInterval(async () => {
       try {
         const res = await axios.get(`/api/generate/${resourceId}/status`);
-        const { progress: progressPercent, completedSteps, totalSteps, currentStep: stepName, failureDetails, failureMessage } = res.data;
+        const { progress: progressPercent, completedSteps, totalSteps, currentStep: stepName, failureDetails, inProgressStep } = res.data;
+        const stepLabel = STEP_LABELS[stepName] || stepName;
 
-        setProgress((prev) => Math.min(100, Math.max(prev, progressPercent || 0, 5)));
-        setLoadingLabel(
-          stepName
-            ? `${stepName} 진행 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`
-            : `AI 생성 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`
-        );
+        if (inProgressStep) {
+          // ⭐ Step 9(영상 생성)는 진짜로 몇 분씩 걸리는데, generation_logs 기준 진행률은
+          // 그 시간 내내 8/9(≈89%)에 그대로 멈춰 있다 — 사용자에겐 "멈춘 것"처럼 보인다.
+          // 경과 시간을 기준으로 89%→98% 사이를 천천히 채워서 "지금도 뭔가 진행 중"임을
+          // 보여주고, 실제 완료(progress:100)가 오면 그 값이 그대로 이긴다.
+          const elapsedMs = inProgressStep.elapsed_ms || 0;
+          const estimatedMs = inProgressStep.step === 'higgsfield-video' ? 5 * 60 * 1000 : 60 * 1000;
+          const base = progressPercent || 0;
+          const synthetic = Math.min(98, base + (98 - base) * Math.min(1, elapsedMs / estimatedMs));
+          setProgress((prev) => Math.min(100, Math.max(prev, synthetic, 5)));
+          setLoadingLabel(
+            `🎬 ${STEP_LABELS[inProgressStep.step] || inProgressStep.step} 진행 중... ` +
+              `(경과 ${formatElapsed(elapsedMs)}${inProgressStep.step === 'higgsfield-video' ? ', 평균 3~8분 소요' : ''})`
+          );
+        } else {
+          setProgress((prev) => Math.min(100, Math.max(prev, progressPercent || 0, 5)));
+          setLoadingLabel(
+            stepLabel
+              ? `${stepLabel} 진행 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`
+              : `AI 생성 중... (${completedSteps || 0}/${totalSteps || 9} 단계)`
+          );
+        }
 
         if (failureDetails && failureDetails.length > 0) {
           const failStep = failureDetails[0];
@@ -314,7 +350,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
 
   // ── Stage 4: 카피 확정 → Step8~9 → 완료 ──
   const handleConfirmCopy = async ({ editedContent }) => {
-    beginLoading('컴플라이언스 검증 및 영상 생성 중... (1~2분 소요)');
+    beginLoading('컴플라이언스 검증 중...');
 
     try {
       const res = await axios.post(`/api/generate/${resourceId}/copy/${copyData.contentId}/confirm`, {
@@ -333,14 +369,24 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
 
       if (res.data.videoUrl) {
         setSuccessMessage('영상이 생성되었습니다!');
-        if (onSuccess) onSuccess(res.data);
       }
+      // ⚠️ 예전에는 여기서 곧바로 onSuccess(res.data)를 호출했는데, onSuccess는 App.jsx의
+      // handleGenerationComplete로 이어져서 resourceId를 즉시 비우고 currentStep을 'filter'로
+      // 되돌린다. setStage('done')과 onSuccess 호출이 같은 이벤트 핸들러 안에서 같은 렌더에
+      // batching되면서, 사용자는 완성된 영상(DoneScreen)을 단 한 프레임도 보지 못하고 화면이
+      // 곧바로 첫 화면(자료 필터링)으로 튕겨나가며 모든 데이터가 사라진 것처럼 보였다.
+      // 이제는 DoneScreen을 보여주기만 하고, 사용자가 "새 자료 만들기"를 직접 눌러야만
+      // onSuccess(=처음 화면으로 리셋)가 실행된다.
     } catch (err) {
       stopStatusPolling();
       console.error('카피 확정 실패:', err);
       setError(err.response?.data?.message || err.message || '카피 확정 중 오류가 발생했습니다.');
       setStage('copy_review');
     }
+  };
+
+  const handleGoHome = () => {
+    if (onSuccess) onSuccess(finalResult);
   };
 
   const handleRestart = () => {
@@ -474,7 +520,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
       )}
 
       {stage === 'done' && finalResult && (
-        <DoneScreen finalResult={finalResult} onRestart={handleRestart} onRetryVideo={handleGenerate} />
+        <DoneScreen finalResult={finalResult} onRestart={handleRestart} onRetryVideo={handleGenerate} onGoHome={handleGoHome} />
       )}
 
       {stage === 'idle' && (
@@ -1172,7 +1218,7 @@ function CopyReviewPanel({ resourceId, copyData, onConfirm }) {
 /**
  * 완료 화면 (기존 videoUrl 표시 로직 유지)
  */
-function DoneScreen({ finalResult, onRestart, onRetryVideo }) {
+function DoneScreen({ finalResult, onRestart, onRetryVideo, onGoHome }) {
   const { videoUrl, validationStatus, validationScore, higgsfieldError, qaResult } = finalResult;
   const videoFailed = !videoUrl;
 
@@ -1193,6 +1239,9 @@ function DoneScreen({ finalResult, onRestart, onRetryVideo }) {
         </div>
         <button onClick={onRetryVideo} className="w-full px-4 py-2 btn-primary">
           🔄 처음부터 다시 생성
+        </button>
+        <button onClick={onGoHome} className="w-full px-4 py-2 bg-dark-chip rounded hover:brightness-110">
+          🏠 새 자료 만들기
         </button>
       </div>
     );
@@ -1268,9 +1317,14 @@ function DoneScreen({ finalResult, onRestart, onRetryVideo }) {
         </div>
       )}
 
-      <button onClick={onRestart} className="w-full px-4 py-2 btn-primary">
-        🔄 다시 생성
-      </button>
+      <div className="flex gap-2">
+        <button onClick={onRestart} className="flex-1 px-4 py-2 btn-primary">
+          🔄 같은 자료로 다시 생성
+        </button>
+        <button onClick={onGoHome} className="flex-1 px-4 py-2 bg-dark-chip rounded hover:brightness-110">
+          🏠 새 자료 만들기
+        </button>
+      </div>
     </div>
   );
 }
