@@ -35,14 +35,16 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 /* ===== MAIN CONTENT ===== */
 .app-main {
   flex: 1;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
   width: 100%;
   padding: 40px 20px;
 }
@@ -51,7 +53,7 @@ body {
 .app-header {
   background: linear-gradient(135deg, #000000 0%, #0a1a2e 50%, #003d7a 100%);
   color: var(--color-primary-white);
-  padding: 1.5rem 0;
+  padding: 1.5rem 20px;
   text-align: center;
   border-bottom: 1px solid rgba(0, 174, 239, 0.3);
   position: relative;
@@ -60,8 +62,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
+  width: 100%;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(8px);
 }
