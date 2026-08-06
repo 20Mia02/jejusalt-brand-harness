@@ -29,7 +29,7 @@
         "새로운 시작",
         "에너지"
       ],
-      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy salt-crystal spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), bright childlike energy, big sparkling energetic round eyes, soft rounded cube-shaped head and body, bright blue (#00AEEF) with a subtle sparkling crystal-facet pattern, blue cap or pointed salt-crystal shaped hair, red teardrop-shaped ears, big joyful smile, pink blush cheeks, short thick arms and legs with clearly defined joints, chibi 2-heads-tall proportions, a small sparkling hexagonal salt-crystal brooch pin in the brand's signature bright blue (#00AEEF) worn at the center of the chest — the shared Jeju Lava Sea Salt family emblem worn identically by all mascot siblings, an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design that must NOT resemble, copy, or evoke the design, silhouette, or color scheme of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty, Rilakkuma, Disney/Pixar mascots)",
+      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE, a full-body product shot composition from head to feet (NOT a tight close-up headshot — the entire character including legs and the chest brooch must be visible in frame) — explicitly an original fantasy salt-crystal spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), this is a small round non-human chibi creature with a simple round potato-shaped body just like the other 7 mascot siblings (same basic silhouette, just recolored) — absolutely NOT a human boy, NOT an anime or manga character, NOT a realistic human face, NOT a flat 2D poster/print illustration, and CRITICALLY: the character's entire body from the neck down is fully covered by a solid-colored blue outer shell/suit (exactly like every other mascot sibling wears a fully-covering colored body) — there must be NO bare/nude skin-toned skin visible anywhere on the body, only the small face area is skin-toned, everything else is the solid blue shell — bright childlike energetic spirit, big sparkling innocent round eyes with a joyful expression, a simple round head and simple round body (soft rounded silhouette, no unusual body shapes), the entire body shell colored bright blue (#00AEEF) with sparkling crystal-facet pattern accents all over, short spiky hair on top of the head styled like small pointed salt-crystal shards in a lighter blue tone, one small star-shaped sparkle mark on one cheek (a flat sparkle decal on the skin, NOT a dangling earring, NOT a 3D object sticking out), big joyful smile, pink blush cheeks, short rounded arms and legs with clearly defined joints, chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio is identical across all 8 Jeju Lava Sea Salt mascot siblings for family consistency), a LARGE, clearly visible sparkling multi-faceted hexagonal salt-crystal brooch pin worn at the center of the chest, cut in soft pink (#FFB6C1) with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by all 8 Jeju Lava Sea Salt mascot siblings as their shared family emblem (only the gem color differs per character), an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design — the scene must contain ONLY this one original character plus generic scenery (waves/clouds/stars), with absolutely NO other characters, cameos, or references anywhere in the frame including the background; must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty or any Sanrio character, Rilakkuma, or any Disney/Pixar/anime/manga character)",
       "versionHistory": [
         {
           "version": "v1.0",
@@ -66,10 +66,34 @@
             "consistencyScore": 65,
             "overallScore": 77.5
           }
+        },
+        {
+          "version": "v1.3",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이며 생기있고, 얼굴 비율이 둥글고 부드러워서 귀여움이 잘 표현됨. 표정이 밝고 따뜻하며 큰 웃음으로 다가가고 싶은 느낌을 줌. 색상도 밝고 부드러운 톤으로 귀여움에 기여함.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_075504_5adfb4e9-cd89-492e-b89d-6e991b9082a3.png",
+          "scores": {
+            "cutenessScore": 85,
+            "detailScore": 75,
+            "consistencyScore": 80,
+            "overallScore": 81.5
+          }
+        },
+        {
+          "version": "v1.4",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 밝으며 표정이 매우 따뜻하고 사랑스럽습니다. 얼굴 비율도 둥글고 귀여운 편이며, 색상도 부드럽고 따뜻한 느낌을 줍니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083755_55c189e4-449a-456d-90e2-d4c0cde81950.png",
+          "scores": {
+            "cutenessScore": 78,
+            "detailScore": 70,
+            "consistencyScore": 65,
+            "overallScore": 73.1
+          }
         }
       ],
-      "currentVersion": "v1.2",
-      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_072752_e5ddf325-b7e3-4a78-be67-fe910f4f58d0.png"
+      "currentVersion": "v1.4",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083755_55c189e4-449a-456d-90e2-d4c0cde81950.png"
     },
     {
       "id": 2,
@@ -100,7 +124,7 @@
         "지혜",
         "포용"
       ],
-      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy mountain-spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), ancient and wise yet gentle presence, sparkling warm kind round eyes, a distinctive soft rounded mountain-peak-shaped body silhouette (evoking Hallasan), dark navy blue (#1A3A52) with a subtle volcanic-rock-colored pattern accent, long soft white and gray hair, a necklace or scarf, gentle heartwarming smile, pink blush cheeks, short thick arms and legs with clearly defined joints, chibi 2-heads-tall proportions, a small sparkling hexagonal salt-crystal brooch pin in the brand's signature bright blue (#00AEEF) worn at the center of the chest — the shared Jeju Lava Sea Salt family emblem worn identically by all mascot siblings, an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design that must NOT resemble, copy, or evoke the design, silhouette, or color scheme of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty, Rilakkuma, Disney/Pixar mascots)",
+      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy mountain-spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), this is a small round non-human chibi creature with a simple round potato-shaped body just like the other 7 mascot siblings (same basic silhouette, just recolored) — absolutely NOT a human grandmother, NOT an anime or manga character, NOT a realistic human face, NOT a flat 2D poster/print illustration, and CRITICALLY: the character's entire body from the neck down is fully covered by a solid-colored dark navy outer shell/suit (exactly like every other mascot sibling wears a fully-covering colored body) — there must be NO bare/nude skin-toned skin visible anywhere on the body, only the small face area is skin-toned, everything else is the solid navy shell — ancient and wise yet gentle presence, big sparkling warm kind round eyes, a simple round head and simple round body (soft rounded silhouette, no unusual body shapes), the entire body shell colored dark navy blue (#1A3A52) with a subtle volcanic-rock pattern accent all over, long soft white and gray wavy hair on top of the head styled like a snow-capped mountain ridge with a small sky-blue ribbon clip, one small star-shaped sparkle mark on one cheek (a flat sparkle decal on the skin, NOT a dangling earring, NOT a 3D object sticking out), gentle heartwarming smile, pink blush cheeks, short rounded arms and legs with clearly defined joints, chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio is identical across all 8 Jeju Lava Sea Salt mascot siblings for family consistency), a LARGE, clearly visible sparkling multi-faceted hexagonal salt-crystal brooch pin worn at the center of the chest, cut in soft sky-blue (#7FA8C9) with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by all 8 Jeju Lava Sea Salt mascot siblings as their shared family emblem (only the gem color differs per character), an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design — the scene must contain ONLY this one original character plus generic scenery (waves/clouds/stars), with absolutely NO other characters, cameos, or references anywhere in the frame including the background; must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty or any Sanrio character, Rilakkuma, or any Disney/Pixar/anime/manga character)",
       "versionHistory": [
         {
           "version": "v1.0",
@@ -137,10 +161,34 @@
             "consistencyScore": 80,
             "overallScore": 82.9
           }
+        },
+        {
+          "version": "v1.2",
+          "date": "2026-08-06",
+          "improvements": "The character has large, sparkling eyes with warm colors that give a lively and inviting impression. The face is round with soft curves, and the smile is gentle and heartwarming, enhancing the overall cuteness. The pose is natural and approachable, and the color tones are warm and soft, contributing positively to the character's charm.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_075429_42d070de-7959-479d-990a-15b1d1b42f09.png",
+          "scores": {
+            "cutenessScore": 82,
+            "detailScore": 75,
+            "consistencyScore": 70,
+            "overallScore": 77.1
+          }
+        },
+        {
+          "version": "v1.3",
+          "date": "2026-08-06",
+          "improvements": "눈은 크고 반짝이며 따뜻한 느낌이 있어 귀여움 요소가 잘 표현됨. 얼굴 비율도 둥글고 부드러운 곡선으로 사랑스러운 인상을 준다. 표정이 다가가고 싶은 미소라 친근함이 있다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083756_9e12f894-b8d1-4a80-8e57-2d1a443666c5.png",
+          "scores": {
+            "cutenessScore": 70,
+            "detailScore": 65,
+            "consistencyScore": 75,
+            "overallScore": 70.5
+          }
         }
       ],
-      "currentVersion": "v1.1",
-      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_072747_2dcb7a5c-e2f6-469d-86a0-2a10575a5ecf.png"
+      "currentVersion": "v1.3",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083756_9e12f894-b8d1-4a80-8e57-2d1a443666c5.png"
     },
     {
       "id": 3,
@@ -171,7 +219,7 @@
         "장인정신",
         "따뜻함"
       ],
-      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy lava-spirit, absolutely NOT a realistic adult human man, NOT a photorealistic human portrait, NOT normal adult human body proportions/face/hands, NO wristwatch, NO rings, NO business-casual or hanbok-style adult clothing — this is a small round non-human toy-like creature with a huge head and a tiny body, not meant to resemble a human at all — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), a sturdy protective guardian-spirit warmth (NOT a literal human father figure, NOT a human man), big kind sparkling round eyes with a gentle trustworthy expression, a huge round head that is over 60% of its total height sitting on a tiny round body (extreme baby-like chibi proportions, the head is dramatically bigger than the body), soft rounded body with slightly angular little shoulder-bumps, deep sea-blue (#2C5282) coloring, short neat black hair streaked with white, a dark navy scarf around the neck, gentle heartwarming smile, pink blush cheeks, tiny stubby arms and legs with clearly defined joints, chibi 2-heads-tall proportions, a small sparkling hexagonal salt-crystal brooch pin in the brand's signature bright blue (#00AEEF) worn at the center of the chest — the shared Jeju Lava Sea Salt family emblem worn identically by all mascot siblings, an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design that must NOT resemble, copy, or evoke the design, silhouette, or color scheme of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty, Rilakkuma, Disney/Pixar mascots)",
+      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy lava-spirit, absolutely NOT a realistic adult human man, NOT a photorealistic human portrait, NO wristwatch, NO rings, NO business-casual or hanbok-style adult clothing — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), this is a small round non-human chibi creature with a simple round potato-shaped body just like the other 7 mascot siblings (same basic silhouette, just recolored), and CRITICALLY: the character's entire body from the neck down is fully covered by a solid-colored deep sea-blue outer shell/suit (exactly like every other mascot sibling wears a fully-covering colored body) — there must be NO bare/nude skin-toned skin visible anywhere on the body, only the small face area is skin-toned, everything else is the solid blue shell — a sturdy protective guardian-spirit warmth (NOT a literal human father figure, NOT a human man), big kind sparkling round eyes with a gentle trustworthy expression, a simple round head and simple round body (soft rounded silhouette, no unusual body shapes), the entire body shell colored deep sea-blue (#2C5282), short neat solid black hair on top of the head styled simply and neatly with no gray or white strands at all (this is a warm middle-aged guardian-spirit, not an elderly figure — must look clearly younger/warmer than 한라 or 가마할방), a small dark navy scarf knot at the neck, one small star-shaped sparkle mark on one cheek (a flat sparkle decal on the skin, NOT a dangling earring, NOT a 3D object sticking out), gentle heartwarming smile, pink blush cheeks, short rounded arms and legs with clearly defined joints, chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio is identical across all 8 Jeju Lava Sea Salt mascot siblings for family consistency), a LARGE, clearly visible sparkling multi-faceted hexagonal salt-crystal brooch pin worn at the center of the chest, cut in warm cream (#F5E6D3) with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by all 8 Jeju Lava Sea Salt mascot siblings as their shared family emblem (only the gem color differs per character), an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design — the scene must contain ONLY this one original character plus generic scenery (waves/clouds/stars), with absolutely NO other characters, cameos, or references anywhere in the frame including the background; must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty or any Sanrio character — no round white face, no centered head-bow, no whisker dots — Rilakkuma, or any Disney/Pixar/anime/manga character)",
       "versionHistory": [
         {
           "version": "v1.0",
@@ -280,10 +328,46 @@
             "consistencyScore": 75,
             "overallScore": 79
           }
+        },
+        {
+          "version": "v1.7",
+          "date": "2026-08-06",
+          "improvements": "The character has very large, sparkling eyes with a warm, gentle smile that conveys trust and approachability. The face shape is rounded with soft curves, and the pink blush on the cheeks adds to the adorable and lively animated feel. The pose is natural and inviting, contributing to the overall cuteness.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_075408_2c7f7b3f-c884-4491-b144-b26234ac79aa.png",
+          "scores": {
+            "cutenessScore": 88,
+            "detailScore": 82,
+            "consistencyScore": 90,
+            "overallScore": 86.6
+          }
+        },
+        {
+          "version": "v1.8",
+          "date": "2026-08-06",
+          "improvements": "The character has large, sparkling eyes with a kind and gentle expression, and the soft blush on the cheeks adds to the warm and approachable vibe. The round face and chibi proportions contribute well to the cuteness, and the overall illustration style is lively and animated rather than photorealistic.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083845_5bf9242e-abb6-42f3-b3b9-bb9bd398b204.png",
+          "scores": {
+            "cutenessScore": 85,
+            "detailScore": 80,
+            "consistencyScore": 75,
+            "overallScore": 81.5
+          }
+        },
+        {
+          "version": "v1.9",
+          "date": "2026-08-06",
+          "improvements": "The character has very large, sparkling eyes that convey warmth and kindness, with a simple, round face and small mouth that enhance the adorable and approachable feel. The gentle smile and rosy cheeks add to the heartwarming expression. The overall design is lively and animated, with soft colors and a playful pose that feels inviting and cute.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_084419_246b98de-6573-493e-9fce-5fc07a8579ee.png",
+          "scores": {
+            "cutenessScore": 90,
+            "detailScore": 85,
+            "consistencyScore": 90,
+            "overallScore": 88.5
+          }
         }
       ],
-      "currentVersion": "v1.6",
-      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_073507_e2012ac7-3f91-41c4-9c80-470231ed42ac.png"
+      "currentVersion": "v1.9",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_084419_246b98de-6573-493e-9fce-5fc07a8579ee.png"
     },
     {
       "id": 4,
@@ -313,7 +397,7 @@
         "우아함",
         "프리미엄"
       ],
-      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy sea-mineral spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), elegant graceful mysterious presence, big sparkling innocent round eyes with a refined expression, soft rounded body with an elegant flowing S-curve silhouette, purple (#6B4C9A) with luxurious sparkling crystal-facet pattern accents, long elegant hair with a pink ribbon, star-shaped earrings and a necklace, charming refined smile, pink blush cheeks, graceful curved arms and legs with clearly defined joints, chibi 2-heads-tall proportions, a small sparkling hexagonal salt-crystal brooch pin in the brand's signature bright blue (#00AEEF) worn at the center of the chest — the shared Jeju Lava Sea Salt family emblem worn identically by all mascot siblings, an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design that must NOT resemble, copy, or evoke the design, silhouette, or color scheme of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty, Rilakkuma, Disney/Pixar mascots)",
+      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy sea-mineral spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), this is a small round non-human chibi creature with a simple round potato-shaped body just like the other 7 mascot siblings (same basic silhouette as 미내/불이, just recolored) — absolutely NOT a human girl, NOT an anime or manga character, NOT an egg or blob with no personality, NOT a realistic human face with makeup, NOT a flat 2D poster/print illustration, and CRITICALLY: the character's entire body from the neck down is fully covered by a solid-colored purple outer shell/suit (exactly like every other mascot sibling wears a fully-covering colored body) — there must be NO bare/nude skin-toned skin visible anywhere on the body, only the small face area is skin-toned, everything else is the solid purple shell — big sparkling innocent round eyes with a refined gentle expression, a simple round head and simple round body (soft rounded silhouette, no unusual body shapes), the entire body shell colored purple (#6B4C9A) with luxurious sparkling crystal-facet pattern accents all over, medium-length wavy blue-purple hair on top of the head styled like a gentle ocean wave with a small pink ribbon clip, one small star-shaped sparkle mark on one cheek (a flat sparkle decal on the skin, NOT a dangling earring, NOT a 3D object sticking out), charming refined smile, pink blush cheeks, short rounded arms and legs with clearly defined joints, chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio is identical across all 8 Jeju Lava Sea Salt mascot siblings for family consistency), a LARGE, clearly visible sparkling multi-faceted hexagonal salt-crystal brooch pin worn at the center of the chest, cut in soft pink (#FFB6C1) with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by all 8 Jeju Lava Sea Salt mascot siblings as their shared family emblem (only the gem color differs per character), an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design — the scene must contain ONLY this one original character plus generic scenery (waves/clouds/stars), with absolutely NO other characters, cameos, or references anywhere in the frame including the background; must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty or any Sanrio character — no round white face, no centered head-bow, no whisker dots — Rilakkuma, or any Disney/Pixar/anime/manga character)",
       "versionHistory": [
         {
           "version": "v1.0",
@@ -338,10 +422,46 @@
             "consistencyScore": 90,
             "overallScore": 84.5
           }
+        },
+        {
+          "version": "v1.2",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이며 순수한 느낌을 주고, 얼굴 비율도 둥글고 부드러운 곡선으로 귀여움을 잘 살렸습니다. 표정도 다가가고 싶은 미소로 따뜻한 인상을 줍니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_075353_e35762f5-09c9-4332-ab5c-26f885d095ad.png",
+          "scores": {
+            "cutenessScore": 70,
+            "detailScore": 65,
+            "consistencyScore": 75,
+            "overallScore": 70.5
+          }
+        },
+        {
+          "version": "v1.3",
+          "date": "2026-08-06",
+          "improvements": "The character has large, sparkling eyes and a warm, gentle expression that evokes a friendly and approachable vibe. The pink ribbon in the hair adds a cute touch, and the soft rounded face shape fits the chibi style well.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_080001_3e7d137d-5c3c-4217-abfd-37b212f47ad9.png",
+          "scores": {
+            "cutenessScore": 70,
+            "detailScore": 65,
+            "consistencyScore": 75,
+            "overallScore": 70.5
+          }
+        },
+        {
+          "version": "v1.4",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이며 순수한 느낌이 잘 살아있고, 얼굴 비율도 둥글고 부드러운 곡선으로 귀여움을 잘 표현했습니다. 표정도 따뜻하고 다가가고 싶은 미소가 있어 친근함이 느껴집니다. 색상은 부드럽고 따뜻한 톤을 잘 사용했고, 포즈도 자연스럽고 사랑스럽습니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_082405_3ff6896c-c3d3-40e0-ad6f-e6d2e28d970d.png",
+          "scores": {
+            "cutenessScore": 83,
+            "detailScore": 75,
+            "consistencyScore": 80,
+            "overallScore": 80.9
+          }
         }
       ],
-      "currentVersion": "v1.1",
-      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_072741_b71462e1-362e-48f9-b21f-cd5981e6a36d.png"
+      "currentVersion": "v1.4",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_082405_3ff6896c-c3d3-40e0-ad6f-e6d2e28d970d.png"
     },
     {
       "id": 5,
@@ -372,7 +492,7 @@
         "활력",
         "포용"
       ],
-      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy sunshine-flame spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), cheerful encouraging spirit, big bright sparkling round eyes full of encouragement, soft round chubby body, sunny yellow (#FFD700) with bright tone and subtle flame-pattern accents, yellow-orange hair with a pink ribbon, big joyful smile that lifts people's spirits, pink blush cheeks, short chubby arms and legs with clearly defined joints, chibi 2-heads-tall proportions, a small sparkling hexagonal salt-crystal brooch pin in the brand's signature bright blue (#00AEEF) worn at the center of the chest — the shared Jeju Lava Sea Salt family emblem worn identically by all mascot siblings, an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design that must NOT resemble, copy, or evoke the design, silhouette, or color scheme of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty, Rilakkuma, Disney/Pixar mascots)",
+      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy sunshine-flame spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), this is a small round non-human chibi creature with a simple round potato-shaped body just like the other 7 mascot siblings (same basic silhouette, just recolored) — absolutely NOT a human girl, NOT an anime or manga character, NOT a realistic human face, NOT a flat 2D poster/print illustration, and CRITICALLY: the character's entire body from the neck down is fully covered by a solid-colored yellow outer shell/suit (exactly like every other mascot sibling wears a fully-covering colored body) — there must be NO bare/nude skin-toned skin visible anywhere on the body, only the small face area is skin-toned, everything else is the solid yellow shell — cheerful encouraging spirit, big bright sparkling round eyes full of encouragement, a simple round head and simple round body (soft rounded silhouette, no unusual body shapes), the entire body shell colored sunny yellow (#FFD700) with subtle flame-swirl pattern accents all over, medium-length yellow-orange wavy hair on top of the head styled like a sunburst with a small pink ribbon clip, one small star-shaped sparkle mark on one cheek (a flat sparkle decal on the skin, NOT a dangling earring, NOT a 3D object sticking out), big joyful smile that lifts people's spirits, pink blush cheeks, short rounded arms and legs with clearly defined joints, chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio is identical across all 8 Jeju Lava Sea Salt mascot siblings for family consistency), a LARGE, clearly visible sparkling multi-faceted hexagonal salt-crystal brooch pin worn at the center of the chest, cut in soft pink (#FFB6C1) with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by all 8 Jeju Lava Sea Salt mascot siblings as their shared family emblem (only the gem color differs per character), an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design — the scene must contain ONLY this one original character plus generic scenery (waves/clouds/stars), with absolutely NO other characters, cameos, or references anywhere in the frame including the background; must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty or any Sanrio character, Rilakkuma, or any Disney/Pixar/anime/manga character)",
       "versionHistory": [
         {
           "version": "v1.0",
@@ -397,10 +517,34 @@
             "consistencyScore": 90,
             "overallScore": 81.5
           }
+        },
+        {
+          "version": "v1.2",
+          "date": "2026-08-06",
+          "improvements": "The character has large, lively eyes with bright highlights and a warm, inviting smile that conveys encouragement and friendliness. The face shape is round and soft, with a chubby body that enhances the cute, approachable vibe. The color palette is warm and soft, mainly yellow tones with pink accents, matching the character's personality well.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_075459_523bed5f-11d1-491e-b25a-9b3975c0618a.png",
+          "scores": {
+            "cutenessScore": 85,
+            "detailScore": 75,
+            "consistencyScore": 90,
+            "overallScore": 83.5
+          }
+        },
+        {
+          "version": "v1.3",
+          "date": "2026-08-06",
+          "improvements": "The character has large, sparkling eyes with a lively and encouraging expression. The round face and body with soft curves are well executed, and the joyful smile is warm and inviting. The color palette is bright and sunny, fitting the primary #FFD700 tone, and the pose is natural and adorable, enhancing the overall cuteness.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083843_be23e008-ad39-4d0a-bd53-b7b75822a524.png",
+          "scores": {
+            "cutenessScore": 88,
+            "detailScore": 82,
+            "consistencyScore": 90,
+            "overallScore": 86.8
+          }
         }
       ],
-      "currentVersion": "v1.1",
-      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_072748_ffe8d85b-0fe9-467b-b3fc-cfbc7ce7dabc.png"
+      "currentVersion": "v1.3",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083843_be23e008-ad39-4d0a-bd53-b7b75822a524.png"
     },
     {
       "id": 6,
@@ -431,7 +575,7 @@
         "정직함",
         "견고함"
       ],
-      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy basalt-rock spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), steady dependable calm presence, big calm sparkling round eyes with a steady expression, soft rounded body with angular shoulders, compact and sturdy, dark navy (#1F3A52) with a subtle geometric pattern accent, short neat black hair, gentle confident smile, pink blush cheeks, strong precise arms and legs with clearly defined joints, chibi 2-heads-tall proportions (slightly smaller and more compact than the other characters), a small sparkling hexagonal salt-crystal brooch pin in the brand's signature bright blue (#00AEEF) worn at the center of the chest — the shared Jeju Lava Sea Salt family emblem worn identically by all mascot siblings, and this brooch is intentionally this character's only accessory, an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design that must NOT resemble, copy, or evoke the design, silhouette, or color scheme of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty, Rilakkuma, Disney/Pixar mascots)",
+      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy basalt-rock spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), this is a small round non-human chibi creature with a simple round potato-shaped body just like the other 7 mascot siblings (same basic silhouette, just recolored) — this character's one signature distinguishing feature is a pair of small soft ROUNDED ears (rounded/oval, NOT pointed, NOT triangular, NOT cat-like) set on top of the head, colored the same dark navy as the body with a lighter tan inner-ear patch, intentionally part of this character's official design — absolutely NOT a cat (no whiskers, no cat-style pointed ears, no round white face with a bow, no Sanrio character), NOT Rilakkuma, NOT anime, and CRITICALLY: the character's entire body from the neck down is fully covered by a solid-colored dark navy outer shell/suit (exactly like every other mascot sibling wears a fully-covering colored body) — there must be NO bare/nude skin-toned skin visible anywhere on the body, only the small face area is skin-toned, everything else is the solid navy shell — steady dependable calm presence, big calm sparkling round eyes with a steady expression, a simple round head and simple round body (soft rounded silhouette, no unusual body shapes) apart from the two signature rounded ears, no hair on top of the head, the entire body shell colored dark navy (#1F3A52) with a hexagonal basalt-column rock-plate pattern subtly etched into the surface like cooled volcanic rock, one small star-shaped sparkle mark on one cheek (a flat sparkle decal on the skin, NOT a dangling earring, NOT a 3D object sticking out), gentle confident smile, pink blush cheeks, short rounded arms and legs with clearly defined joints, chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio is identical across all 8 Jeju Lava Sea Salt mascot siblings for family consistency, slightly more compact overall than the other characters), a LARGE, clearly visible sparkling multi-faceted hexagonal salt-crystal brooch pin worn at the center of the chest, cut in soft sky-blue (#7FA8C9) with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by all 8 Jeju Lava Sea Salt mascot siblings as their shared family emblem (only the gem color differs per character), and this brooch is intentionally this character's only accessory, an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design — the scene must contain ONLY this one original character plus generic scenery (waves/clouds/stars), with absolutely NO other characters, cameos, or references anywhere in the frame including the background — this is critical, no other character or logo of any kind may appear anywhere in the image; must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty or any Sanrio character, Rilakkuma, or any Disney/Pixar/anime/manga character)",
       "versionHistory": [
         {
           "version": "v1.0",
@@ -456,10 +600,58 @@
             "consistencyScore": 75,
             "overallScore": 79
           }
+        },
+        {
+          "version": "v1.2",
+          "date": "2026-08-06",
+          "improvements": "The character has a smooth, rounded head and a compact body which contributes to a cute chibi style. The large eyes and small mouth add to the approachable and gentle expression. The pastel gradient background with stars and clouds enhances a playful and lively atmosphere.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_075458_75eeacca-9c56-40f3-b2bc-ba1163b57f55.png",
+          "scores": {
+            "cutenessScore": 70,
+            "detailScore": 65,
+            "consistencyScore": 40,
+            "overallScore": 60.5
+          }
+        },
+        {
+          "version": "v1.3",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝임이 살아있으며, 얼굴 비율과 표정이 매우 귀엽고 따뜻한 느낌을 준다. 전체적으로 사랑스럽고 애니메이션 스타일의 생명력 있는 캐릭터로 보인다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_080102_6f7aefc4-4810-4066-a752-e644f0315bcc.png",
+          "scores": {
+            "cutenessScore": 85,
+            "detailScore": 80,
+            "consistencyScore": 75,
+            "overallScore": 81.5
+          }
+        },
+        {
+          "version": "v1.4",
+          "date": "2026-08-06",
+          "improvements": "The character has large, sparkling eyes and a gentle, confident smile that gives a warm and approachable expression. The rounded face and soft blush add to the cuteness. The color palette is soft and calming with a nice contrast between the skin tone and the dark navy shell.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083844_5dabacbb-fd74-4a9f-ac30-e78fea129a9e.png",
+          "scores": {
+            "cutenessScore": 75,
+            "detailScore": 70,
+            "consistencyScore": 80,
+            "overallScore": 75.5
+          }
+        },
+        {
+          "version": "v1.5",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이는 점은 애니메이션 스타일의 생명력을 어느 정도 전달합니다. 표정이 다가가기 쉬운 미소여서 친근함이 느껴집니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_084808_7db7f3e8-34d5-49ff-9684-1083888688f4.png",
+          "scores": {
+            "cutenessScore": 65,
+            "detailScore": 55,
+            "consistencyScore": 40,
+            "overallScore": 57.5
+          }
         }
       ],
-      "currentVersion": "v1.1",
-      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_072652_452e8bf1-518e-4812-98a9-8c3ad1d4e4f5.png"
+      "currentVersion": "v1.5",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_084808_7db7f3e8-34d5-49ff-9684-1083888688f4.png"
     },
     {
       "id": 7,
@@ -490,7 +682,7 @@
         "70년 기술",
         "따뜻함"
       ],
-      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy hearth-kettle spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), warm nurturing craftsperson spirit full of wisdom and gentleness, warm kind twinkling round eyes, soft round pudgy kettle-shaped body with no angular edges, warm brown (#8B4513) with subtle flame-pattern accents, white hair with a neat bob and a white headscarf on top, a brown apron, heartwarming comforting smile, pink blush cheeks, thick warm arms and legs with clearly defined joints, chibi 2-heads-tall proportions, a small sparkling hexagonal salt-crystal brooch pin in the brand's signature bright blue (#00AEEF) worn at the center of the chest — the shared Jeju Lava Sea Salt family emblem worn identically by all mascot siblings, an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design that must NOT resemble, copy, or evoke the design, silhouette, or color scheme of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty, Rilakkuma, Disney/Pixar mascots)",
+      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy hearth-kettle spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), brightly and evenly lit with every color and detail clearly visible — this must NOT be a dark, underexposed, or shadowy silhouette, this is a small round non-human chibi creature with a simple round potato-shaped body just like the other 7 mascot siblings (same basic silhouette, just recolored) — absolutely NOT a human grandmother, NOT any existing bear-mascot character, NOT Rilakkuma, NOT any Sanrio character, NOT anime, and CRITICALLY: the character's entire body from the neck down is fully covered by a solid-colored warm brown outer shell/suit (exactly like every other mascot sibling wears a fully-covering colored body) — there must be NO bare/nude skin-toned skin visible anywhere on the body, only the small face area is skin-toned, everything else is the solid brown shell — warm nurturing craftsperson spirit full of wisdom and gentleness, big warm kind twinkling round eyes, a simple round head and simple round body (soft rounded silhouette, no unusual body shapes, no ears visible), the entire body shell colored warm brown (#8B4513) with subtle wood-grain/rope-weave pattern accents all over, white hair with a neat bob on top of the head and a small white headscarf knot tied at the top (like a tiny bow), one small star-shaped sparkle mark on one cheek (a flat sparkle decal on the skin, NOT a dangling earring, NOT a 3D object sticking out), heartwarming comforting smile, pink blush cheeks, short rounded arms and legs with clearly defined joints, chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio is identical across all 8 Jeju Lava Sea Salt mascot siblings for family consistency), a LARGE, clearly visible sparkling multi-faceted hexagonal salt-crystal brooch pin worn at the center of the chest, cut in warm orange (#FF6B35) with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by all 8 Jeju Lava Sea Salt mascot siblings as their shared family emblem (only the gem color differs per character), an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design — the scene must contain ONLY this one original character plus generic scenery (waves/clouds/stars), with absolutely NO other characters, cameos, or references anywhere in the frame including the background; must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty or any Sanrio character, Rilakkuma, or any Disney/Pixar/anime/manga character)",
       "versionHistory": [
         {
           "version": "v1.0",
@@ -515,10 +707,46 @@
             "consistencyScore": 85,
             "overallScore": 76.5
           }
+        },
+        {
+          "version": "v1.2",
+          "date": "2026-08-06",
+          "improvements": "The character has large, lively eyes with a warm and gentle expression. The face is rounded with soft curves and a heartwarming smile, which enhances its approachable and adorable appeal. The color palette uses warm, deep browns and soft oranges that contribute to a cozy and nurturing feel.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_075414_5ea40569-880e-495c-bfec-c147b71e8c90.png",
+          "scores": {
+            "cutenessScore": 85,
+            "detailScore": 78,
+            "consistencyScore": 80,
+            "overallScore": 82.9
+          }
+        },
+        {
+          "version": "v1.3",
+          "date": "2026-08-06",
+          "improvements": "The character has a simple, rounded silhouette and a warm color palette that fits the intended warmth and nurturing vibe. The star-shaped cheek decal and large star brooch add charm and visual interest. The background is playful and complements the character well.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083933_eca4dfa7-eb48-470d-8244-c3d3ed1eb1da.png",
+          "scores": {
+            "cutenessScore": 75,
+            "detailScore": 60,
+            "consistencyScore": 70,
+            "overallScore": 70.5
+          }
+        },
+        {
+          "version": "v1.4",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 둥글며 다가가고 싶은 미소가 있어 친근한 느낌이 있다. 얼굴 비율도 둥글고 부드러운 곡선으로 귀여움을 어느 정도 잘 표현했다. 색상도 따뜻하고 포근한 톤을 잘 사용했다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_084858_f9979209-a81d-4467-8a0c-de38f29b47d0.png",
+          "scores": {
+            "cutenessScore": 70,
+            "detailScore": 65,
+            "consistencyScore": 80,
+            "overallScore": 71.5
+          }
         }
       ],
-      "currentVersion": "v1.1",
-      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_072742_62aec6ab-3f84-45e4-a2cf-a4c31ee5c69e.png"
+      "currentVersion": "v1.4",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_084858_f9979209-a81d-4467-8a0c-de38f29b47d0.png"
     },
     {
       "id": 8,
@@ -549,7 +777,7 @@
         "긍정",
         "활력"
       ],
-      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy flame spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), energetic spirit bursting with positivity, big sparkling round eyes bursting with positivity, soft rounded dynamic flame-shaped body, orange-red (#FF4500) with flowing flame pattern accents, red-orange-yellow flame-like hair with a softly pointed flickering top, big joyful infectious smile, pink blush cheeks, long strong arms and legs with clearly defined joints, chibi 2-heads-tall proportions, a small sparkling hexagonal salt-crystal brooch pin in the brand's signature bright blue (#00AEEF) worn at the center of the chest — the shared Jeju Lava Sea Salt family emblem worn identically by all mascot siblings, an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design that must NOT resemble, copy, or evoke the design, silhouette, or color scheme of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty, Rilakkuma, Disney/Pixar mascots)",
+      "higgsfieldPromptTemplate": "adorable chibi mascot CREATURE — explicitly an original fantasy flame spirit, NOT a human person and not meant to resemble one — rendered as a glossy premium 3D collectible vinyl/resin figurine still, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy), warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions), this is a small round non-human chibi creature with a simple round potato-shaped body just like the other 7 mascot siblings (same basic silhouette, just recolored) — absolutely NOT a human boy, NOT an anime or manga character, NOT a realistic human face, NOT a flat 2D poster/print illustration, and CRITICALLY: the character's entire body from the neck down is fully covered by a solid-colored orange-red outer shell/suit (exactly like every other mascot sibling wears a fully-covering colored body) — there must be NO bare/nude skin-toned skin visible anywhere on the body, only the small face area is skin-toned, everything else is the solid orange-red shell — energetic spirit bursting with positivity, big sparkling round eyes bursting with positivity, a simple round head and simple round body (soft rounded silhouette, no unusual body shapes), the entire body shell colored orange-red (#FF4500) with subtle flowing flame-swirl pattern accents all over, red-orange-yellow flame-like wavy hair on top of the head with a softly pointed flickering top and a small light-peach ribbon clip, one small star-shaped sparkle mark on one cheek (a flat sparkle decal on the skin, NOT a dangling earring, NOT a 3D object sticking out), big joyful infectious smile, pink blush cheeks, short rounded arms and legs with clearly defined joints, chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio is identical across all 8 Jeju Lava Sea Salt mascot siblings for family consistency), a LARGE, clearly visible sparkling multi-faceted hexagonal salt-crystal brooch pin worn at the center of the chest, cut in light peach (#FFE4B5) with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by all 8 Jeju Lava Sea Salt mascot siblings as their shared family emblem (only the gem color differs per character), an even more vividly decorated playful illustrated Jeju-themed background scene rendered with the same soft 3D depth as the character (cute cartoon waves with sparkle highlights, fluffy round clouds, tiny twinkling stars, pastel gradient sky — NEVER a blank plain wall or flat solid color), gentle even lighting, no text overlay, no logos, no letters or numbers, a wholly original brand mascot design — the scene must contain ONLY this one original character plus generic scenery (waves/clouds/stars), with absolutely NO other characters, cameos, or references anywhere in the frame including the background; must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon-style creatures, Kakao Friends, LINE Friends, Hello Kitty or any Sanrio character, Rilakkuma, or any Disney/Pixar/anime/manga character)",
       "versionHistory": [
         {
           "version": "v1.0",
@@ -574,10 +802,34 @@
             "consistencyScore": 90,
             "overallScore": 87.9
           }
+        },
+        {
+          "version": "v1.2",
+          "date": "2026-08-06",
+          "improvements": "The character has very large, sparkling eyes with a joyful and infectious smile, which adds to the warm and approachable feel. The rounded face and soft curves contribute positively to the overall cuteness. The color palette is warm and vibrant, fitting the flame spirit theme well.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_075309_20f8af5c-c317-4797-85b1-45c2da0084bb.png",
+          "scores": {
+            "cutenessScore": 70,
+            "detailScore": 65,
+            "consistencyScore": 75,
+            "overallScore": 70.5
+          }
+        },
+        {
+          "version": "v1.3",
+          "date": "2026-08-06",
+          "improvements": "캐릭터의 눈이 크고 반짝이며 생기있고, 얼굴 비율도 둥글고 부드러운 곡선을 잘 살렸으며, 표정이 따뜻하고 다가가고 싶은 미소를 잘 표현했습니다. 색상도 따뜻하고 사랑스러운 톤을 유지하고 있습니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083931_a5fe2802-006b-4f32-97d1-e22607ea7da6.png",
+          "scores": {
+            "cutenessScore": 78,
+            "detailScore": 70,
+            "consistencyScore": 75,
+            "overallScore": 74.4
+          }
         }
       ],
-      "currentVersion": "v1.1",
-      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_072925_562d17fd-6950-4c9c-986a-e45c1e062411.png"
+      "currentVersion": "v1.3",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_083931_a5fe2802-006b-4f32-97d1-e22607ea7da6.png"
     }
   ]
 }

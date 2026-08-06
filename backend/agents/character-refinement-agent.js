@@ -72,6 +72,14 @@ async function evaluateCharacterImage({ generatedImageUrl, originalPrompt, chara
 색상: primary ${characterConfig.colorPalette?.primary || ""}
 액세서리: ${JSON.stringify(characterConfig.accessories || {})}
 
+🚨 최우선 하드 체크 (다른 무엇보다 먼저 확인): 이미지 안에 실존하는 저작권 캐릭터가
+그대로 등장하거나(예: 배경에 헬로키티/카카오프렌즈/포켓몬 등이 그려져 있는 경우),
+메인 캐릭터 자체가 그런 실존 캐릭터를 명백히 베낀 디자인이면 — 이건 절대 통과시키면
+안 되는 치명적 위반입니다. 이 경우 overallScore를 반드시 30점 이하로, shouldRetry는
+반드시 true로 설정하고, consistencyWeaknesses에 구체적으로 어떤 저작권 캐릭터가
+보였는지 적으세요. improvedPrompt에는 그 저작권 캐릭터를 명시적으로 배제하는 문구를
+추가하세요.
+
 ⚠️ 매우 중요한 판정 원칙:
 (a) "인형같은 귀여운 외모"는 좋지만, 실제로 촬영된 물리적 인형/피규어 사진(사실적인 원단
 짜임, 플라스틱/비닐 광택 반사, 스튜디오 제품사진 조명, 경직되고 생명력 없는 느낌)처럼
