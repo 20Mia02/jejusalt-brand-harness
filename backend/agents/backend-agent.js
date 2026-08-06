@@ -1104,8 +1104,13 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
     // 후처리(스티칭)가 필요하다 — 이번 수정 범위 밖의 별도 작업.
     const MODEL = "seedance_2_0";
     const MAX_CLIP_SECONDS = 15;
-    const requestedDuration = videoConfig.duration || MAX_CLIP_SECONDS;
-    const duration = Math.min(Math.max(Math.round(requestedDuration), 4), MAX_CLIP_SECONDS);
+    const MIN_CLIP_SECONDS = 4;
+    // 숫자로 변환 불가한 값(문자열/undefined 등)이 들어와도 조용히 NaN이 CLI로 새어나가지
+    // 않도록 방어한다 — 지금은 호출부(generation.js)가 이미 검증된 duration만 넘기지만,
+    // 이 함수 자체는 그 보장에 기대지 않는다.
+    const rawDuration = Number(videoConfig.duration);
+    const requestedDuration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : MAX_CLIP_SECONDS;
+    const duration = Math.min(Math.max(Math.round(requestedDuration), MIN_CLIP_SECONDS), MAX_CLIP_SECONDS);
     if (requestedDuration > MAX_CLIP_SECONDS) {
       console.warn(
         `[Step 9] 요청 길이 ${requestedDuration}초가 모델 한계(${MAX_CLIP_SECONDS}초)를 초과 → ${duration}초로 축약해서 생성 (핵심 장면만 압축)`
@@ -1140,7 +1145,9 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
     // ⚠️ 이 프롬프트는 뒤에서 execPromise(child_process.exec)로 셸에 그대로 전달된다.
     // generatedContent(AI가 생성한 카피)를 처음으로 여기 포함시키면서, 따옴표/셸 특수문자가
     // 섞여 들어와 명령이 깨지거나 인젝션으로 악용될 위험이 생겼다 → 셸에 위험한 문자를 제거한다.
-    const sanitizeForShell = (s) => String(s || "").replace(/["'`$\\;|&<>\n\r]/g, " ").replace(/\s+/g, " ").trim();
+    // exec()는 shell 옵션을 지정하지 않아 OS 기본 셸을 쓰는데, Windows에서는 cmd.exe라
+    // %(환경변수 확장)·^(이스케이프)·()(조건/그룹 구문)도 함께 제거한다.
+    const sanitizeForShell = (s) => String(s || "").replace(/["'`$\\;|&<>%^()\n\r]/g, " ").replace(/\s+/g, " ").trim();
     const metadata = sanitizeForShell(
       [
         `${character} character`,
@@ -1169,8 +1176,10 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
     const baseCommand = `higgsfield generate create ${MODEL} --prompt "${metadata}" --duration ${duration} --resolution 720p`;
     let command = baseCommand;
     if (videoConfig.referenceJobId) {
-      console.log(`  레퍼런스 이미지(start-image job id): ${videoConfig.referenceJobId}`);
-      command += ` --start-image "${videoConfig.referenceJobId}"`;
+      // job id는 원래 우리 쪽에서 생성한 UUID라 위험이 낮지만, 방어적으로 동일하게 sanitize한다.
+      const safeReferenceJobId = sanitizeForShell(videoConfig.referenceJobId);
+      console.log(`  레퍼런스 이미지(start-image job id): ${safeReferenceJobId}`);
+      command += ` --start-image "${safeReferenceJobId}"`;
     }
     command += ` --wait`;
 
