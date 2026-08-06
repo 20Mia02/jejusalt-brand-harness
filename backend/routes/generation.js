@@ -1595,7 +1595,7 @@ router.post("/:resourceId/retry-from/:step", async (req, res) => {
 // body: { characterId, resourceId?, versionOverride?, videoType?, duration?, forceRefine? }
 // ─────────────────────────────────────────────────────
 router.post("/character", async (req, res) => {
-  const { characterId, resourceId, versionOverride, videoType, duration, forceRefine } = req.body || {};
+  const { characterId, resourceId, versionOverride, videoType, duration, forceRefine, maxRetries } = req.body || {};
 
   if (!characterId) {
     return res.status(400).json({ success: false, message: "characterId가 필요합니다" });
@@ -1624,6 +1624,11 @@ router.post("/character", async (req, res) => {
 
       const refined = await refineCharacterImage({
         characterConfig: { ...character, higgsfieldPromptTemplate: promptWithVersion },
+        // ⚠️ AI 평가자가 자유롭게 다시 쓰는 improvedPrompt로 2-3차 재시도를 거치면서
+        // 브랜드 브리프에서 크게 벗어나거나(실제 인간 얼굴, 저작권 캐릭터 등장) 심지어
+        // 저작권 침해로 이어지는 사례가 발견됨 — 필요할 때 1회만(직접 작성한 고정 템플릿
+        // 그대로) 시도하도록 강제할 수 있게 외부에서 제어 가능하게 열어둔다.
+        ...(maxRetries ? { maxRetries } : {}),
       });
       attempts = refined.attempts;
 

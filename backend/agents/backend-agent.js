@@ -283,6 +283,14 @@ async function callTimelyAIAgent(agentName, payload) {
   const client = new OpenAI({
     apiKey: apiKey,
     baseURL: baseURL,
+    // ⚠️ 타임아웃 미설정 시 SDK 기본값(10분)까지 응답을 기다린다 — TimelyAI 브릿지가
+    // 느려지거나 응답 없이 걸리면 사용자 화면에는 "compliance-reviewer 진행 중..."이
+    // 수 분~10분 동안 멈춘 것처럼 보이는 원인이 됐다. 45초로 짧게 끊어서 callAgent의
+    // 자체 재시도(최대 3회, 지수 백오프)가 대신 빠르게 돌게 한다.
+    timeout: 45000,
+    // SDK 자체 재시도(기본 2회)까지 겹치면 callAgent의 재시도(3회)와 중첩되어
+    // 최악의 경우 지연이 배로 불어난다 — 재시도는 callAgent 쪽에서만 한다.
+    maxRetries: 0,
   });
 
   const systemPrompt = getSystemPromptForAgent(agentName, payload);
