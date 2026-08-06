@@ -720,12 +720,117 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
               </div>
             )}
 
-            {/* 전체 프로필 (확장) */}
-            {expandedId === char.id && char.character_profile && (
-              <div className="mt-4 pt-4 border-t border-brand-blue/10 bg-dark-bg p-3 rounded text-xs text-dark-text-muted max-h-48 overflow-y-auto">
-                <pre className="whitespace-pre-wrap">
-                  {JSON.stringify(char.character_profile, null, 2)}
-                </pre>
+            {/* 전체 프로필 (확장) - v3 설계 데이터 표시 */}
+            {expandedId === char.id && (
+              <div className="mt-4 pt-4 border-t border-brand-blue/10 space-y-4">
+                {/* 기본 정보 */}
+                <div className="bg-dark-bg p-3 rounded text-sm">
+                  <h5 className="font-semibold text-dark-text mb-2">👤 기본 정보</h5>
+                  {char.gender && <div><span className="font-semibold">성별:</span> {char.gender}</div>}
+                  {char.type && <div><span className="font-semibold">타입:</span> {char.type}</div>}
+                  {char.role && <div><span className="font-semibold">역할:</span> {char.role}</div>}
+                </div>
+
+                {/* 신체 구조 */}
+                {char.bodyStructure && (
+                  <div className="bg-dark-bg p-3 rounded text-sm">
+                    <h5 className="font-semibold text-dark-text mb-2">🦴 신체 구조</h5>
+                    <div className="space-y-1 text-xs text-dark-text-muted">
+                      {char.bodyStructure.headRatio && (
+                        <div><span className="text-dark-text">머리 비율:</span> {char.bodyStructure.headRatio}</div>
+                      )}
+                      {char.bodyStructure.bodyShape && (
+                        <div><span className="text-dark-text">신체 형태:</span> {char.bodyStructure.bodyShape}</div>
+                      )}
+                      {char.bodyStructure.arms && (
+                        <div><span className="text-dark-text">팔:</span> {char.bodyStructure.arms}</div>
+                      )}
+                      {char.bodyStructure.legs && (
+                        <div><span className="text-dark-text">다리:</span> {char.bodyStructure.legs}</div>
+                      )}
+                      {char.bodyStructure.proportionType && (
+                        <div><span className="text-dark-text">프로포션:</span> {char.bodyStructure.proportionType}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 성별 표현 */}
+                {char.genderExpression && (
+                  <div className="bg-dark-bg p-3 rounded text-sm">
+                    <h5 className="font-semibold text-dark-text mb-2">👗 성별 표현</h5>
+                    <div className="space-y-1 text-xs text-dark-text-muted">
+                      {char.genderExpression.hair && (
+                        <div><span className="text-dark-text">머리:</span> {char.genderExpression.hair}</div>
+                      )}
+                      {char.genderExpression.eyebrows && (
+                        <div><span className="text-dark-text">눈썹:</span> {char.genderExpression.eyebrows}</div>
+                      )}
+                      {char.genderExpression.eyelashes && (
+                        <div><span className="text-dark-text">속눈썹:</span> {char.genderExpression.eyelashes}</div>
+                      )}
+                      {char.genderExpression.bodyShape && (
+                        <div><span className="text-dark-text">신체:</span> {char.genderExpression.bodyShape}</div>
+                      )}
+                      {char.genderExpression.accessories && (
+                        <div><span className="text-dark-text">액세서리:</span> {char.genderExpression.accessories}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 애니메이션 노트 */}
+                {char.animationNotes && (
+                  <div className="bg-dark-bg p-3 rounded text-sm">
+                    <h5 className="font-semibold text-dark-text mb-2">🎬 애니메이션</h5>
+                    <div className="space-y-1 text-xs text-dark-text-muted">
+                      {char.animationNotes.jointsRequired && (
+                        <div><span className="text-dark-text">관절:</span> {Array.isArray(char.animationNotes.jointsRequired) ? char.animationNotes.jointsRequired.join(', ') : char.animationNotes.jointsRequired}</div>
+                      )}
+                      {char.animationNotes.facialExpressions && (
+                        <div><span className="text-dark-text">표정:</span> {Array.isArray(char.animationNotes.facialExpressions) ? char.animationNotes.facialExpressions.join(', ') : char.animationNotes.facialExpressions}</div>
+                      )}
+                      {char.animationNotes.movements && (
+                        <div><span className="text-dark-text">동작:</span> {Array.isArray(char.animationNotes.movements) ? char.animationNotes.movements.join(', ') : char.animationNotes.movements}</div>
+                      )}
+                      {char.animationNotes.specialNotes && (
+                        <div><span className="text-dark-text">특수:</span> {char.animationNotes.specialNotes}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 상징성 */}
+                {char.symbolism && (
+                  <div className="bg-dark-bg p-3 rounded text-sm">
+                    <h5 className="font-semibold text-dark-text mb-2">✨ 상징성</h5>
+                    <div className="space-y-1 text-xs text-dark-text-muted">
+                      {char.symbolism.color && (
+                        <div><span className="text-dark-text">색상:</span> {char.symbolism.color}</div>
+                      )}
+                      {char.symbolism.shape && (
+                        <div><span className="text-dark-text">형태:</span> {char.symbolism.shape}</div>
+                      )}
+                      {char.symbolism.texture && (
+                        <div><span className="text-dark-text">텍스처:</span> {char.symbolism.texture}</div>
+                      )}
+                      {char.symbolism.expression && (
+                        <div><span className="text-dark-text">표현:</span> {char.symbolism.expression}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 프롬프트 */}
+                {char.higgsfieldPrompt && (
+                  <div className="bg-dark-bg p-3 rounded text-xs">
+                    <h5 className="font-semibold text-dark-text mb-2">📝 생성 프롬프트</h5>
+                    <pre className="whitespace-pre-wrap text-dark-text-muted overflow-hidden">
+                      {char.higgsfieldPrompt.substring(0, 300)}
+                      {char.higgsfieldPrompt.length > 300 ? '...' : ''}
+                    </pre>
+                  </div>
+                )}
               </div>
             )}
           </div>

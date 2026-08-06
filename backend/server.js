@@ -12,6 +12,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 const { getConfig } = require("./utils/config-loader");
 
 const app = express();
@@ -51,6 +52,11 @@ if (missingEnvVars.length > 0) {
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// 정적 파일 제공 (캐릭터 이미지/참고자료)
+const docsPath = path.resolve(__dirname, '../docs');
+console.log(`📁 정적 파일 경로: ${docsPath}`);
+app.use('/docs', express.static(docsPath));
 
 // 요청 로깅 (간단한 디버깅용)
 app.use((req, res, next) => {

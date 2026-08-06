@@ -1,0 +1,90 @@
+{
+  "compliance_rules": {
+    "food": {
+      "category_name": "식품",
+      "critical_rules": [
+        {
+          "rule_id": "FOOD_001",
+          "rule_name": "false_efficacy",
+          "description": "의학적 효능 주장 금지",
+          "risk_level": "critical",
+          "keywords_to_avoid": ["치료", "완치", "약효", "의학적", "암"],
+          "compliant_alternative": "영양 공급, 에너지 제공",
+          "penalty": "불통과"
+        },
+        {
+          "rule_id": "FOOD_002",
+          "rule_name": "authentic_origin",
+          "description": "원산지 거짓 표시 금지",
+          "risk_level": "critical",
+          "foreign_origin_keywords": ["프랑스", "히말라야", "이탈리아", "독일산", "일본산"],
+          "requirements": ["원산지 명시 필수", "인증서 필요"],
+          "penalty": "불통과"
+        },
+        {
+          "rule_id": "FOOD_003",
+          "rule_name": "price_deception",
+          "description": "과장된 할인율 금지",
+          "risk_level": "high",
+          "allowed_discount_range": "0~70%",
+          "max_discount_percent": 70,
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_004",
+          "rule_name": "ambiguous_health_claim",
+          "description": "애매한 건강 개선 표현 (단정적이지 않지만 오해 소지)",
+          "risk_level": "medium",
+          "pattern_keywords": ["개선할 수 있습니다", "좋아질 수 있습니다", "도움될 수 있습니다", "일 수 있음"],
+          "compliant_alternative": "~을 지원함, ~에 도움을 줄 수 있는 성분을 포함",
+          "penalty": "경고"
+        }
+      ]
+    },
+    "beauty": {
+      "category_name": "뷰티",
+      "critical_rules": [
+        {
+          "rule_id": "BEAUTY_001",
+          "rule_name": "cosmetic_claim_ban",
+          "description": "의학/약사 용어 금지",
+          "risk_level": "critical",
+          "forbidden_words": ["치료", "재생", "재생력", "피부질환"],
+          "compliant_alternative": "케어, 개선, 관리",
+          "penalty": "불통과"
+        },
+        {
+          "rule_id": "BEAUTY_002",
+          "rule_name": "ingredient_certification",
+          "description": "천연/유기농 인증 필수",
+          "risk_level": "high",
+          "certification_types": ["ECOCERT", "USDA_Organic"],
+          "penalty": "경고"
+        }
+      ]
+    },
+    "healthcare": {
+      "category_name": "헬스케어",
+      "critical_rules": [
+        {
+          "rule_id": "HEALTH_001",
+          "rule_name": "false_efficacy",
+          "description": "의학적 효능/치료 효과 주장 금지",
+          "risk_level": "critical",
+          "keywords_to_avoid": ["치료", "완치", "처방", "의학적 효과", "질병 예방"],
+          "compliant_alternative": "건강 관리 지원, 영양 보조",
+          "penalty": "불통과"
+        },
+        {
+          "rule_id": "HEALTH_002",
+          "rule_name": "ambiguous_health_claim",
+          "description": "애매한 건강 개선 표현",
+          "risk_level": "medium",
+          "pattern_keywords": ["개선할 수 있습니다", "좋아질 수 있습니다", "도움될 수 있습니다"],
+          "compliant_alternative": "~을 지원함",
+          "penalty": "경고"
+        }
+      ]
+    }
+  }
+}

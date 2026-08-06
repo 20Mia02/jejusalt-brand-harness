@@ -14,6 +14,8 @@
 const axios = require("axios");
 const { exec } = require("child_process");
 const util = require("util");
+const fs = require("fs");
+const path = require("path");
 const execPromise = util.promisify(exec);
 const { callDatabase } = require("./database-agent");
 
@@ -29,6 +31,139 @@ function getScenarioTemplates() {
     _scenarioTemplatesCache = require("../config/scenario-templates.json");
   }
   return _scenarioTemplatesCache;
+}
+
+// ============================================================================
+// [컴플라이언스 규칙] compliance-rules.json 로드 (카테고리별 규칙 분리 — 멘토링 피드백 2)
+// ============================================================================
+let cachedComplianceRules = null;
+
+function loadComplianceRules() {
+  if (cachedComplianceRules) return cachedComplianceRules;
+  try {
+    const rulesPath = path.join(__dirname, "../../compliance-rules.json");
+    cachedComplianceRules = JSON.parse(fs.readFileSync(rulesPath, "utf8")).compliance_rules;
+  } catch (e) {
+    console.warn("⚠️ compliance-rules.json 로드 실패, 빈 규칙으로 진행:", e.message);
+    cachedComplianceRules = {};
+  }
+  return cachedComplianceRules;
+}
+
+// 브랜드 카테고리 표기(뷰티/헬스케어/식품 등) → compliance-rules.json의 카테고리 키로 매핑
+function resolveComplianceCategoryKey(category) {
+  const map = {
+    식품: "food",
+    뷰티: "beauty",
+    헬스케어: "healthcare",
+    food: "food",
+    beauty: "beauty",
+    healthcare: "healthcare",
+  };
+  return map[category] || "food";
+}
+
+function getComplianceRulesForCategory(category) {
+  const all = loadComplianceRules();
+  const key = resolveComplianceCategoryKey(category);
+  return all[key] || all.food || { category_name: category || "일반", critical_rules: [] };
+}
+
+/**
+ * compliance-rules.json의 카테고리별 규칙을 텍스트에 대해 실제로 평가한다.
+ * - Mock 모드(TimelyAI 키 미설정)에서도 결정론적으로 pass/warning/fail이 갈리도록
+ *   키워드/패턴 기반으로 직접 판정한다 (멘토링 피드백 1, 4에서 요구하는 재현 가능한 테스트를 위해 필수).
+ * - 실제 TimelyAI 호출 시에는 이 결과 대신 LLM 응답을 사용하지만, 동일한 규칙 목록을
+ *   프롬프트에 그대로 전달하므로 판단 기준은 항상 이 규칙 파일 하나로 통일된다.
+ */
+function evaluateComplianceContent(content, category) {
+  const text = content || "";
+  const rules = getComplianceRulesForCategory(category);
+  const passedRules = [];
+  const failedRules = [];
+  const identifiedRisks = [];
+  const violations = [];
+  let hasCriticalFail = false;
+  let hasWarning = false;
+
+  for (const rule of rules.critical_rules || []) {
+    let hit = null;
+
+    if (Array.isArray(rule.keywords_to_avoid)) {
+      const found = rule.keywords_to_avoid.find((kw) => text.includes(kw));
+      if (found) hit = `금지어 "${found}" 검출`;
+    } else if (Array.isArray(rule.forbidden_words)) {
+      const found = rule.forbidden_words.find((kw) => text.includes(kw));
+      if (found) hit = `금지어 "${found}" 검출`;
+    } else if (Array.isArray(rule.foreign_origin_keywords)) {
+      const found = rule.foreign_origin_keywords.find((kw) => text.includes(kw));
+      if (found && !text.includes("제주")) hit = `원산지 불일치 의심 표현 "${found}" 검출 (브랜드 원산지: 제주)`;
+    } else if (rule.max_discount_percent != null) {
+      const match = text.match(/(\d+)\s*%\s*(할인|세일)/);
+      if (match && Number(match[1]) > rule.max_discount_percent) {
+        hit = `할인율 ${match[1]}%가 허용 범위(${rule.allowed_discount_range})를 초과`;
+      }
+    } else if (Array.isArray(rule.pattern_keywords)) {
+      const found = rule.pattern_keywords.find((kw) => text.includes(kw));
+      if (found) hit = `애매한 표현 "${found}" 검출`;
+    }
+
+    if (hit) {
+      const isCritical = rule.penalty === "불통과";
+      if (isCritical) hasCriticalFail = true;
+      else hasWarning = true;
+
+      failedRules.push(rule.rule_name);
+      violations.push({
+        rule_id: rule.rule_id,
+        severity: rule.risk_level,
+        evidence: hit,
+        correction: rule.compliant_alternative || rule.requirements?.join(", ") || "표현 수정 필요",
+      });
+      identifiedRisks.push({
+        risk_id: `R${String(identifiedRisks.length + 1).padStart(3, "0")}`,
+        type: rule.rule_name,
+        description: hit,
+        severity: rule.risk_level,
+        recommendation: rule.compliant_alternative
+          ? `"${rule.compliant_alternative}" 등의 표현으로 변경`
+          : "해당 표현을 브랜드 가이드라인에 맞게 수정",
+      });
+    } else {
+      passedRules.push(rule.rule_name);
+    }
+  }
+
+  const ruleComplianceScore = Math.max(0, 100 - failedRules.length * 25);
+  const riskScore = Math.max(0, 100 - identifiedRisks.length * 15);
+  const confidence = Math.round((ruleComplianceScore + riskScore) / 2);
+
+  const complianceStatus = hasCriticalFail ? "fail" : hasWarning ? "warning" : "pass";
+  const finalRecommendation =
+    complianceStatus === "fail"
+      ? `불통과 - ${violations.map((v) => v.rule_id).join(", ")} 위반 사항 수정 후 재검수 필요`
+      : complianceStatus === "warning"
+      ? `조건부 통과 - ${violations.map((v) => v.rule_id).join(", ")} 수정 후 재검수 권장`
+      : "통과 - 발견된 위반 사항 없음";
+
+  return {
+    compliance_status: complianceStatus,
+    confidence,
+    breakdown: {
+      rule_compliance: {
+        score: ruleComplianceScore,
+        passed_rules: passedRules,
+        failed_rules: failedRules,
+      },
+      risk_assessment: {
+        score: riskScore,
+        identified_risks: identifiedRisks,
+      },
+    },
+    violations,
+    final_recommendation: finalRecommendation,
+    summary: complianceStatus === "pass" ? "안전함" : complianceStatus === "warning" ? "일부 주의 필요" : "위반 사항 발견",
+  };
 }
 
 // ============================================================================
@@ -328,6 +463,68 @@ function getMockResponseForAgent(agentName, payload) {
     }
   }
 
+  // compliance-reviewer-agent: 카테고리별 compliance-rules.json을 실제로 평가해서
+  // Mock 모드에서도 입력 내용에 따라 결정론적으로 pass/warning/fail이 갈리도록 한다
+  // (멘토링 피드백 1: 구조화된 판단 근거 / 피드백 2: 카테고리별 규칙 / 피드백 4: 재현 가능한 테스트)
+  if (agentName === "compliance-reviewer-agent") {
+    return evaluateComplianceContent(payload?.content, payload?.category);
+  }
+
+  // post-generation-qa-agent: 영상 생성 완료 후 결과물 품질 검수 (멘토링 피드백 3)
+  if (agentName === "post-generation-qa-agent") {
+    const expectedDuration = payload?.expectedDuration || 30;
+    const actualDuration = expectedDuration + (Math.random() > 0.5 ? 1 : -1); // Mock: ±1초 오차 시뮬레이션
+    const durationDiff = Math.abs(actualDuration - expectedDuration);
+    const durationOk = durationDiff <= 2;
+    const hasReference = !!payload?.referenceImageUrl;
+
+    const checks = [
+      {
+        check_id: "video_integrity",
+        result: payload?.videoUrl ? "pass" : "fail",
+        details: payload?.videoUrl ? "정상 재생 가능한 URL 확인" : "영상 URL이 없습니다",
+        recommendation: payload?.videoUrl ? null : "영상 재생성 필요",
+      },
+      {
+        check_id: "duration_match",
+        result: durationOk ? "pass" : "warning",
+        details: `요청 ${expectedDuration}초, 실제 ${actualDuration}초 (오차 ${durationDiff}초)`,
+        recommendation: durationOk ? null : "시나리오 길이 재조정 권장",
+      },
+      {
+        check_id: "character_consistency",
+        result: hasReference ? "pass" : "warning",
+        details: hasReference ? "레퍼런스 대비 일치도 확인됨" : "레퍼런스 이미지가 없어 비교 불가 (첫 생성)",
+        recommendation: hasReference ? null : "다음 생성부터 레퍼런스 기반 비교 가능",
+      },
+      {
+        check_id: "no_text_overlay",
+        result: "pass",
+        details: "프롬프트에 텍스트 오버레이를 포함하지 않아 삽입 위험 없음",
+        recommendation: null,
+      },
+      {
+        check_id: "audio_quality",
+        result: "pass",
+        details: "음성 잡음 검출 안 됨",
+        recommendation: null,
+      },
+    ];
+
+    const failCount = checks.filter((c) => c.result === "fail").length;
+    const warningCount = checks.filter((c) => c.result === "warning").length;
+    const qaStatus = failCount > 0 ? "fail" : warningCount > 0 ? "warning" : "pass";
+    const overallScore = Math.max(0, 100 - failCount * 30 - warningCount * 10);
+
+    return {
+      qa_status: qaStatus,
+      qa_passed: qaStatus !== "fail",
+      qa_checks: checks,
+      overall_score: overallScore,
+      action_required: qaStatus === "fail" ? "재생성 권장" : qaStatus === "warning" ? "확인 후 사용 권장" : "none",
+    };
+  }
+
   const mockData = {
     "resource-analyzer-agent": {
       metadata: {
@@ -426,13 +623,6 @@ function getMockResponseForAgent(agentName, payload) {
     },
     "product-detail-page-writer-agent": {
       content: "제주소금은 세 가지 특징을 가지고 있습니다: 1. 순수함 2. 건강함 3. 신뢰성"
-    },
-    "compliance-reviewer-agent": {
-      validation: {
-        status: "APPROVED",
-        score: 90,
-        issues: []
-      }
     },
     "trend-analyzer-agent": {
       trends: [
@@ -576,6 +766,18 @@ ${templateDesc}
 ${brand.characterCommonMotif || "알(egg) 모양의 동글동글한 몸통, 이마 위에 작은 육각형 소금 결정 모양 브로치, 단순한 검은 점 눈동자에 흰색 하이라이트 하나"}
 색상과 소품은 캐릭터마다 다르게 하되, 위 공통 요소는 절대 빠뜨리지 마세요.
 
+⭐⭐⭐ 4가지 캐릭터 타입 분류 (완전 리디자인 기준, docs/character-concept.md 참고 — 반드시 준수):
+사용자의 방향성(direction)을 보고 아래 4가지 타입 중 1~2개를 골라 그 타입의 색상/형태/성격을 따르세요.
+${brand.characterTypeSystem
+  ? Object.entries(brand.characterTypeSystem)
+      .map(
+        ([key, t]) =>
+          `- ${key}(${t.nameKr}): 상징=${t.symbol} / 색상=${(t.colors || []).join(", ")} / 형태=${t.shape} / 성격=${t.personality}`
+      )
+      .join("\n")
+  : "- SALT(소금결정): 밝은 파랑, 각진 기하학적 형태, 활발함\n- LAVA(용암해수): 어두운 파랑, 유기적 곡선, 신뢰감\n- MINERAL(미네랄): 중간 톤, 세련된 곡선, 우아함\n- FIRE(불/에너지): 따뜻한 톤, 역동적 형태, 에너지"}
+설계한 캐릭터의 visual_description 첫 문장에 선택한 타입을 명시하세요 (예: "[SALT 타입] ...").
+
 사용자가 입력한 캐릭터 이름과 방향성 설명을 최대한 반영해서:
 - 음성 톤 설명
 - 성격 특성 (배열)
@@ -643,16 +845,22 @@ customStyle(사용자가 원하는 톤/문구)이 있으면 최대한 반영하�
 
     "compliance-reviewer-agent": `당신은 ${brand.nameKorean || "제주소금"} 제품의 마케팅 콘텐츠를 검증하는 AI 에이전트입니다.
 
-검증 기준:
+브랜드 공통 기준:
 - 피해야 할 표현: ${(brand.absoluteNos || []).join(", ") || "의료표현, 과도한 유행어"}
 - 필수 포함 가치: ${(brand.toneValues || []).join(", ") || "정직함, 신뢰성"}
 
-제공된 카피를 검토하고:
-- 승인 여부 (APPROVED / REJECTED)
-- 신뢰도 점수 (0~100)
-- 발견된 문제점 (없으면 빈 배열)
+⭐ 카테고리별 규칙 (멘토링 피드백 2): 입력의 complianceRules 필드에 이 제품 카테고리(식품/뷰티/헬스케어)에 해당하는
+compliance-rules.json 규칙 목록(critical_rules)이 들어있습니다. 각 규칙의 rule_id, rule_name, risk_level,
+keywords_to_avoid/forbidden_words 등을 근거로 카피 전문을 한 줄 한 줄 대조해서 위반 여부를 판단하세요.
+규칙에 명시적으로 없는 표현이라도 브랜드 공통 기준(absoluteNos)에 위배되면 위반으로 처리하세요.
 
-을 반환하세요.`,
+⭐ 판단 근거 구조화 (멘토링 피드백 1): 최종 신뢰도 점수만 던지지 말고, 반드시 아래 두 축으로 점수를 분해해서 제시하세요:
+1. rule_compliance: 규칙 자체를 지켰는지(통과/위반 규칙 목록)
+2. risk_assessment: 규칙 위반까지는 아니지만 오해 소지가 있는 애매한 표현(risk)이 있는지
+
+각 위반/위험 항목에는 반드시 구체적인 근거(evidence, 실제 카피에서 인용)와 수정 제안(recommendation/correction)을 포함하세요.
+규칙의 penalty가 "불통과"인 항목을 하나라도 위반하면 compliance_status는 "fail", "경고"만 있으면 "warning",
+아무 위반/위험도 없으면 "pass"로 판정하세요.`,
 
     "trend-analyzer-agent": `당신은 ${brand.nameKorean || "제주소금"} 브랜드의 마케팅 콘텐츠 방향을 제안하는 AI 에이전트입니다.
 
@@ -664,6 +872,19 @@ customStyle(사용자가 원하는 톤/문구)이 있으면 최대한 반영하�
 입력의 category(상품 카테고리)와 focus(마케팅 강조점)를 참고해서, 이 제품과 자연스럽게 연결되는
 트렌드 키워드 5개와 각각을 콘텐츠에 녹이는 구체적인 방법(angle), 왜 이 브랜드에 맞는지(reason)를
 제안하세요.`,
+
+    "post-generation-qa-agent": `당신은 Higgsfield로 생성이 완료된 영상의 최종 품질을 검수하는 AI 에이전트입니다 (멘토링 피드백 3).
+텍스트 카피는 이미 compliance-reviewer-agent가 검증했으므로, 여기서는 "실제 영상 결과물"만 검사합니다.
+
+검증 항목 5가지:
+1. video_integrity: videoUrl이 유효한 형식(https://로 시작, mp4/webm 등)인가?
+2. duration_match: expectedDuration과 실제 영상 길이(추정 가능하면)가 ±2초 이내로 일치하는가?
+3. character_consistency: referenceImageUrl(있는 경우)과 이번에 생성된 캐릭터가 일관되어 보이는가?
+4. no_text_overlay: generatedContent의 마케팅 문구가 영상에 텍스트로 잘못 삽입되지 않았는가?
+5. audio_quality: 음성이 명확하고 잡음이 없는가?
+
+각 항목을 pass/warning/fail로 판정하고, 근거(details)와 문제가 있을 때만 수정 권장사항(recommendation)을 제시하세요.
+하나라도 fail이면 qa_status는 "fail", warning만 있으면 "warning", 전부 pass면 "pass"로 판정하세요.`,
   };
 
   return prompts[agentName] || `당신은 AI 에이전트입니다. 주어진 입력을 분석하고 JSON 형식으로 반환하세요.`;
@@ -804,13 +1025,50 @@ function getOutputSpecForAgent(agentName, payload) {
     "product-detail-page-writer-agent": `반드시 아래 JSON 형태로만 응답하세요:
 { "content": "생성된 상세페이지 카피 전체 텍스트..." }`,
 
-    "compliance-reviewer-agent": `반드시 아래 JSON 형태로만 응답하세요:
+    "compliance-reviewer-agent": `반드시 agent-schemas.json의 compliance_reviewer_agent 스키마를 준수하는 JSON으로만 응답하세요 (멘토링 피드백 5):
 {
-  "validation": {
-    "status": "APPROVED",
-    "score": 85,
-    "issues": []
-  }
+  "compliance_status": "pass",
+  "confidence": 90,
+  "breakdown": {
+    "rule_compliance": {
+      "score": 95,
+      "passed_rules": ["false_efficacy", "authentic_origin"],
+      "failed_rules": []
+    },
+    "risk_assessment": {
+      "score": 85,
+      "identified_risks": [
+        {
+          "risk_id": "R001",
+          "type": "minor_ambiguity",
+          "description": "제품 효과 표현이 '~일 수 있음' 구조로 약간 애매함",
+          "severity": "low",
+          "recommendation": "'~할 수 있음' → '~을 지원함'으로 변경"
+        }
+      ]
+    }
+  },
+  "violations": [
+    { "rule_id": "FOOD_001", "severity": "critical", "evidence": "카피에서 인용한 실제 문제 표현", "correction": "수정 제안" }
+  ],
+  "final_recommendation": "조건부 통과 - R001 수정 후 재검수",
+  "summary": "안전함"
+}
+(violations와 identified_risks는 위반/위험이 없으면 빈 배열 [] 로 응답)`,
+
+    "post-generation-qa-agent": `반드시 agent-schemas.json의 post_generation_qa_agent 스키마를 준수하는 JSON으로만 응답하세요:
+{
+  "qa_status": "pass",
+  "qa_passed": true,
+  "qa_checks": [
+    { "check_id": "video_integrity", "result": "pass", "details": "정상 재생 확인", "recommendation": null },
+    { "check_id": "duration_match", "result": "pass", "details": "요청 30초, 실제 31초 (오차 1초)", "recommendation": null },
+    { "check_id": "character_consistency", "result": "pass", "details": "레퍼런스 대비 일치도 확인", "recommendation": null },
+    { "check_id": "no_text_overlay", "result": "pass", "details": "오버레이 텍스트 미검출", "recommendation": null },
+    { "check_id": "audio_quality", "result": "pass", "details": "잡음 없음", "recommendation": null }
+  ],
+  "overall_score": 92,
+  "action_required": "none"
 }`,
 
     "trend-analyzer-agent": `반드시 아래 JSON 형태로만 응답하세요 (trends는 정확히 5개):
@@ -1111,4 +1369,6 @@ module.exports = {
   callHiggsfield,
   pollHiggsfield,
   generateCharacterReferenceImage,
+  evaluateComplianceContent,
+  getComplianceRulesForCategory,
 };

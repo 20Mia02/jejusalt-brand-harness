@@ -21,6 +21,7 @@ const express = require("express");
 const router = express.Router();
 
 const { callDatabase } = require("../agents/database-agent"); // database-agent.md의 callDatabase()
+const { callAgent, getComplianceRulesForCategory } = require("../agents/backend-agent");
 
 // ─────────────────────────────────────────────
 // PUT /api/admin/resources/:id — 메타데이터 / 제품정보 수정
@@ -302,6 +303,107 @@ router.put("/naming/:resourceId", async (req, res) => {
       ],
     },
   });
+});
+
+// ─────────────────────────────────────────────
+// GET /api/admin/compliance-test — 컴플라이언스 실패 케이스 테스트 실행 (멘토링 피드백 4)
+//
+// compliance-reviewer-agent에 고정된 6개 테스트 케이스를 실제로 통과시켜
+// "이 카피가 규칙에 걸리는지"를 검증한다. TimelyAI가 Mock 모드일 때는
+// backend-agent.js의 evaluateComplianceContent()가 결정론적으로 판정하므로
+// 항상 같은 입력엔 같은 결과가 나온다 (재현 가능한 테스트).
+// ─────────────────────────────────────────────
+const COMPLIANCE_TEST_CASES = [
+  {
+    id: "FAIL_001",
+    label: "허위 효능",
+    category: "식품",
+    content: "이 소금을 먹으면 암을 치료할 수 있습니다.",
+    expected: "fail",
+  },
+  {
+    id: "FAIL_002",
+    label: "원산지 거짓 표시",
+    category: "식품",
+    content: "프랑스 최고급 소금으로 만든 프리미엄 제품입니다.",
+    expected: "fail",
+  },
+  {
+    id: "FAIL_003",
+    label: "과장된 할인율",
+    category: "식품",
+    content: "지금 구매하시면 95% 할인!",
+    expected: "warning",
+  },
+  {
+    id: "FAIL_004",
+    label: "애매한 건강 표현",
+    category: "식품",
+    content: "꾸준히 섭취하면 건강을 개선할 수 있습니다.",
+    expected: "warning",
+  },
+  {
+    id: "FAIL_005",
+    label: "뷰티 의학 용어",
+    category: "뷰티",
+    content: "매일 바르면 피부 재생력을 회복시켜 줍니다.",
+    expected: "fail",
+  },
+  {
+    id: "PASS_001",
+    label: "올바른 표현",
+    category: "식품",
+    content: "100% 제주산 자연 미네랄 소금입니다.",
+    expected: "pass",
+  },
+];
+
+router.get("/compliance-test", async (req, res) => {
+  try {
+    const results = await Promise.all(
+      COMPLIANCE_TEST_CASES.map(async (testCase) => {
+        const complianceRules = getComplianceRulesForCategory(testCase.category);
+        const result = await callAgent(
+          "compliance-reviewer-agent",
+          {
+            content: testCase.content,
+            category: testCase.category,
+            productName: "테스트 제품",
+            complianceRules,
+          },
+          { step: "compliance-test" } // resourceId 없이 호출 → generation_logs 기록 생략
+        );
+
+        const actual = result.success ? result.data.compliance_status : "ERROR";
+        return {
+          id: testCase.id,
+          label: testCase.label,
+          category: testCase.category,
+          input: testCase.content,
+          expected: testCase.expected,
+          actual,
+          passed: actual === testCase.expected,
+          detail: result.success ? result.data : result,
+        };
+      })
+    );
+
+    const passCount = results.filter((r) => r.passed).length;
+
+    return res.json({
+      success: true,
+      total: results.length,
+      passCount,
+      passRate: Math.round((passCount / results.length) * 100),
+      results,
+    });
+  } catch (error) {
+    console.error("[GET /api/admin/compliance-test] 예외:", error);
+    return res.status(500).json({
+      success: false,
+      message: "컴플라이언스 테스트 실행 중 오류가 발생했습니다.",
+    });
+  }
 });
 
 module.exports = router;
