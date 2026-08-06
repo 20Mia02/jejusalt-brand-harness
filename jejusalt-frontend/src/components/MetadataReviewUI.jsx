@@ -197,7 +197,7 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
 
   return (
     <div className="max-w-4xl mx-auto p-6 ui-card animate-fade-in">
-      <h2 className="text-2xl font-bold mb-2">🔍 Step 3: 메타데이터 검토</h2>
+      <h2 className="text-2xl font-bold mb-2">🔍 Step 2: 메타데이터 검토</h2>
       <p className="text-dark-text-muted mb-6">AI가 분석한 결과를 확인하고 필요하면 수정하세요.</p>
 
       {error && (
