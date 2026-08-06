@@ -581,11 +581,11 @@ export default function AdminMode() {
                           </div>
                           {char.reference_image_url && (
                             <>
-                              <div className="w-full h-20 bg-dark-chip rounded border border-brand-blue/20 flex items-center justify-center overflow-hidden mb-2">
+                              <div className="w-full aspect-square bg-dark-chip rounded border border-brand-blue/20 flex items-center justify-center overflow-hidden mb-2">
                                 <img
                                   src={char.reference_image_url}
                                   alt={`${char.character_name} reference`}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-contain"
                                   onError={(e) => {
                                     e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3C/svg%3E';
                                   }}

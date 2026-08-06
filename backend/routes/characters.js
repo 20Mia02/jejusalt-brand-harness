@@ -39,6 +39,9 @@ try {
 // v3 설계 시스템: config.json의 캐릭터를 기본값으로 포함
 // ─────────────────────────────────────────────
 router.get("/library", async (req, res) => {
+  // ⭐ 캐릭터 사진이 실제로 갱신됐는데도 브라우저가 이전 응답을 캐시해서 옛날 캐릭터로
+  // 보이는 문제가 실사용자 테스트에서 발견됨 — 항상 최신 상태를 받도록 명시적으로 막는다.
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate");
   try {
     // 1단계: config.json의 v3 기본 캐릭터 로드 및 필드 변환 (이름으로 조회할 수 있도록 Map)
     const baseCharacterMap = new Map(
