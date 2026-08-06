@@ -1,0 +1,451 @@
+{
+  "characters": [
+    {
+      "id": 1,
+      "name": "결이",
+      "description": "제주 소금 결정처럼 당찬 첫걸음을 내딛는 밝은 소년 캐릭터",
+      "personalityKeywords": [
+        "도전적",
+        "에너지 넘침",
+        "순수함",
+        "희망",
+        "새로운 시작"
+      ],
+      "colorPalette": {
+        "primary": "#00AEEF",
+        "secondary": "#3FC4FF",
+        "accent": "#FFB6C1"
+      },
+      "accessories": {
+        "hair": "파란 모자 또는 뾰족한 소금결정 머리, 짧고 단정함",
+        "clothing": "밝은 파랑 정육면체 몸(모서리 약간 둥글게), 은은한 크리스탈 광택 무늬",
+        "scarf": "없음",
+        "others": "빨간 물방울 모양 귀, 큰 웃음"
+      },
+      "worldviewTags": [
+        "제주",
+        "소금결정",
+        "희망",
+        "새로운 시작",
+        "에너지"
+      ],
+      "higgsfieldPromptTemplate": "adorable 3D character illustration render in the style of Kakao Friends or a Pixar/DreamWorks animated character still (an ILLUSTRATED character render, NOT a photograph of a physical toy or product, no studio product-photography lighting or reflections, no realistic fabric weave or plastic sheen), soft smooth cel-shaded cartoon surfaces, warm flat illustrated coloring, young Korean boy character, big sparkling energetic eyes, soft rounded cube-shaped head and body, bright blue (#00AEEF) with a subtle sparkling crystal-facet pattern, blue cap or pointed salt-crystal shaped hair, red teardrop-shaped ears, big joyful smile that makes people smile back, pink blush cheeks, short thick arms and legs with clearly defined joints, chibi 2-heads-tall proportions, not a real photographed doll, not stiff or lifeless, full of warmth and life like a beloved animated character, a cute charming illustrated Jeju-themed background scene (soft dreamy pastel sky, gentle sparkling waves, fluffy clouds, or tiny stars — a warm inviting decorated setting, NOT a blank plain wall), gentle even lighting, no text overlay, no logos, no letters or numbers, original unique brand mascot design, does not resemble any existing copyrighted character or franchise",
+      "versionHistory": [
+        {
+          "version": "v1.0",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이는 별 모양으로 생명감이 느껴지며, 얼굴 비율도 둥글고 부드러워 귀여움이 잘 표현됨. 표정이 매우 밝고 활기차며, 큰 웃음이 따뜻한 느낌을 줌. 색상도 밝고 부드러운 파란색과 빨간색이 잘 어우러짐.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_062257_38ae9178-c42e-445c-8713-41dcac0a261f.png",
+          "scores": {
+            "cutenessScore": 85,
+            "detailScore": 75,
+            "consistencyScore": 90,
+            "overallScore": 83.5
+          }
+        },
+        {
+          "version": "v1.1",
+          "date": "2026-08-06",
+          "improvements": "The character has large, expressive eyes with a lively sparkle and a warm, joyful smile that invites friendliness. The face shape is rounded and soft, contributing to a cute and approachable look. The color palette is bright and appealing, with the primary blue standing out well.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063330_210e571c-c547-489e-a98f-e3ff6fc0e4b2.png",
+          "scores": {
+            "cutenessScore": 75,
+            "detailScore": 70,
+            "consistencyScore": 80,
+            "overallScore": 75.5
+          }
+        }
+      ],
+      "currentVersion": "v1.1",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063330_210e571c-c547-489e-a98f-e3ff6fc0e4b2.png"
+    },
+    {
+      "id": 2,
+      "name": "한라",
+      "description": "제주 자연의 근원을 아우르는 신비롭고 지혜로운 할머니 캐릭터",
+      "personalityKeywords": [
+        "신비로움",
+        "지혜",
+        "역사",
+        "포용",
+        "차분함"
+      ],
+      "colorPalette": {
+        "primary": "#1A3A52",
+        "secondary": "#3A6488",
+        "accent": "#7FA8C9"
+      },
+      "accessories": {
+        "hair": "길고 부드러운 흰/회색 머리",
+        "clothing": "어두운 파랑 둥근 산 모양 몸, 거친 화산암 색상의 은은한 무늬",
+        "scarf": "목걸이 또는 스카프",
+        "others": "이마에 경험을 나타내는 은은한 주름"
+      },
+      "worldviewTags": [
+        "제주",
+        "한라산",
+        "신비로움",
+        "지혜",
+        "포용"
+      ],
+      "higgsfieldPromptTemplate": "adorable 3D character illustration render in the style of Kakao Friends or a Pixar/DreamWorks animated character still (an ILLUSTRATED character render, NOT a photograph of a physical toy or product, no studio product-photography lighting or reflections, no realistic fabric weave or plastic sheen), soft smooth cel-shaded cartoon surfaces, warm flat illustrated coloring, wise Korean grandmother character, sparkling warm kind eyes with a gentle wise expression, soft rounded mountain-peak-shaped head silhouette, dark navy blue (#1A3A52) with a subtle volcanic-rock-colored pattern accent, long soft white and gray hair, a necklace or scarf, gentle heartwarming smile, pink blush cheeks, short thick arms and legs with clearly defined joints, chibi 2-heads-tall proportions, not a real photographed doll, not stiff or lifeless, full of warmth and life like a beloved animated character, a cute charming illustrated Jeju-themed background scene (soft dreamy pastel sky, gentle sparkling waves, fluffy clouds, or tiny stars — a warm inviting decorated setting, NOT a blank plain wall), gentle even lighting, no text overlay, no logos, no letters or numbers, original unique brand mascot design, does not resemble any existing copyrighted character or franchise",
+      "versionHistory": [
+        {
+          "version": "v1.0",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이며 따뜻한 느낌을 주고, 얼굴 비율이 둥글고 부드러운 곡선으로 귀여움을 잘 살렸습니다. 표정도 다가가고 싶은 미소로 매우 친근합니다. 색상도 따뜻하고 부드러운 톤이며, 포즈가 자연스럽고 사랑스럽습니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063113_de6ea315-d7b7-47f4-86c5-c8b6ff2edb86.png",
+          "scores": {
+            "cutenessScore": 85,
+            "detailScore": 75,
+            "consistencyScore": 80,
+            "overallScore": 81.5
+          }
+        },
+        {
+          "version": "v1.0",
+          "date": "2026-08-06",
+          "improvements": "The character's face has a warm, gentle smile with noticeable blush on the cheeks that conveys a heartwarming expression. The rounded, chibi-style proportions and soft curves contribute well to the cute, approachable look. The pose is natural and inviting, enhancing the character's charm.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063333_b49edbbb-125f-45b9-a58b-9bdc776ea36e.png",
+          "scores": {
+            "cutenessScore": 80,
+            "detailScore": 75,
+            "consistencyScore": 85,
+            "overallScore": 79.5
+          }
+        }
+      ],
+      "currentVersion": "v1.0",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063333_b49edbbb-125f-45b9-a58b-9bdc776ea36e.png"
+    },
+    {
+      "id": 3,
+      "name": "용암이",
+      "description": "70년 제주 바다의 기술을 담은 따뜻한 아버지 캐릭터",
+      "personalityKeywords": [
+        "따뜻함",
+        "신뢰감",
+        "낮은 목소리",
+        "경험 많음",
+        "보호본능"
+      ],
+      "colorPalette": {
+        "primary": "#2C5282",
+        "secondary": "#8B6F47",
+        "accent": "#F5E6D3"
+      },
+      "accessories": {
+        "hair": "흰머리 섞인 검은머리, 짧고 단정하게 내려앉은 스타일",
+        "clothing": "깊은 남색 전통 옷, 각진 어깨의 둥근 몸",
+        "scarf": "짙은 남색 스카프",
+        "others": "손목시계, 낡은 반지, 주름진 손"
+      },
+      "worldviewTags": [
+        "제주",
+        "70년 전통",
+        "바다",
+        "장인정신",
+        "따뜻함"
+      ],
+      "higgsfieldPromptTemplate": "adorable 3D character illustration render in the style of Kakao Friends or a Pixar/DreamWorks animated character still (an ILLUSTRATED character render, NOT a photograph of a physical toy or product, no studio product-photography lighting or reflections, no realistic fabric weave or plastic sheen), soft smooth cel-shaded cartoon surfaces, warm flat illustrated coloring, warm Korean father character, big kind sparkling eyes with a gentle trustworthy expression, soft rounded face and body with angular shoulders, deep sea-blue (#2C5282) coloring, short neat black hair streaked with white, a dark navy scarf around the neck, gentle heartwarming smile, pink blush cheeks, thick sturdy arms and legs with clearly defined joints, chibi 2-heads-tall proportions, not a real photographed doll, not stiff or lifeless, full of warmth and life like a beloved animated character, a cute charming illustrated Jeju-themed background scene (soft dreamy pastel sky, gentle sparkling waves, fluffy clouds, or tiny stars — a warm inviting decorated setting, NOT a blank plain wall), gentle even lighting, no text overlay, no logos, no letters or numbers, original unique brand mascot design, does not resemble any existing copyrighted character or franchise",
+      "versionHistory": [
+        {
+          "version": "v1.0",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 생기있으며, 얼굴 비율이 둥글고 부드러운 곡선으로 귀여움을 잘 살렸습니다. 표정도 따뜻하고 다가가고 싶은 미소를 잘 표현했습니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_061344_6aaa0125-94c1-48c1-8e14-71fe95af5a30.png",
+          "scores": {
+            "cutenessScore": 80,
+            "detailScore": 75,
+            "consistencyScore": 70,
+            "overallScore": 76.5
+          }
+        },
+        {
+          "version": "v1.1",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝임이 있어 생명감이 느껴지고, 얼굴 비율이 둥글고 부드러워 친근한 인상을 준다. 표정도 따뜻하고 다가가고 싶은 미소를 잘 표현했다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_062555_1996e905-7c9e-4476-ba5f-277d4e564081.png",
+          "scores": {
+            "cutenessScore": 80,
+            "detailScore": 75,
+            "consistencyScore": 70,
+            "overallScore": 76.5
+          }
+        },
+        {
+          "version": "v1.1",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이며 생기있고, 얼굴 비율이 둥글고 부드러워서 따뜻한 인상을 준다. 미소가 친근하고 다가가고 싶은 느낌을 잘 살렸다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_062720_c1a192f5-5daa-4605-b1ff-d3ac387cf366.png",
+          "scores": {
+            "cutenessScore": 75,
+            "detailScore": 70,
+            "consistencyScore": 80,
+            "overallScore": 75.5
+          }
+        },
+        {
+          "version": "v1.1",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이는 느낌이 있으며, 얼굴은 둥글고 부드러운 곡선으로 귀여운 인상을 줍니다. 표정은 따뜻하고 다가가고 싶은 미소를 잘 표현했습니다. 색상도 따뜻하고 부드러운 톤을 잘 사용했습니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_062846_44a43173-a159-4ed9-a2ed-0e19352285e7.png",
+          "scores": {
+            "cutenessScore": 75,
+            "detailScore": 70,
+            "consistencyScore": 65,
+            "overallScore": 71.5
+          }
+        },
+        {
+          "version": "v1.2",
+          "date": "2026-08-06",
+          "improvements": "The character has a large, round face with big eyes and a wide, warm smile that conveys friendliness and approachability. The pose is natural and inviting, contributing to a cute and lively feel. The color palette is soft and warm, with a nice use of blues and skin tones.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063348_8bf27f5f-97a3-4361-8661-cbb65d2e4d83.png",
+          "scores": {
+            "cutenessScore": 70,
+            "detailScore": 65,
+            "consistencyScore": 60,
+            "overallScore": 66.5
+          }
+        }
+      ],
+      "currentVersion": "v1.2",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063348_8bf27f5f-97a3-4361-8661-cbb65d2e4d83.png"
+    },
+    {
+      "id": 4,
+      "name": "해수",
+      "description": "제주 바다의 자유로움과 우아함을 닮은 프리미엄 캐릭터",
+      "personalityKeywords": [
+        "경쾌함",
+        "순수함",
+        "우아함",
+        "신비로움"
+      ],
+      "colorPalette": {
+        "primary": "#6B4C9A",
+        "secondary": "#008B8B",
+        "accent": "#FFB6C1"
+      },
+      "accessories": {
+        "hair": "길고 우아한 머리, 분홍 리본",
+        "clothing": "보라색 우아한 S자 곡선 몸, 고급스러운 크리스탈 무늬",
+        "scarf": "없음 (리본으로 대체)",
+        "others": "별모양 귀걸이, 목걸이"
+      },
+      "worldviewTags": [
+        "제주",
+        "바다",
+        "미네랄",
+        "우아함",
+        "프리미엄"
+      ],
+      "higgsfieldPromptTemplate": "adorable 3D character illustration render in the style of Kakao Friends or a Pixar/DreamWorks animated character still (an ILLUSTRATED character render, NOT a photograph of a physical toy or product, no studio product-photography lighting or reflections, no realistic fabric weave or plastic sheen), soft smooth cel-shaded cartoon surfaces, warm flat illustrated coloring, elegant Korean young woman character, big sparkling innocent eyes with a refined graceful expression, soft rounded face with an elegant S-curve body silhouette, purple (#6B4C9A) with luxurious sparkling crystal-facet pattern accents, long elegant hair with a pink ribbon, star-shaped earrings and a necklace, charming refined smile, pink blush cheeks, graceful curved arms and legs with clearly defined joints, chibi 2-heads-tall proportions, not a real photographed doll, not stiff or lifeless, full of warmth and life like a beloved animated character, a cute charming illustrated Jeju-themed background scene (soft dreamy pastel sky, gentle sparkling waves, fluffy clouds, or tiny stars — a warm inviting decorated setting, NOT a blank plain wall), gentle even lighting, no text overlay, no logos, no letters or numbers, original unique brand mascot design, does not resemble any existing copyrighted character or franchise",
+      "versionHistory": [
+        {
+          "version": "v1.0",
+          "date": "2026-08-06",
+          "improvements": "The character's eyes are large, sparkling, and have a lively, innocent feel, scoring well on the eye criteria. The face has a soft rounded shape with a warm, inviting smile, contributing positively to the overall cuteness. The pose is natural and lively, adding to the character's approachable and charming vibe. The color palette is warm and soft, enhancing the character's appeal.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063448_6e2a06c8-c17b-4df8-8212-e0409bda3be7.png",
+          "scores": {
+            "cutenessScore": 82,
+            "detailScore": 75,
+            "consistencyScore": 70,
+            "overallScore": 77.9
+          }
+        }
+      ],
+      "currentVersion": "v1.0",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063448_6e2a06c8-c17b-4df8-8212-e0409bda3be7.png"
+    },
+    {
+      "id": 5,
+      "name": "미내",
+      "description": "언제나 응원해주는 밝고 포용적인 누나 캐릭터",
+      "personalityKeywords": [
+        "격려",
+        "함께함",
+        "활발함",
+        "포용",
+        "밝음"
+      ],
+      "colorPalette": {
+        "primary": "#FFD700",
+        "secondary": "#FFA500",
+        "accent": "#FFB6C1"
+      },
+      "accessories": {
+        "hair": "노랑/주황 머리, 분홍 리본",
+        "clothing": "노랑 동그랗고 통통한 몸, 밝은 톤과 은은한 불꽃 무늬",
+        "scarf": "없음 (리본으로 대체)",
+        "others": "큰 웃음, 밝은 하이라이트"
+      },
+      "worldviewTags": [
+        "제주",
+        "격려",
+        "밝음",
+        "활력",
+        "포용"
+      ],
+      "higgsfieldPromptTemplate": "adorable 3D character illustration render in the style of Kakao Friends or a Pixar/DreamWorks animated character still (an ILLUSTRATED character render, NOT a photograph of a physical toy or product, no studio product-photography lighting or reflections, no realistic fabric weave or plastic sheen), soft smooth cel-shaded cartoon surfaces, warm flat illustrated coloring, cheerful Korean young woman character, big bright sparkling eyes full of encouragement, soft round chubby face and body, sunny yellow (#FFD700) with bright tone and subtle flame-pattern accents, yellow-orange hair with a pink ribbon, big joyful smile that lifts people's spirits, pink blush cheeks, short chubby arms and legs with clearly defined joints, chibi 2-heads-tall proportions, not a real photographed doll, not stiff or lifeless, full of warmth and life like a beloved animated character, a cute charming illustrated Jeju-themed background scene (soft dreamy pastel sky, gentle sparkling waves, fluffy clouds, or tiny stars — a warm inviting decorated setting, NOT a blank plain wall), gentle even lighting, no text overlay, no logos, no letters or numbers, original unique brand mascot design, does not resemble any existing copyrighted character or franchise",
+      "versionHistory": [
+        {
+          "version": "v1.0",
+          "date": "2026-08-06",
+          "improvements": "The character has very large, bright, and sparkling eyes that convey encouragement well. The face is round and chubby with soft curves, and the big joyful smile is warm and inviting. The overall look is very cute and lively, with a natural and charming pose that feels approachable.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063407_cd720354-f3dd-4a3d-bcd8-04f936a2aefe.png",
+          "scores": {
+            "cutenessScore": 85,
+            "detailScore": 75,
+            "consistencyScore": 90,
+            "overallScore": 83.5
+          }
+        }
+      ],
+      "currentVersion": "v1.0",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063407_cd720354-f3dd-4a3d-bcd8-04f936a2aefe.png"
+    },
+    {
+      "id": 6,
+      "name": "현무",
+      "description": "묵직하고 정직한 기술력을 지닌 신뢰로운 형 캐릭터",
+      "personalityKeywords": [
+        "신뢰성",
+        "기술력",
+        "정직함",
+        "견고함",
+        "차분함"
+      ],
+      "colorPalette": {
+        "primary": "#1F3A52",
+        "secondary": "#4A4A4A",
+        "accent": "#7FA8C9"
+      },
+      "accessories": {
+        "hair": "검정색 짧은 머리, 단정함",
+        "clothing": "다크 파랑 각진 어깨의 튼튼한 몸, 견고한 질감과 은은한 기하학적 무늬",
+        "scarf": "없음 (단순함이 신뢰성의 표현)",
+        "others": "액세서리 없음"
+      },
+      "worldviewTags": [
+        "제주",
+        "신뢰",
+        "기술",
+        "정직함",
+        "견고함"
+      ],
+      "higgsfieldPromptTemplate": "adorable 3D character illustration render in the style of Kakao Friends or a Pixar/DreamWorks animated character still (an ILLUSTRATED character render, NOT a photograph of a physical toy or product, no studio product-photography lighting or reflections, no realistic fabric weave or plastic sheen), soft smooth cel-shaded cartoon surfaces, warm flat illustrated coloring, trustworthy Korean young man character, big calm sparkling eyes with a steady dependable expression, soft rounded face with angular shoulders on a compact sturdy body, dark navy (#1F3A52) with a subtle geometric pattern accent, short neat black hair, no accessories, gentle confident smile, pink blush cheeks, strong precise arms and legs with clearly defined joints, chibi 2-heads-tall proportions (slightly smaller and more compact than the other characters), not a real photographed doll, not stiff or lifeless, full of warmth and life like a beloved animated character, a cute charming illustrated Jeju-themed background scene (soft dreamy pastel sky, gentle sparkling waves, fluffy clouds, or tiny stars — a warm inviting decorated setting, NOT a blank plain wall), gentle even lighting, no text overlay, no logos, no letters or numbers, original unique brand mascot design, does not resemble any existing copyrighted character or franchise",
+      "versionHistory": [
+        {
+          "version": "v1.0",
+          "date": "2026-08-06",
+          "improvements": "The character has large, lively eyes with a gentle sparkle and a warm, approachable smile. The face shape is soft and rounded, contributing to a friendly and cute appearance. The pink blush on cheeks adds to the warmth and charm. The pose is natural and relaxed, enhancing the character's approachable vibe.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063409_ae9c95fd-e3dd-4fbe-9204-01b5ee12a7ad.png",
+          "scores": {
+            "cutenessScore": 80,
+            "detailScore": 75,
+            "consistencyScore": 70,
+            "overallScore": 76.5
+          }
+        }
+      ],
+      "currentVersion": "v1.0",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063409_ae9c95fd-e3dd-4fbe-9204-01b5ee12a7ad.png"
+    },
+    {
+      "id": 7,
+      "name": "가마할방",
+      "description": "70년 기술의 무게를 짊어진 장인 캐릭터",
+      "personalityKeywords": [
+        "장인정신",
+        "견고함",
+        "따뜻함",
+        "헌신",
+        "포근함"
+      ],
+      "colorPalette": {
+        "primary": "#3D2817",
+        "secondary": "#8B4513",
+        "accent": "#FF6B35"
+      },
+      "accessories": {
+        "hair": "흰머리, 단정한 단발, 머리 위 흰 수건",
+        "clothing": "갈색 앞치마, 동그랗고 포근한 몸에 따뜻한 질감",
+        "scarf": "주황색 리본",
+        "others": "목걸이, 손가락 반지"
+      },
+      "worldviewTags": [
+        "제주",
+        "장인",
+        "전통",
+        "70년 기술",
+        "따뜻함"
+      ],
+      "higgsfieldPromptTemplate": "adorable 3D character illustration render in the style of Kakao Friends or a Pixar/DreamWorks animated character still (an ILLUSTRATED character render, NOT a photograph of a physical toy or product, no studio product-photography lighting or reflections, no realistic fabric weave or plastic sheen), soft smooth cel-shaded cartoon surfaces, warm flat illustrated coloring, Korean grandmother craftsperson character, warm kind twinkling eyes full of wisdom and gentleness, soft round pudgy face and body, warm brown (#8B4513) with subtle flame-pattern accents, white hair with a neat bob and a white headscarf on top, a brown apron, heartwarming comforting smile, pink blush cheeks, thick warm arms and legs with clearly defined joints, chibi 2-heads-tall proportions, not a real photographed doll, not stiff or lifeless, full of warmth and life like a beloved animated character, a cute charming illustrated Jeju-themed background scene (soft dreamy pastel sky, gentle sparkling waves, fluffy clouds, or tiny stars — a warm inviting decorated setting, NOT a blank plain wall), gentle even lighting, no text overlay, no logos, no letters or numbers, original unique brand mascot design, does not resemble any existing copyrighted character or franchise",
+      "versionHistory": [
+        {
+          "version": "v1.0",
+          "date": "2026-08-06",
+          "improvements": "The character has large, expressive eyes with a warm and inviting smile that conveys gentleness and wisdom. The rounded face shape and soft blush on the cheeks add to the overall approachable and comforting look. The color palette is warm and soft, especially the orange scarf and brown tones, which enhance the character's warmth.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063445_ac488e14-5406-4053-88cf-a5b2c71abb07.png",
+          "scores": {
+            "cutenessScore": 80,
+            "detailScore": 75,
+            "consistencyScore": 85,
+            "overallScore": 80.5
+          }
+        }
+      ],
+      "currentVersion": "v1.0",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063445_ac488e14-5406-4053-88cf-a5b2c71abb07.png"
+    },
+    {
+      "id": 8,
+      "name": "불이",
+      "description": "열정과 에너지를 나누는 활발한 친구 캐릭터",
+      "personalityKeywords": [
+        "열정",
+        "에너지",
+        "공유",
+        "긍정",
+        "활력"
+      ],
+      "colorPalette": {
+        "primary": "#FF4500",
+        "secondary": "#FFD700",
+        "accent": "#FFE4B5"
+      },
+      "accessories": {
+        "hair": "빨강/주황/노랑 불꽃 느낌 머리",
+        "clothing": "주황빨강 역동적 불꽃 모양 몸, 흐르는 불꽃 무늬",
+        "scarf": "없음 (에너지 자체가 액세서리)",
+        "others": "크고 반짝이는 눈, 큰 웃음"
+      },
+      "worldviewTags": [
+        "제주",
+        "열정",
+        "에너지",
+        "긍정",
+        "활력"
+      ],
+      "higgsfieldPromptTemplate": "adorable 3D character illustration render in the style of Kakao Friends or a Pixar/DreamWorks animated character still (an ILLUSTRATED character render, NOT a photograph of a physical toy or product, no studio product-photography lighting or reflections, no realistic fabric weave or plastic sheen), soft smooth cel-shaded cartoon surfaces, warm flat illustrated coloring, energetic Korean young man character, big sparkling eyes bursting with positivity, soft rounded dynamic flame-shaped head and body, orange-red (#FF4500) with flowing flame pattern accents, red-orange-yellow flame-like hair with a softly pointed flickering top, big joyful infectious smile, pink blush cheeks, long strong arms and legs with clearly defined joints, chibi 2-heads-tall proportions, not a real photographed doll, not stiff or lifeless, full of warmth and life like a beloved animated character, a cute charming illustrated Jeju-themed background scene (soft dreamy pastel sky, gentle sparkling waves, fluffy clouds, or tiny stars — a warm inviting decorated setting, NOT a blank plain wall), gentle even lighting, no text overlay, no logos, no letters or numbers, original unique brand mascot design, does not resemble any existing copyrighted character or franchise",
+      "versionHistory": [
+        {
+          "version": "v1.0",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이며 매우 생기있고 귀엽습니다. 얼굴 비율도 둥글고 부드러운 곡선으로 사랑스럽고, 표정은 활기차고 따뜻한 미소로 다가가고 싶은 느낌을 줍니다. 색상은 따뜻하고 부드러운 톤이 잘 표현되어 있습니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063427_ea7d7b21-c3ac-402f-abc3-04c233c9da53.png",
+          "scores": {
+            "cutenessScore": 88,
+            "detailScore": 75,
+            "consistencyScore": 90,
+            "overallScore": 84.9
+          }
+        }
+      ],
+      "currentVersion": "v1.0",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063427_ea7d7b21-c3ac-402f-abc3-04c233c9da53.png"
+    }
+  ]
+}

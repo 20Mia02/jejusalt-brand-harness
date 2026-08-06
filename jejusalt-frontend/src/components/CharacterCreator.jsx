@@ -88,6 +88,12 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
   // ── 캐릭터 라이브러리 (기본 캐릭터 풀) ──
   const [library, setLibrary] = useState([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
+  // ⭐ CHARACTER_GENERATION_SYSTEM_PROMPT.md: 캐릭터별 귀여움/디테일/일관성 자동 평가 +
+  // 버전 관리 시스템(characters.json, name으로 병합). refiningName: 현재 리파인 진행 중인
+  // 캐릭터 이름(중복 클릭 방지용), evolutionOpenName: "캐릭터 진화 보기"가 펼쳐진 캐릭터.
+  const [refinementByName, setRefinementByName] = useState({});
+  const [refiningName, setRefiningName] = useState(null);
+  const [evolutionOpenName, setEvolutionOpenName] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newCharName, setNewCharName] = useState('');
   const [newCharDirection, setNewCharDirection] = useState('');
@@ -111,6 +117,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
   useEffect(() => {
     loadLibrary();
+    loadRefinementData();
   }, []);
 
   const loadLibrary = async () => {
@@ -122,6 +129,39 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       console.error('캐릭터 라이브러리 로드 실패:', err);
     } finally {
       setLibraryLoading(false);
+    }
+  };
+
+  // characters.json(귀여움/디테일/일관성 리파인먼트 시스템)의 버전 정보를 이름으로 병합
+  const loadRefinementData = async () => {
+    try {
+      const res = await axios.get('/api/generate/characters');
+      const byName = {};
+      for (const c of res.data.characters || []) {
+        byName[c.name] = c;
+      }
+      setRefinementByName(byName);
+    } catch (err) {
+      console.error('캐릭터 리파인먼트 데이터 로드 실패:', err);
+    }
+  };
+
+  // "귀여움 리파인 시작" — 자동으로 생성→평가→(부족하면) 재시도까지 돌고 새 버전으로 확정
+  const handleRefineCharacter = async (refChar) => {
+    if (!refChar) return;
+    try {
+      setRefiningName(refChar.name);
+      const res = await axios.post('/api/generate/character', { characterId: refChar.id, forceRefine: true });
+      setRefinementByName((prev) => ({
+        ...prev,
+        [refChar.name]: { ...prev[refChar.name], currentVersion: res.data.currentVersion, referenceImageUrl: res.data.referenceImageUrl, versionHistory: res.data.versionHistory },
+      }));
+      setSuccessMessage(`${refChar.name} ${res.data.currentVersion} 완성! ${res.data.cutenessMessage || ''}`);
+      loadLibrary();
+    } catch (err) {
+      setError(`${refChar.name} 리파인 실패: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setRefiningName(null);
     }
   };
 
@@ -473,7 +513,11 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
           <p className="text-sm text-dark-text-muted">라이브러리 불러오는 중...</p>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {library.map((libChar) => (
+            {library.map((libChar) => {
+              const refChar = refinementByName[libChar.character_name];
+              const isRefining = refiningName === libChar.character_name;
+              const isEvolutionOpen = evolutionOpenName === libChar.character_name;
+              return (
               <div
                 key={libChar.id}
                 className="border border-brand-blue/10 bg-dark-bg rounded-lg p-3 hover:border-brand-blue/40 transition relative group"
@@ -485,6 +529,9 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                   )}
                   {libChar.source === 'ai_generated' && (
                     <span className="ml-1 text-xs bg-brand-blue/10 text-brand-blue px-1 rounded">AI생성</span>
+                  )}
+                  {refChar?.currentVersion && (
+                    <span className="ml-1 text-xs bg-status-approved/10 text-status-approved px-1 rounded">{refChar.currentVersion}</span>
                   )}
                 </div>
                 {/* 레퍼런스: 있으면 실제 영상, 없으면 "아직 없음" placeholder로 일관성 상태를 항상 보이게 함 */}
@@ -531,8 +578,48 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                     </button>
                   )}
                 </div>
+
+                {/* ⭐ 귀여움/디테일/일관성 자동 리파인먼트 시스템 */}
+                <div className="flex gap-1 mt-1">
+                  <button
+                    onClick={() => handleRefineCharacter(refChar || { id: null, name: libChar.character_name })}
+                    disabled={isRefining || !refChar}
+                    title={!refChar ? '이 캐릭터는 아직 characters.json에 등록되지 않았습니다' : ''}
+                    className="flex-1 text-xs px-2 py-1 bg-brand-blue/10 text-brand-blue rounded hover:bg-brand-blue/20 disabled:opacity-40 font-semibold"
+                  >
+                    {isRefining ? '🪄 귀여움 다듬는 중...' : '🪄 귀여움 리파인'}
+                  </button>
+                  {refChar?.versionHistory?.length > 0 && (
+                    <button
+                      onClick={() => setEvolutionOpenName(isEvolutionOpen ? null : libChar.character_name)}
+                      className="text-xs px-2 py-1 bg-dark-chip text-dark-text rounded hover:brightness-125"
+                    >
+                      {isEvolutionOpen ? '▲ 진화' : '▼ 진화'}
+                    </button>
+                  )}
+                </div>
+
+                {isEvolutionOpen && refChar?.versionHistory?.length > 0 && (
+                  <div className="mt-2 space-y-1.5 border-t border-brand-blue/10 pt-2">
+                    <div className="text-[10px] text-dark-text-muted mb-1">🕰️ 캐릭터 진화 보기</div>
+                    {refChar.versionHistory.slice().reverse().map((v) => (
+                      <div key={v.version} className="flex items-center gap-1.5 text-[10px] bg-dark-chip rounded p-1">
+                        <div className="w-8 h-8 rounded overflow-hidden bg-dark-bg flex-shrink-0">
+                          {v.referenceImageUrl && <ReferenceMedia url={v.referenceImageUrl} alt={v.version} className="w-full h-full object-cover" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold">{v.version} <span className="text-dark-text-muted">({v.date})</span></div>
+                          {v.scores?.overallScore != null && (
+                            <div className="text-status-approved">종합 {v.scores.overallScore}점 (귀여움 {v.scores.cutenessScore})</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
