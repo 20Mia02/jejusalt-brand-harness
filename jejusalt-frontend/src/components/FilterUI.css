@@ -2,23 +2,23 @@
    FilterUI — 기업 전문 웹 페이지 수준 리디자인
    ============================================================ */
 
-/* Step 1: 메인 컨테이너 - 중앙 정렬 */
+/* Step 1: 메인 컨테이너 - 완벽한 중앙 정렬 */
 .filter-ui-main-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   width: 100%;
-  min-height: auto;
-  padding: 40px 20px;
+  padding: 0;
 }
 
 /* 로고 섹션 */
 .filter-ui-logo-section {
   display: flex;
   justify-content: center;
-  margin-bottom: 40px;
+  margin-bottom: 32px;
   width: 100%;
+  margin-top: 40px;
 }
 
 .filter-ui-logo-section img {
@@ -32,7 +32,7 @@
   display: flex;
   justify-content: center;
   gap: 12px;
-  margin-bottom: 40px;
+  margin-bottom: 32px;
   width: 100%;
 }
 
@@ -75,16 +75,20 @@ html.dark .filter-ui-tab-button.active {
   box-shadow: 0 4px 12px rgba(0, 174, 239, 0.4);
 }
 
-/* Step 3: 폼 박스 컨테이너 - 중앙 정렬 및 기업 수준 디자인 */
+/* Step 3: 폼 박스 컨테이너 - 완벽한 중앙 정렬 및 기업 수준 디자인 */
 .filter-ui-form-container {
   width: 850px;
   max-width: 90%;
+  margin: 0 auto;
   background-color: #ffffff;
   border-radius: 16px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(0, 0, 0, 0.06);
   padding: 48px 40px;
   animation: fadeIn 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  align-self: center;
 }
 
 html.dark .filter-ui-form-container {
