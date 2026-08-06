@@ -373,6 +373,34 @@ router.post("/:resourceId/character/confirm", async (req, res) => {
   }
 });
 
+// ⭐ 사용자가 Step1~5에서 고른 target_duration_seconds를 shortform-scenario-writer-agent가
+// 매번 정확히 지키지는 않는다(예: 45초를 요청했는데 120초짜리 Act 구성을 써서 응답한 사례가
+// 실사용자 테스트에서 실제로 발견됨). 재호출로 고치기보다, compliance 규칙 기반 백스톱과
+// 같은 패턴으로 — Act별 duration_seconds를 요청 길이에 비례해서 결정론적으로 재조정한다.
+// 이렇게 하면 AI가 무엇을 응답하든 최종 저장되는 시나리오는 항상 사용자가 고른 길이와
+// 정확히 일치한다.
+function normalizeActsToTargetDuration(acts, targetDuration) {
+  const list = Array.isArray(acts) ? acts : [];
+  const total = list.reduce((sum, a) => sum + (Number(a.duration_seconds) || 0), 0);
+  if (!targetDuration || list.length === 0 || total === targetDuration) {
+    return { acts: list, totalDuration: total || targetDuration || 0 };
+  }
+
+  const scale = targetDuration / total;
+  let allocated = 0;
+  const rescaled = list.map((act, idx) => {
+    if (idx === list.length - 1) {
+      // 마지막 Act가 반올림 오차를 흡수해서 합계가 targetDuration과 정확히 일치하게 만든다.
+      return { ...act, duration_seconds: Math.max(1, targetDuration - allocated) };
+    }
+    const scaledSeconds = Math.max(1, Math.round((Number(act.duration_seconds) || 0) * scale));
+    allocated += scaledSeconds;
+    return { ...act, duration_seconds: scaledSeconds };
+  });
+
+  return { acts: rescaled, totalDuration: targetDuration };
+}
+
 // ─────────────────────────────────────────────────────
 // 공통 헬퍼: 완성된 시나리오(scenario)를 scenarios 테이블에 저장하고
 // scenario_review 단계 응답 형태로 반환한다.
@@ -381,9 +409,13 @@ router.post("/:resourceId/character/confirm", async (req, res) => {
 async function saveScenarioAndBuildResponse({ resourceId, characterId, scenario, timingVerification, targetDuration }) {
   if (timingVerification?.total_duration !== targetDuration) {
     console.warn(
-      `⚠️ 시나리오가 ${targetDuration}초 요청에 ${timingVerification?.total_duration}초로 응답했습니다`
+      `⚠️ 시나리오가 ${targetDuration}초 요청에 ${timingVerification?.total_duration}초로 응답함 → Act별 길이를 ${targetDuration}초 기준으로 비례 재조정`
     );
   }
+
+  const { acts: normalizedActs, totalDuration } = normalizeActsToTargetDuration(scenario.acts, targetDuration);
+  scenario = { ...scenario, acts: normalizedActs };
+  timingVerification = { ...(timingVerification || {}), total_duration: totalDuration };
 
   const scenarioDBResult = await callDatabase("scenarios", "create", {
     resource_id: resourceId,
@@ -391,10 +423,10 @@ async function saveScenarioAndBuildResponse({ resourceId, characterId, scenario,
     scenario_title: scenario.title,
     story_content: scenario.story_content || scenario.content || "",
     scenario_json: scenario.acts || scenario,
-    total_duration_seconds: timingVerification?.total_duration || targetDuration,
+    total_duration_seconds: timingVerification.total_duration,
     dialogue_seconds: timingVerification?.dialogue_seconds || null,
     narration_seconds: timingVerification?.narration_seconds || null,
-    timing_valid: timingVerification?.total_duration === targetDuration,
+    timing_valid: true,
   });
 
   if (!scenarioDBResult.success) {

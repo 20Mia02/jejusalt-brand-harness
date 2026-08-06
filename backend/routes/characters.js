@@ -40,54 +40,71 @@ try {
 // ─────────────────────────────────────────────
 router.get("/library", async (req, res) => {
   try {
-    // 1단계: config.json의 v3 기본 캐릭터 로드 및 필드 변환
-    const baseCharacters = (config.characters || []).map(char => ({
-      // database 필드명으로 변환
-      id: char.id,
-      character_name: char.name,
-      character_profile: char.visualIdentity,
-      voice_tone: char.toneTrait || "",
-      personality_traits: char.role ? [char.role] : [],
-      is_base_character: true,
-      generation_count: char.generation_count || 0,
+    // 1단계: config.json의 v3 기본 캐릭터 로드 및 필드 변환 (이름으로 조회할 수 있도록 Map)
+    const baseCharacterMap = new Map(
+      (config.characters || []).map((char) => [
+        char.name,
+        {
+          // database 필드명으로 변환
+          id: char.id,
+          character_name: char.name,
+          character_profile: char.visualIdentity,
+          voice_tone: char.toneTrait || "",
+          personality_traits: char.role ? [char.role] : [],
+          is_base_character: true,
+          generation_count: char.generation_count || 0,
 
-      // v3 설계 데이터 포함 (프론트엔드에서 표시 가능하도록)
-      gender: char.gender,
-      ageGroup: char.ageGroup,
-      type: char.type,
-      role: char.role,
-      toneTrait: char.toneTrait,
-      bodyStructure: char.bodyStructure,
-      genderExpression: char.genderExpression,
-      animationNotes: char.animationNotes,
-      symbolism: char.symbolism,
-      visualIdentity: char.visualIdentity,
-      higgsfieldPrompt: char.higgsfieldPrompt,
-      reference_image_url: char.reference_image_url,
-    }));
+          // v3 설계 데이터 포함 (프론트엔드에서 표시 가능하도록)
+          gender: char.gender,
+          ageGroup: char.ageGroup,
+          type: char.type,
+          role: char.role,
+          toneTrait: char.toneTrait,
+          bodyStructure: char.bodyStructure,
+          genderExpression: char.genderExpression,
+          animationNotes: char.animationNotes,
+          symbolism: char.symbolism,
+          visualIdentity: char.visualIdentity,
+          higgsfieldPrompt: char.higgsfieldPrompt,
+          reference_image_url: char.reference_image_url,
+        },
+      ])
+    );
 
-    // 2단계: 데이터베이스에서 추가 캐릭터 조회
+    // 2단계: 데이터베이스에서 캐릭터 조회
     const result = await callDatabase("character_library", "read", null, {});
+    const dbRows = result.success && result.rows ? result.rows : [];
 
-    let additionalCharacters = [];
-    if (result.success && result.rows) {
-      // 중복 제거: config의 캐릭터와 다른 것들만 추가
-      const baseIds = new Set(baseCharacters.map(c => c.id || c.character_name));
-      additionalCharacters = result.rows.filter(
-        c => !baseIds.has(c.id || c.character_name)
-      );
+    // ⭐ 중복 노출 버그 수정: config.json 기본 캐릭터와 DB(character_library)에 시드된
+    // 동명의 캐릭터가 서로 다른 id를 가지고 있어(config는 1~8 정수, DB는 UUID) 기존
+    // 중복 제거 로직(`baseIds.has(c.id || c.character_name)`)이 걸러내지 못하고 8개
+    // 캐릭터가 전부 2개씩(총 16개) 노출되고 있었다. 실제로 모든 자료 생성 파이프라인
+    // (routes/resources.js)은 DB 쪽만 읽으므로 DB가 진짜 소스이며, 오늘 8명 전원에게
+    // 실제 Higgsfield 3D 마스코트 레퍼런스 이미지도 DB 쪽에 채워 넣었다. 반면 config.json
+    // 쪽은 v3 설계 문서의 정적 스냅샷이라 사진이 없거나 옛날 2D 컨셉 스케치만 남아있을
+    // 수 있다(예: 결이). 그래서 이름이 겹치면 DB 쪽 값(사진/생성이력)을 우선하되,
+    // config.json에만 있는 v3 설계 메타데이터(higgsfieldPrompt, bodyStructure 등)는
+    // 함께 병합해서 보존한다.
+    const mergedByName = new Map();
+    for (const row of dbRows) {
+      const base = baseCharacterMap.get(row.character_name);
+      mergedByName.set(row.character_name, base ? { ...base, ...row } : row);
+    }
+    // DB에 아직 한 번도 시드되지 않은 config 기본 캐릭터만 폴백으로 추가
+    for (const [name, base] of baseCharacterMap) {
+      if (!mergedByName.has(name)) mergedByName.set(name, base);
     }
 
-    // 3단계: 기본 캐릭터 + 추가 캐릭터 합치기
-    const allCharacters = [...baseCharacters, ...additionalCharacters];
+    const allCharacters = Array.from(mergedByName.values());
+    const baseCount = baseCharacterMap.size;
 
     return res.json({
       success: true,
       characters: allCharacters,
       designSystemVersion: config.brand?.designSystemVersion || "v3",
       stats: {
-        baseCharacters: baseCharacters.length,
-        additionalCharacters: additionalCharacters.length,
+        baseCharacters: baseCount,
+        additionalCharacters: allCharacters.length - baseCount,
         total: allCharacters.length
       }
     });
