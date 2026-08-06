@@ -488,12 +488,13 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                   )}
                 </div>
                 {/* 레퍼런스: 있으면 실제 영상, 없으면 "아직 없음" placeholder로 일관성 상태를 항상 보이게 함 */}
-                <div className="w-full h-20 bg-dark-chip rounded border border-brand-blue/10 flex items-center justify-center overflow-hidden mb-2">
+                {/* 정사각 프레임 + object-contain: 캐릭터 전신이 잘리지 않고 다 보이도록 */}
+                <div className="w-full aspect-square bg-dark-chip rounded border border-brand-blue/10 flex items-center justify-center overflow-hidden mb-2">
                   {libChar.reference_image_url ? (
                     <ReferenceMedia
                       url={libChar.reference_image_url}
                       alt={`${libChar.character_name} reference`}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                     />
                   ) : (
                     <span className="text-[10px] text-dark-text-muted text-center">🖼️ 레퍼런스 없음<br/>(첫 생성 후 저장됨)</span>
@@ -703,11 +704,11 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
             {char.reference_image_url && (
               <div className="mt-3 mb-3">
                 <span className="text-xs font-semibold text-dark-text-muted">🖼️ 레퍼런스:</span>
-                <div className="mt-2 w-full h-32 bg-dark-chip rounded border border-brand-blue/20 flex items-center justify-center overflow-hidden">
+                <div className="mt-2 w-full max-w-xs aspect-square bg-dark-chip rounded border border-brand-blue/20 flex items-center justify-center overflow-hidden">
                   <ReferenceMedia
                     url={char.reference_image_url}
                     alt={`${char.character_name} reference`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 <div className="text-xs text-dark-text-muted mt-2 break-all">
