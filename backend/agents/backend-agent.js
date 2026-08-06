@@ -1130,8 +1130,14 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
     const characterVisual = libraryChar?.higgsfieldPrompt || visualDescription;
     // ⚠️ --start-image 레퍼런스가 없거나 거부될 경우를 대비한 텍스트상의 안전장치 —
     // 레퍼런스 없이도 실사 인물이 아니라 마스코트로 나오도록 명시적으로 못박는다.
+    // ⭐ 재현성 버그 수정: 동일 캐릭터·동일 레퍼런스 job id로도 장면(scene) 내용에 따라
+    // "화산암 질감/불꽃 무늬" 같은 재질 묘사가 과도하게 해석되어 아예 다른 생김새(예:
+    // 바위 크리처)로 새어나가는 사례가 실제로 관찰됨 — 심하면 실존 캐릭터(디즈니 엘리멘탈 등)를
+    // 연상시켜 `docs/character-concept.md`의 "실존 유명 캐릭터 연상 디자인 금지" 규칙을
+    // 위반할 위험이 있다. 레퍼런스 이미지를 그대로 따르고, 장면이 바뀌어도 몸 형태/얼굴은
+    // 고정하라고 명시적으로 못박는다.
     const mascotAnchor =
-      "3D pixar-style plush toy mascot character, non-human, stylized cute cartoon figure, toy-like material, NOT a real human, not photorealistic";
+      "3D pixar-style plush toy mascot character, non-human, stylized cute cartoon figure, toy-like material, NOT a real human, not photorealistic, must exactly match the provided start-image reference character design in every scene (same face, same body shape, same proportions, only pose/background changes), keep a round cute chibi mascot body with a clearly visible friendly face at all times, do NOT turn into a rock/lava/fire elemental creature or any existing famous animated character, texture details (rocky/flame patterns) are surface decoration only and must not change the character's overall silhouette";
 
     // ⭐ 브랜드/스토리 반영: 예전에는 "product promotion"이라는 문구 하나뿐이라 시나리오·카피에
     // 정성껏 담은 브랜드/스토리 내용이 영상 프롬프트에 전혀 전달되지 않았다. 실제 생성된 카피
