@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제주소금 8종 캐릭터 비주얼 — 검수용 (v1)</title>
+<style>
+  :root{
+    --bg-start:#ffd6e8;
+    --bg-end:#cfe8ff;
+    --card-bg:rgba(255,255,255,0.72);
+    --ink:#2a2f43;
+    --muted:#6b7280;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    background:linear-gradient(135deg,var(--bg-start) 0%,var(--bg-end) 100%);
+    color:var(--ink);
+    padding:24px 18px 60px;
+    min-height:100vh;
+  }
+  .wrap{max-width:1280px;margin:0 auto}
+  header{text-align:center;margin-bottom:22px}
+  header h1{font-size:24px;margin:0 0 8px;font-weight:800;letter-spacing:-0.4px}
+  header p{margin:0;color:var(--muted);font-size:14px}
+  .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 18px;margin:14px auto 22px;max-width:900px;font-size:13px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,0.08)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+  .card{
+    background:var(--card-bg);
+    border:1px solid rgba(255,255,255,0.8);
+    border-radius:22px;
+    padding:16px 14px 16px;
+    box-shadow:0 10px 26px -14px rgba(60,70,110,0.35);
+    backdrop-filter:blur(2px);
+    display:flex;flex-direction:column;align-items:center;
+    transition:transform .15s ease;
+  }
+  .card:hover{transform:translateY(-3px)}
+  .avatar{position:relative;width:180px;height:180px;display:flex;align-items:center;justify-content:center}
+  .silhouette{stroke-linecap:round;stroke-linejoin:round}
+  .tag{
+    margin-top:10px;font-size:12px;color:var(--muted);
+    border-top:1px dashed rgba(0,0,0,0.12);padding-top:8px;
+    width:100%;text-align:center;line-height:1.45;
+  }
+  .name{font-weight:800;font-size:16px;margin:2px 0 2px;letter-spacing:-0.2px}
+  .key{font-size:12px;color:var(--muted);margin:0 0 6px}
+  .crumb{display:inline-block;background:rgba(0,0,0,0.05);border-radius:999px;padding:2px 9px;font-size:11px;color:var(--ink);margin:0 4px 4px 0}
+  footer{max-width:900px;margin:26px auto 0;text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
+  .note{background:rgba(255,245,245,0.6);border:1px dashed rgba(120,80,120,0.25);border-radius:14px;padding:10px 12px;margin-top:12px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>제주소금 8종 캐릭터 — 정면 기본 포즈 비교</h1>
+      <p>기준: character-reference-v1.md · 공통: 큰 둥근 머리(60%+) + 짧고 둥근 팔다리 + 매트·보송 파스텔 톤</p>
+      <div class="legend">
+        <span><i class="dot" style="background:#00AEEF"></i>결이(SALT)</span>
+        <span><i class="dot" style="background:#0D1B2A;color:#0D1B2A"></i>용암이</span>
+        <span><i class="dot" style="background:#6B4C9A"></i>해수(물)</span>
+        <span><i class="dot" style="background:#FFD700"></i>미내(담수)</span>
+        <span><i class="dot" style="background:#1F3A52;color:#1F3A52"></i>현무(응축)</span>
+        <span><i class="dot" style="background:#8B4513;color:#8B4513"></i>가마할방(포근)</span>
+        <span><i class="dot" style="background:#FF4500"></i>불이(불)</span>
+        <span><i class="dot" style="background:#1A3A52;color:#1A3A52"></i>한라(산)</span>
+      </div>
+    </header>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="note">
+      ※ 이 파일은 최종 이미지 렌더링이 아니라 <b>기준 시트대로 실제로 어떻게 보이는지</b>를 VS Code에서 바로 검수하는 비주얼 체크리스트입니다.
+      각 캐릭터의 <b>상징 힌트(결이의 각진 정점 / 불이의 뾰족한 위쪽 / 해수의 물결 테두리 / 한라의 봉우리 높이 등)</b>가 분명하게 보이되,
+      전체 실루엣은 <b>동글·말랑</b>을 유지하는 방향으로 그렸습니다.
+    </div>
+
+    <footer>
+      버전: v1 · 공통 실루엣 유지 + 캐릭터별 상징 형태/그라디언트/질감 힌트로 구분 · 색상 변경 없음
+    </footer>
+  </div>
+
+<script>
+const characters = [
+  {
+    id:"gyeol",
+    name:"결이",
+    role:"당찬 소년 / 메인 마스코트",
+    symbol:"소금 결정 (각진 구조)",
+    color:"#00AEEF",
+    cardColor:"#e3f5fe",
+    accent:"밝은 파랑",
+    silhouette:`
+      <g class="silhouette" stroke="#00AEEF" stroke-width="4.5" fill="none">
+        <!-- 몸통: 짧고 동글한 배모양 -->
+        <path d="M-18,-28 C-30,-22 -32,-4 -22,6 C-12,16 12,16 22,6 C32,-4 30,-22 18,-28 Z" fill="rgba(0,174,239,0.14)"/>
+        <!-- 다리: 짧고 둥근 막대 (왼쪽/오른쪽) -->
+        <path d="M-12,12 C-14,22 -12,32 -8,36" fill="none"/>
+        <path d="M12,12 C14,22 12,32 8,36" fill="none"/>
+        <!-- 발: 작게 튀어나옴 -->
+        <circle cx="-9" cy="37" r="4.5" fill="#00AEEF"/>
+        <circle cx="9" cy="37" r="4.5" fill="#00AEEF"/>
+        <!-- 팔: 짧고 둥근 막대 (왼쪽/오른쪽) -->
+        <path d="M-20,-18 C-30,-12 -34,-2 -32,4" fill="none"/>
+        <path d="M20,-18 C30,-12 34,-2 32,4" fill="none"/>
+        <!-- 손: 둥근 덩어리 -->
+        <circle cx="-33" cy="5" r="5" fill="#00AEEF"/>
+        <circle cx="33" cy="5" r="5" fill="#00AEEF"/>
+      </g>
+      <!-- 머리: 둥근 구형 + 정점·테두리 소금 결정 힌트 -->
+      <g class="silhouette">
+        <!-- 기본 둥근 머리 -->
+        <circle cx="0" cy="-52" r="42" fill="#00AEEF" stroke="#00AEEF" stroke-width="2"/>
+        <!-- 정점·테두리 결정 힌트 (겹친 다각형 레이어) -->
+        <path d="M0,-94 L10,-74 L6,-52 L-6,-52 L-10,-74 Z" fill="#cfe8ff" opacity="0.9"/>
+        <path d="M0,-92 L8,-72 L4,-50 L-4,-50 L-8,-72 Z" fill="none" stroke="#7fd0ff" stroke-width="2"/>
+        <!-- 귀 일부만 살짝 -->
+        <circle cx="-40" cy="-50" r="4.5" fill="#00AEEF"/>
+        <circle cx="40" cy="-50" r="4.5" fill="#00AEEF"/>
+      </g>
+      <!-- 얼굴 -->
+      <g class="silhouette" fill="#2a2f43">
+        <!-- 눈: 매우 큰 검은 동그란 점 -->
+        <circle cx="-14" cy="-56" r="6.5"/>
+        <circle cx="14" cy="-56" r="6.5"/>
+        <!-- 눈동자(검은 동그라미 위주, 작은 하이라이트 1개만) -->
+        <circle cx="-11" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="17" cy="-57" r="2" fill="#ffffff"/>
+        <!-- 코: 작은 점 -->
+        <circle cx="0" cy="-46" r="1.8"/>
+        <!-- 입: 아주 작은 "-" -->
+        <path d="M-4,-40 L4,-40" stroke="#2a2f43" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </g>
+      <!-- 분홍 뺨 -->
+      <circle cx="-22" cy="-46" r="5" fill="#ffb3c8" opacity="0.75"/>
+      <circle cx="22" cy="-46" r="5" fill="#ffb3c8" opacity="0.75"/>
+    `,
+    hint:"머리 정점·테두리에 소금 결정 느낌이 분명하게 보인다 (멀리선 동글이, 가까이선 각진 맛)"
+  },
+  {
+    id:"yongam",
+    name:"용암이",
+    role:"포근한 케어 / 따뜨함",
+    symbol:"지열의 따뜨함 (내부→외부)",
+    color:"#0D1B2A",
+    cardColor:"#e7eff7",
+    accent:"진한 파랑",
+    silhouette:`
+      <g class="silhouette" stroke="#0D1B2A" stroke-width="4.5" fill="none">
+        <path d="M-18,-28 C-30,-22 -32,-4 -22,6 C-12,16 12,16 22,6 C32,-4 30,-22 18,-28 Z" fill="rgba(13,27,42,0.14)"/>
+        <path d="M-12,12 C-14,22 -12,32 -8,36" fill="none"/>
+        <path d="M12,12 C14,22 12,32 8,36" fill="none"/>
+        <circle cx="-9" cy="37" r="4.5" fill="#0D1B2A"/>
+        <circle cx="9" cy="37" r="4.5" fill="#0D1B2A"/>
+        <path d="M-20,-18 C-30,-12 -34,-2 -32,4" fill="none"/>
+        <path d="M20,-18 C30,-12 34,-2 32,4" fill="none"/>
+        <circle cx="-33" cy="5" r="5" fill="#0D1B2A"/>
+        <circle cx="33" cy="5" r="5" fill="#0D1B2A"/>
+      </g>
+      <!-- 머리: 기본 동글이 유지 + 중심에서 바깥으로 따뜨한 톤 그라디언트 -->
+      <defs>
+        <radialGradient id="yongamH" cx="50%" cy="48%" r="60%">
+          <stop offset="0%" stop-color="#8fb4cf"/>
+          <stop offset="100%" stop-color="#0D1B2A"/>
+        </radialGradient>
+      </defs>
+      <circle cx="0" cy="-52" r="42" fill="url(#yongamH)" stroke="#0D1B2A" stroke-width="2"/>
+      <circle cx="-40" cy="-50" r="4.5" fill="#0D1B2A"/>
+      <circle cx="40" cy="-50" r="4.5" fill="#0D1B2A"/>
+      <g class="silhouette" fill="#2a2f43">
+        <circle cx="-14" cy="-56" r="6.5"/>
+        <circle cx="14" cy="-56" r="6.5"/>
+        <circle cx="-11" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="17" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="0" cy="-46" r="1.8"/>
+        <path d="M-4,-40 L4,-40" stroke="#2a2f43" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </g>
+      <circle cx="-22" cy="-46" r="5" fill="#ffc9c0" opacity="0.7"/>
+      <circle cx="22" cy="-46" r="5" fill="#ffc9c0" opacity="0.7"/>
+      <!-- 중심에서 바깥으로 퍼지는 따뜨한 톤 힌트 (복숭아/살구) -->
+      <path d="M0,-52 m-16,0 a16,10 0 1,0 32,0" fill="none" stroke="#ffb3a8" stroke-width="2" opacity="0.7"/>
+    `,
+    hint:"기본 동글이 유지하되 중심→테두리로 따뜨한 톤 그라디언트가 분명하게 퍼진다"
+  },
+  {
+    id:"hae-su",
+    name:"해수",
+    role:"우아한 여성 / 프리미엄",
+    symbol:"물의 흐름 (물결 테두리)",
+    color:"#6B4C9A",
+    cardColor:"#f1ecf7",
+    accent:"보라/청록",
+    silhouette:`
+      <g class="silhouette" stroke="#6B4C9A" stroke-width="4.5" fill="none">
+        <path d="M-18,-28 C-30,-22 -32,-4 -22,6 C-12,16 12,16 22,6 C32,-4 30,-22 18,-28 Z" fill="rgba(107,76,154,0.14)"/>
+        <path d="M-12,12 C-14,22 -12,32 -8,36" fill="none"/>
+        <path d="M12,12 C14,22 12,32 8,36" fill="none"/>
+        <circle cx="-9" cy="37" r="4.5" fill="#6B4C9A"/>
+        <circle cx="9" cy="37" r="4.5" fill="#6B4C9A"/>
+        <path d="M-20,-18 C-30,-12 -34,-2 -32,4" fill="none"/>
+        <path d="M20,-18 C30,-12 34,-2 32,4" fill="none"/>
+        <circle cx="-33" cy="5" r="5" fill="#6B4C9A"/>
+        <circle cx="33" cy="5" r="5" fill="#6B4C9A"/>
+      </g>
+      <!-- 머리: 테두리가 물결 같은 부드러운 곡선으로 분명하게 -->
+      <path d="M-42,-52
+               C-46,-78 -12,-96 0,-96
+               C12,-96 46,-78 42,-52
+               C46,-36 20,-26 0,-26
+               C-20,-26 -46,-36 -42,-52 Z"
+            fill="#6B4C9A" stroke="#6B4C9A" stroke-width="2"/>
+      <!-- 깊은물→밝은물 그라디언트 힌트 -->
+      <path d="M-20,-58 C-22,-76 -6,-86 0,-86 C6,-86 22,-76 20,-58" fill="none" stroke="#cfe2ff" stroke-width="3" opacity="0.8"/>
+      <circle cx="-40" cy="-50" r="4.5" fill="#6B4C9A"/>
+      <circle cx="40" cy="-50" r="4.5" fill="#6B4C9A"/>
+      <g class="silhouette" fill="#2a2f43">
+        <circle cx="-14" cy="-56" r="6.5"/>
+        <circle cx="14" cy="-56" r="6.5"/>
+        <circle cx="-11" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="17" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="0" cy="-46" r="1.8"/>
+        <path d="M-4,-40 L4,-40" stroke="#2a2f43" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </g>
+      <circle cx="-22" cy="-46" r="5" fill="#ffb3c8" opacity="0.7"/>
+      <circle cx="22" cy="-46" r="5" fill="#ffb3c8" opacity="0.7"/>
+    `,
+    hint:"머리 테두리가 완전한 원이 아니라 물결 같은 부드러운 곡선으로 분명하게 보인다"
+  },
+  {
+    id:"mi-nae",
+    name:"미내",
+    role:"포용적인 누나 / 활기·생기",
+    symbol:"담수 (맑음·투명함)",
+    color:"#FFD700",
+    cardColor:"#fff7de",
+    accent:"노랑/주황",
+    silhouette:`
+      <g class="silhouette" stroke="#E6C200" stroke-width="4.5" fill="none">
+        <path d="M-18,-28 C-30,-22 -32,-4 -22,6 C-12,16 12,16 22,6 C32,-4 30,-22 18,-28 Z" fill="rgba(255,215,0,0.16)"/>
+        <path d="M-12,12 C-14,22 -12,32 -8,36" fill="none"/>
+        <path d="M12,12 C14,22 12,32 8,36" fill="none"/>
+        <circle cx="-9" cy="37" r="4.5" fill="#E6C200"/>
+        <circle cx="9" cy="37" r="4.5" fill="#E6C200"/>
+        <path d="M-20,-18 C-30,-12 -34,-2 -32,4" fill="none"/>
+        <path d="M20,-18 C30,-12 34,-2 32,4" fill="none"/>
+        <circle cx="-33" cy="5" r="5" fill="#E6C200"/>
+        <circle cx="33" cy="5" r="5" fill="#E6C200"/>
+      </g>
+      <!-- 머리: 가장 깔끔하고 밝은 동글이 + 아주 살짝 더 명확한 하이라이트 -->
+      <circle cx="0" cy="-52" r="42" fill="#FFD700" stroke="#E6C200" stroke-width="2"/>
+      <circle cx="-40" cy="-50" r="4.5" fill="#FFD700"/>
+      <circle cx="40" cy="-50" r="4.5" fill="#FFD700"/>
+      <circle cx="-16" cy="-64" r="6" fill="#fff7de" opacity="0.9"/>
+      <circle cx="16" cy="-64" r="6" fill="#fff7de" opacity="0.9"/>
+      <g class="silhouette" fill="#2a2f43">
+        <circle cx="-14" cy="-56" r="6.5"/>
+        <circle cx="14" cy="-56" r="6.5"/>
+        <circle cx="-11" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="17" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="0" cy="-46" r="1.8"/>
+        <path d="M-4,-40 L4,-40" stroke="#2a2f43" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </g>
+      <circle cx="-22" cy="-46" r="5" fill="#ffb3c8" opacity="0.7"/>
+      <circle cx="22" cy="-46" r="5" fill="#ffb3c8" opacity="0.7"/>
+    `,
+    hint:"가장 깔끔하고 밝은 동글이, 아주 살짝 더 명확한 하이라이트로 투명함 강조"
+  },
+  {
+    id:"hyeon-bu",
+    name:"현무",
+    role:"신뢰로운 형 / 정제·신뢰",
+    symbol:"응축·정제 (컴팩트·간결)",
+    color:"#1F3A52",
+    cardColor:"#e6edf4",
+    accent:"다크 파랑",
+    silhouette:`
+      <g class="silhouette" stroke="#1F3A52" stroke-width="4.5" fill="none">
+        <path d="M-14,-28 C-24,-22 -24,-4 -16,6 C-8,14 8,14 16,6 C24,-4 24,-22 14,-28 Z" fill="rgba(31,58,82,0.16)"/>
+        <path d="M-9,11 C-10,20 -8,28 -6,30" fill="none"/>
+        <path d="M9,11 C10,20 8,28 6,30" fill="none"/>
+        <circle cx="-7" cy="31" r="3.6" fill="#1F3A52"/>
+        <circle cx="7" cy="31" r="3.6" fill="#1F3A52"/>
+        <path d="M-15,-17 C-22,-12 -24,-4 -22,2" fill="none"/>
+        <path d="M15,-17 C22,-12 24,-4 22,2" fill="none"/>
+        <circle cx="-23" cy="3" r="4" fill="#1F3A52"/>
+        <circle cx="23" cy="3" r="4" fill="#1F3A52"/>
+      </g>
+      <!-- 머리: 가장 간결하고 정돈된 동글이 (크기 약간 작게, 컴팩트하게) -->
+      <circle cx="0" cy="-50" r="38" fill="#1F3A52" stroke="#1F3A52" stroke-width="2"/>
+      <circle cx="-37" cy="-48" r="4" fill="#1F3A52"/>
+      <circle cx="37" cy="-48" r="4" fill="#1F3A52"/>
+      <g class="silhouette" fill="#2a2f43">
+        <circle cx="-12" cy="-54" r="6"/>
+        <circle cx="12" cy="-54" r="6"/>
+        <circle cx="-9" cy="-55" r="1.8" fill="#ffffff"/>
+        <circle cx="15" cy="-55" r="1.8" fill="#ffffff"/>
+        <circle cx="0" cy="-44" r="1.6"/>
+        <path d="M-3,-38 L3,-38" stroke="#2a2f43" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      </g>
+      <circle cx="-20" cy="-44" r="4.5" fill="#ffb3c8" opacity="0.7"/>
+      <circle cx="20" cy="-44" r="4.5" fill="#ffb3c8" opacity="0.7"/>
+      <!-- 정돈된 정렬 힌트: 매끄러운 정렬선 -->
+      <path d="M0,-88 L0,-14" stroke="#7fa8c9" stroke-width="1.4" opacity="0.55" stroke-dasharray="2 4"/>
+    `,
+    hint:"가장 간결하고 정돈된 동글이 + 컴팩트한 느낌 (응축·정제)이 분명하게 보인다"
+  },
+  {
+    id:"gama",
+    name:"가마할방",
+    role:"포근한 할아버지 / 포근함·온기",
+    symbol:"포근함·온기 (솜 같은 부드러움)",
+    color:"#8B4513",
+    cardColor:"#f6ece3",
+    accent:"갈색+회색",
+    silhouette:`
+      <g class="silhouette" stroke="#8B4513" stroke-width="4.5" fill="none">
+        <path d="M-20,-28 C-32,-22 -34,-4 -24,6 C-14,16 14,16 24,6 C34,-4 32,-22 20,-28 Z" fill="rgba(139,69,19,0.16)"/>
+        <path d="M-13,12 C-15,22 -13,32 -9,36" fill="none"/>
+        <path d="M13,12 C15,22 13,32 9,36" fill="none"/>
+        <circle cx="-10" cy="37" r="5" fill="#8B4513"/>
+        <circle cx="10" cy="37" r="5" fill="#8B4513"/>
+        <path d="M-22,-18 C-32,-12 -36,-2 -34,4" fill="none"/>
+        <path d="M22,-18 C32,-12 36,-2 34,4" fill="none"/>
+        <circle cx="-35" cy="5" r="5.5" fill="#8B4513"/>
+        <circle cx="35" cy="5" r="5.5" fill="#8B4513"/>
+      </g>
+      <!-- 머리: 가장 포동포동한 곡선 + 회색/백발 혼합 -->
+      <circle cx="0" cy="-54" r="44" fill="#9aa6ad" stroke="#8B4513" stroke-width="2"/>
+      <circle cx="0" cy="-54" r="44" fill="url(#gamaH)" opacity="0.55"/>
+      <circle cx="-42" cy="-52" r="5" fill="#9aa6ad"/>
+      <circle cx="42" cy="-52" r="5" fill="#9aa6ad"/>
+      <g class="silhouette" fill="#2a2f43">
+        <circle cx="-15" cy="-58" r="7"/>
+        <circle cx="15" cy="-58" r="7"/>
+        <circle cx="-12" cy="-59" r="2.2" fill="#ffffff"/>
+        <circle cx="18" cy="-59" r="2.2" fill="#ffffff"/>
+        <circle cx="0" cy="-47" r="2"/>
+        <path d="M-4,-40 L4,-40" stroke="#2a2f43" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </g>
+      <circle cx="-24" cy="-48" r="6" fill="#ffc9c0" opacity="0.7"/>
+      <circle cx="24" cy="-48" r="6" fill="#ffc9c0" opacity="0.7"/>
+      <!-- 가장 부드러운 곡선 강조 (포동포동 뱃살 느낌) -->
+      <path d="M-30,-18 C-36,-4 -30,8 -20,10" fill="none" stroke="#cbb49a" stroke-width="3" opacity="0.6"/>
+      <path d="M30,-18 C36,-4 30,8 20,10" fill="none" stroke="#cbb49a" stroke-width="3" opacity="0.6"/>
+    `,
+    hint:"가장 부드럽고 포동포동한 곡선 + 솜 같은 느낌, 각진 부분 전혀 없음"
+  },
+  {
+    id:"buri",
+    name:"불이",
+    role:"에너지 넘치는 친구 / 열정",
+    symbol:"불 (위쪽 뾰족·울렁)",
+    color:"#FF4500",
+    cardColor:"#ffe2d8",
+    accent:"주황빨강",
+    silhouette:`
+      <g class="silhouette" stroke="#FF4500" stroke-width="4.5" fill="none">
+        <path d="M-18,-28 C-30,-22 -32,-4 -22,6 C-12,16 12,16 22,6 C32,-4 30,-22 18,-28 Z" fill="rgba(255,69,0,0.16)"/>
+        <path d="M-12,12 C-14,22 -12,32 -8,36" fill="none"/>
+        <path d="M12,12 C14,22 12,32 8,36" fill="none"/>
+        <circle cx="-9" cy="37" r="4.5" fill="#FF4500"/>
+        <circle cx="9" cy="37" r="4.5" fill="#FF4500"/>
+        <path d="M-20,-18 C-30,-12 -34,-2 -32,4" fill="none"/>
+        <path d="M20,-18 C30,-12 34,-2 32,4" fill="none"/>
+        <circle cx="-33" cy="5" r="5" fill="#FF4500"/>
+        <circle cx="33" cy="5" r="5" fill="#FF4500"/>
+      </g>
+      <!-- 머리: 위쪽이 분명하게 뾰족·울렁이는 불꽃 느낌 -->
+      <path d="M-42,-52
+               C-46,-78 -20,-102 0,-104
+               C20,-102 46,-78 42,-52
+               C46,-36 20,-26 0,-26
+               C-20,-26 -46,-36 -42,-52 Z"
+            fill="#FF4500" stroke="#FF4500" stroke-width="2"/>
+      <!-- 위쪽으로 더 밝은 톤 그라디언트 (타오르는 느낌) -->
+      <path d="M-12,-78 C-14,-90 -2,-100 0,-100 C2,-100 14,-90 12,-78" fill="none" stroke="#ffd0a0" stroke-width="3" opacity="0.9"/>
+      <!-- 울렁이는 불꽃 흔들림 힌트 -->
+      <path d="M-20,-60 C-22,-70 -10,-78 -6,-72" fill="none" stroke="#ffb37a" stroke-width="2.4" opacity="0.8"/>
+      <path d="M20,-60 C22,-70 10,-78 6,-72" fill="none" stroke="#ffb37a" stroke-width="2.4" opacity="0.8"/>
+      <circle cx="-40" cy="-50" r="4.5" fill="#FF4500"/>
+      <circle cx="40" cy="-50" r="4.5" fill="#FF4500"/>
+      <g class="silhouette" fill="#2a2f43">
+        <circle cx="-14" cy="-56" r="6.5"/>
+        <circle cx="14" cy="-56" r="6.5"/>
+        <circle cx="-11" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="17" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="0" cy="-46" r="1.8"/>
+        <path d="M-4,-40 L4,-40" stroke="#2a2f43" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </g>
+      <circle cx="-22" cy="-46" r="5" fill="#ffb3c8" opacity="0.7"/>
+      <circle cx="22" cy="-46" r="5" fill="#ffb3c8" opacity="0.7"/>
+    `,
+    hint:"위쪽이 분명하게 뾰족·울렁이는 불꽃 느낌, 위쪽 밝은 톤 그라디언트"
+  },
+  {
+    id:"han-ra",
+    name:"한라",
+    role:"신비로운 할머니 / 영양·포용",
+    symbol:"한라산 (봉우리·높이)",
+    color:"#1A3A52",
+    cardColor:"#e4ebf2",
+    accent:"어두운 파랑",
+    silhouette:`
+      <g class="silhouette" stroke="#1A3A52" stroke-width="4.5" fill="none">
+        <path d="M-18,-28 C-30,-22 -32,-4 -22,6 C-12,16 12,16 22,6 C32,-4 30,-22 18,-28 Z" fill="rgba(26,58,82,0.16)"/>
+        <path d="M-12,12 C-14,22 -12,32 -8,36" fill="none"/>
+        <path d="M12,12 C14,22 12,32 8,36" fill="none"/>
+        <circle cx="-9" cy="37" r="4.5" fill="#1A3A52"/>
+        <circle cx="9" cy="37" r="4.5" fill="#1A3A52"/>
+        <path d="M-20,-18 C-30,-12 -34,-2 -32,4" fill="none"/>
+        <path d="M20,-18 C30,-12 34,-2 32,4" fill="none"/>
+        <circle cx="-33" cy="5" r="5" fill="#1A3A52"/>
+        <circle cx="33" cy="5" r="5" fill="#1A3A52"/>
+      </g>
+      <!-- 머리: 정상부 분명하게 약간 날카로운 느낌 + 조금 더 위로 솟은 느낌 -->
+      <path d="M-40,-52
+               C-44,-78 -16,-92 0,-96
+               C16,-92 44,-78 40,-52
+               C44,-36 20,-26 0,-26
+               C-20,-26 -44,-36 -40,-52 Z"
+            fill="#1A3A52" stroke="#1A3A52" stroke-width="2"/>
+      <!-- 정상부 약간 날카로운 봉우리 힌트 -->
+      <path d="M0,-96 L-6,-88 L0,-86 L6,-88 Z" fill="#3a6488" opacity="0.85"/>
+      <path d="M0,-96 L-4,-88 L2,-86 L4,-90 Z" fill="#7fa8c9" opacity="0.8"/>
+      <circle cx="-38" cy="-50" r="4.5" fill="#1A3A52"/>
+      <circle cx="38" cy="-50" r="4.5" fill="#1A3A52"/>
+      <g class="silhouette" fill="#2a2f43">
+        <circle cx="-14" cy="-56" r="6.5"/>
+        <circle cx="14" cy="-56" r="6.5"/>
+        <circle cx="-11" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="17" cy="-57" r="2" fill="#ffffff"/>
+        <circle cx="0" cy="-46" r="1.8"/>
+        <path d="M-4,-40 L4,-40" stroke="#2a2f43" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </g>
+      <circle cx="-22" cy="-46" r="5" fill="#ffb3c8" opacity="0.7"/>
+      <circle cx="22" cy="-46" r="5" fill="#ffb3c8" opacity="0.7"/>
+    `,
+    hint:"정상부 분명하게 약간 날카로운 느낌 + 조금 더 위로 솟은 안정감 (포용력)"
+  }
+];
+
+const grid = document.getElementById("grid");
+characters.forEach(c=>{
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <div class="avatar">${c.silhouette}</div>
+    <div class="name">${c.name}</div>
+    <div class="key">${c.role}</div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin:2px 0 8px">
+      <span class="crumb">${c.symbol}</span>
+      <span class="crumb">${c.accent}</span>
+    </div>
+    <div class="tag">${c.hint}</div>
+  `;
+  grid.appendChild(card);
+});
+</script>
+</body>
+</html>
