@@ -40,10 +40,11 @@ body {
 /* ===== MAIN CONTENT ===== */
 .app-main {
   flex: 1;
-  padding: 40px 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
   width: 100%;
+  padding: 40px 20px;
 }
 
 /* ===== WORLD-CLASS HEADER DESIGN ===== */
