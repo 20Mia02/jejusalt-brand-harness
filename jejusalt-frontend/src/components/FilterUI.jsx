@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import "./FilterUI.css";
 
 // 사업 우선순위 카테고리 (뷰티 > 헬스케어) — UI에서 ⭐ 우선순위 뱃지로 강조
 const PRIORITY_CATEGORIES = ["뷰티", "헬스케어"];
@@ -228,9 +229,9 @@ export default function FilterUI({ onResourceCreated }) {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="filter-ui-main-wrapper">
       {/* 로고 */}
-      <div className="flex justify-center mb-6">
+      <div className="filter-ui-logo-section">
         <img
           src={isDarkMode ? "/assets/logo/jeju-salt-logo-dark.png" : "/assets/logo/jeju-salt-logo.png"}
           alt="제주소금 JEJU LAVA SEA SALT 로고"
@@ -239,18 +240,14 @@ export default function FilterUI({ onResourceCreated }) {
       </div>
 
       {/* 모드 선택 탭 */}
-      <div className="flex gap-4 mb-6 border-b border-brand-blue/20">
+      <div className="filter-ui-tabs-wrapper">
         <button
           onClick={() => {
             setMode("input");
             setError(null);
             setSuccessMessage(null);
           }}
-          className={`px-6 py-3 font-semibold border-b-2 transition ${
-            mode === "input"
-              ? "border-brand-blue text-brand-blue"
-              : "border-transparent text-dark-text-muted hover:text-dark-text"
-          }`}
+          className={`filter-ui-tab-button ${mode === "input" ? "active" : ""}`}
         >
           📝 Step 1: 자료 입력
         </button>
@@ -260,11 +257,7 @@ export default function FilterUI({ onResourceCreated }) {
             setError(null);
             setSuccessMessage(null);
           }}
-          className={`px-6 py-3 font-semibold border-b-2 transition ${
-            mode === "filter"
-              ? "border-brand-blue text-brand-blue"
-              : "border-transparent text-dark-text-muted hover:text-dark-text"
-          }`}
+          className={`filter-ui-tab-button ${mode === "filter" ? "active" : ""}`}
         >
           🔍 기존 자료 검색
         </button>
@@ -272,26 +265,29 @@ export default function FilterUI({ onResourceCreated }) {
 
       {/* 메시지 */}
       {error && (
-        <div className="bg-status-rejected/10 border border-status-rejected/30 text-status-rejected px-4 py-3 rounded mb-4 animate-fade-in">
+        <div className="filter-ui-message error">
           {error}
         </div>
       )}
       {successMessage && (
-        <div className="bg-status-approved/10 border border-status-approved/30 text-status-approved px-4 py-3 rounded mb-4 animate-fade-in">
+        <div className="filter-ui-message success">
           {successMessage}
         </div>
       )}
 
       {/* 자료 입력 모드 */}
       {mode === "input" && (
-        <div className="ui-card p-6 max-w-2xl mx-auto animate-fade-in">
-          <h2 className="text-2xl font-bold mb-6">📝 제주소금 자료 입력</h2>
+        <div className="filter-ui-form-container">
+          <div className="filter-ui-form-header">
+            <div className="filter-ui-step-number">1</div>
+            <h2 className="filter-ui-form-title">📝 제주소금 자료 입력</h2>
+          </div>
 
           <div className="space-y-4">
             {/* 제품명 */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                제품명 <span className="text-status-rejected">*</span>
+            <div className="filter-ui-form-group">
+              <label className="filter-ui-label">
+                제품명 <span className="filter-ui-label-required">*</span>
               </label>
               <input
                 type="text"
@@ -299,56 +295,52 @@ export default function FilterUI({ onResourceCreated }) {
                 value={inputForm.productName}
                 onChange={handleInputChange}
                 placeholder="예: 제주소금, 프리미엄 천연 해염"
-                className="w-full input-field"
+                className="filter-ui-input"
               />
-              <p className="text-xs text-dark-text-muted mt-1">최소 3자 이상</p>
+              <p className="filter-ui-helper-text">최소 3자 이상</p>
             </div>
 
             {/* 제품 정보 */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                제품 정보 <span className="text-status-rejected">*</span>
+            <div className="filter-ui-form-group">
+              <label className="filter-ui-label">
+                제품 정보 <span className="filter-ui-label-required">*</span>
               </label>
               <textarea
                 name="productInfo"
                 value={inputForm.productInfo}
                 onChange={handleInputChange}
                 placeholder="예: 제주 청정 해역에서 채취한 천연 소금입니다. 미네랄이 풍부하고..."
-                className="w-full input-field h-32"
+                className="filter-ui-textarea"
               />
-              <p className="text-xs text-dark-text-muted mt-1">최소 30자 이상</p>
+              <p className="filter-ui-helper-text">최소 30자 이상</p>
             </div>
 
             {/* 키워드 */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                키워드 (선택사항)
-              </label>
+            <div className="filter-ui-form-group">
+              <label className="filter-ui-label">키워드 (선택사항)</label>
               <input
                 type="text"
                 name="keywords"
                 value={inputForm.keywords}
                 onChange={handleInputChange}
                 placeholder="예: 건강, 웰빙, 프리미엄, 자연 (쉼표로 구분)"
-                className="w-full input-field"
+                className="filter-ui-input"
               />
-              <p className="text-xs text-dark-text-muted mt-1">쉼표로 구분해서 입력하세요</p>
+              <p className="filter-ui-helper-text">쉼표로 구분해서 입력하세요</p>
             </div>
 
             {/* 추가 참고자료 (선택) */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                📎 추가 참고자료 (선택사항)
-              </label>
+            <div className="filter-ui-form-group">
+              <label className="filter-ui-label">📎 추가 참고자료 (선택사항)</label>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".md,.txt"
                 multiple
                 onChange={handleReferenceFileSelect}
-                className="w-full input-field text-sm"
+                className="filter-ui-input"
               />
-              <p className="text-xs text-dark-text-muted mt-1">
+              <p className="filter-ui-helper-text">
                 기업자료_요약.md 등 .md/.txt 파일을 올리면 AI가 내용을 분석해서 시나리오 작성에 반영합니다.
               </p>
 
@@ -374,36 +366,33 @@ export default function FilterUI({ onResourceCreated }) {
             </div>
 
             {/* 트렌드 키워드 (선택) */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                🔥 요즘 트렌드 키워드 (선택사항)
-              </label>
+            <div className="filter-ui-form-group">
+              <label className="filter-ui-label">🔥 요즘 트렌드 키워드 (선택사항)</label>
               <input
                 type="text"
                 name="trendKeywords"
                 value={inputForm.trendKeywords}
                 onChange={handleInputChange}
                 placeholder="예: 저속노화, 물광피부, 전해질 밸런스 (쉼표로 구분)"
-                className="w-full input-field"
+                className="filter-ui-input"
               />
-              <p className="text-xs text-dark-text-muted mt-1">
+              <p className="filter-ui-helper-text">
                 최근 SNS/뉴스에서 화제인 키워드를 입력하면 AI가 트렌드를 반영한 콘텐츠 주제를 제안합니다.
               </p>
             </div>
 
             {/* 소비자 커스터마이징 (선택) */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                ✍️ 원하는 스타일/문구 (선택사항)
-              </label>
+            <div className="filter-ui-form-group">
+              <label className="filter-ui-label">✍️ 원하는 스타일/문구 (선택사항)</label>
               <textarea
                 name="customStyle"
                 value={inputForm.customStyle}
                 onChange={handleInputChange}
                 placeholder="예: 20대가 좋아할 만한 발랄한 톤으로, '물광' 이라는 단어를 꼭 넣어주세요"
-                className="w-full input-field h-20"
+                className="filter-ui-textarea"
+                style={{ minHeight: '80px' }}
               />
-              <p className="text-xs text-dark-text-muted mt-1">
+              <p className="filter-ui-helper-text">
                 원하는 톤, 꼭 들어갔으면 하는 문구 등을 직접 입력하면 AI 생성에 반영됩니다.
               </p>
             </div>
@@ -412,7 +401,7 @@ export default function FilterUI({ onResourceCreated }) {
             <button
               onClick={handleSubmitResource}
               disabled={loading}
-              className="w-full mt-6 px-6 py-3 btn-primary disabled:opacity-50"
+              className="filter-ui-button-primary"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -460,8 +449,11 @@ export default function FilterUI({ onResourceCreated }) {
       {mode === "filter" && (
         <div className="animate-fade-in">
           {/* 필터 섹션 */}
-          <div className="ui-card p-6 mb-6">
-            <h2 className="text-2xl font-bold mb-6">🔍 기존 자료 검색</h2>
+          <div className="filter-ui-form-container">
+            <div className="filter-ui-form-header">
+              <div className="filter-ui-step-number">2</div>
+              <h2 className="filter-ui-form-title">🔍 기존 자료 검색</h2>
+            </div>
 
             <div className="space-y-6">
               {/* 카테고리 */}
@@ -601,10 +593,13 @@ export default function FilterUI({ onResourceCreated }) {
 
           {/* 결과 섹션 */}
           {filteredResources.length > 0 && (
-            <div className="ui-card p-6">
-              <h2 className="text-2xl font-bold mb-4">
-                검색 결과 ({filteredResources.length}개)
-              </h2>
+            <div className="filter-ui-form-container">
+              <div className="filter-ui-form-header">
+                <div className="filter-ui-step-number">3</div>
+                <h2 className="filter-ui-form-title">
+                  검색 결과 ({filteredResources.length}개)
+                </h2>
+              </div>
               <div className="grid grid-cols-1 gap-4">
                 {filteredResources.map((resource) => (
                   <div key={resource.id} className="result-card p-4">

@@ -1,0 +1,361 @@
+/* ============================================================
+   FilterUI — 기업 전문 웹 페이지 수준 리디자인
+   ============================================================ */
+
+/* Step 1: 메인 컨테이너 - 중앙 정렬 */
+.filter-ui-main-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: auto;
+  padding: 40px 20px;
+}
+
+/* 로고 섹션 */
+.filter-ui-logo-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 40px;
+  width: 100%;
+}
+
+.filter-ui-logo-section img {
+  height: 80px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Step 2: 모드 선택 탭 - 중앙 정렬 및 프리미엄 스타일 */
+.filter-ui-tabs-wrapper {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 40px;
+  width: 100%;
+}
+
+.filter-ui-tab-button {
+  padding: 12px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background-color: transparent;
+  color: #999999;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: -0.3px;
+}
+
+.filter-ui-tab-button:hover {
+  background-color: rgba(0, 174, 239, 0.08);
+  color: #666666;
+}
+
+.filter-ui-tab-button.active {
+  background-color: #00AEEF;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 174, 239, 0.3);
+  border-color: #00AEEF;
+}
+
+/* 다크모드 */
+html.dark .filter-ui-tab-button {
+  color: #888888;
+}
+
+html.dark .filter-ui-tab-button:hover {
+  background-color: rgba(0, 174, 239, 0.15);
+  color: #999999;
+}
+
+html.dark .filter-ui-tab-button.active {
+  box-shadow: 0 4px 12px rgba(0, 174, 239, 0.4);
+}
+
+/* Step 3: 폼 박스 컨테이너 - 중앙 정렬 및 기업 수준 디자인 */
+.filter-ui-form-container {
+  width: 850px;
+  max-width: 90%;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 48px 40px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+html.dark .filter-ui-form-container {
+  background-color: #1a1a1a;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Step 4: 폼 헤더 섹션 */
+.filter-ui-form-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #00AEEF;
+}
+
+.filter-ui-step-number {
+  background-color: #00AEEF;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.filter-ui-form-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+html.dark .filter-ui-form-title {
+  color: #ffffff;
+}
+
+/* Step 5: 입력 필드 그룹 */
+.filter-ui-form-group {
+  margin-bottom: 32px;
+}
+
+.filter-ui-form-group:last-child {
+  margin-bottom: 0;
+}
+
+.filter-ui-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2a2f43;
+  margin-bottom: 8px;
+  letter-spacing: -0.3px;
+}
+
+html.dark .filter-ui-label {
+  color: #e0e0e0;
+}
+
+.filter-ui-label-required {
+  color: #ff4444;
+  margin-left: 4px;
+}
+
+.filter-ui-helper-text {
+  display: block;
+  font-size: 12px;
+  color: #999999;
+  margin-top: 4px;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+html.dark .filter-ui-helper-text {
+  color: #888888;
+}
+
+/* Step 6: 입력 필드 */
+.filter-ui-input,
+.filter-ui-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1a1a1a;
+  font-size: 14px;
+  line-height: 1.6;
+  font-family: inherit;
+  transition: all 0.2s ease-in-out;
+  letter-spacing: -0.3px;
+}
+
+.filter-ui-input::placeholder,
+.filter-ui-textarea::placeholder {
+  color: #cccccc;
+}
+
+.filter-ui-input:focus,
+.filter-ui-textarea:focus {
+  outline: none;
+  border-color: #00AEEF;
+  box-shadow: 0 0 0 3px rgba(0, 174, 239, 0.1);
+}
+
+html.dark .filter-ui-input,
+html.dark .filter-ui-textarea {
+  background-color: #2a2a2a;
+  border-color: #444444;
+  color: #ffffff;
+}
+
+html.dark .filter-ui-input::placeholder,
+html.dark .filter-ui-textarea::placeholder {
+  color: #666666;
+}
+
+html.dark .filter-ui-input:focus,
+html.dark .filter-ui-textarea:focus {
+  box-shadow: 0 0 0 3px rgba(0, 174, 239, 0.2);
+}
+
+.filter-ui-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Step 7: 버튼 스타일 */
+.filter-ui-button-primary {
+  background-color: #00AEEF;
+  color: white;
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  margin-top: 24px;
+  width: 100%;
+}
+
+.filter-ui-button-primary:hover {
+  background-color: #0095d0;
+  box-shadow: 0 4px 12px rgba(0, 174, 239, 0.3);
+  transform: translateY(-2px);
+}
+
+.filter-ui-button-primary:active {
+  background-color: #0085b8;
+  transform: translateY(0);
+}
+
+.filter-ui-button-primary:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Step 8: 메시지 섹션 */
+.filter-ui-message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  animation: slideIn 0.3s ease-in-out;
+}
+
+.filter-ui-message.error {
+  background-color: rgba(255, 68, 68, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  color: #ff4444;
+}
+
+.filter-ui-message.success {
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+html.dark .filter-ui-message {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Step 9: 선택 옵션 그룹 */
+.filter-ui-options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filter-ui-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.filter-ui-option:hover {
+  background-color: rgba(0, 174, 239, 0.05);
+}
+
+html.dark .filter-ui-option:hover {
+  background-color: rgba(0, 174, 239, 0.1);
+}
+
+/* Step 10: 여백 리듬감 */
+.filter-ui-section-divider {
+  height: 1px;
+  background-color: #e0e0e0;
+  margin: 32px 0;
+}
+
+html.dark .filter-ui-section-divider {
+  background-color: #333333;
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .filter-ui-form-container {
+    width: 100%;
+    max-width: 100%;
+    padding: 32px 24px;
+  }
+
+  .filter-ui-main-wrapper {
+    padding: 30px 16px;
+  }
+
+  .filter-ui-form-title {
+    font-size: 16px;
+  }
+
+  .filter-ui-tabs-wrapper {
+    margin-bottom: 30px;
+  }
+
+  .filter-ui-tab-button {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+}
