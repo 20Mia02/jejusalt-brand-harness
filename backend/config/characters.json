@@ -208,10 +208,34 @@
             "consistencyScore": 60,
             "overallScore": 66.5
           }
+        },
+        {
+          "version": "v1.3",
+          "date": "2026-08-06",
+          "improvements": "The character has large, expressive eyes with a warm, gentle smile that conveys kindness and approachability. The face shape is rounded and soft, contributing to a cute and friendly appearance. The color palette uses warm and soft tones that enhance the character's inviting nature.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_064202_f4eca26d-2c2b-47e5-8859-45803c6313c8.png",
+          "scores": {
+            "cutenessScore": 75,
+            "detailScore": 65,
+            "consistencyScore": 70,
+            "overallScore": 71.5
+          }
+        },
+        {
+          "version": "v1.4",
+          "date": "2026-08-06",
+          "improvements": "눈이 크고 반짝이며 살아있는 느낌이 강하고, 얼굴 비율도 둥글고 부드러워서 매우 귀엽습니다. 표정이 따뜻하고 친근하며, 전체적으로 애니메이션 캐릭터처럼 사랑스럽고 생명력이 느껴집니다. 색상도 따뜻하고 부드러운 톤이며, 포즈가 자연스럽고 사랑스럽습니다.",
+          "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_064558_691bffe2-4126-45b9-b7f0-2d70d005c215.png",
+          "scores": {
+            "cutenessScore": 90,
+            "detailScore": 75,
+            "consistencyScore": 85,
+            "overallScore": 83
+          }
         }
       ],
-      "currentVersion": "v1.2",
-      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_063348_8bf27f5f-97a3-4361-8661-cbb65d2e4d83.png"
+      "currentVersion": "v1.4",
+      "referenceImageUrl": "https://d8j0ntlcm91z4.cloudfront.net/user_3HDFWrhTertWgWHeyGLFLaHo24P/hf_20260806_064558_691bffe2-4126-45b9-b7f0-2d70d005c215.png"
     },
     {
       "id": 4,
