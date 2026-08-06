@@ -107,6 +107,26 @@ body {
   transition: background-color 0.2s var(--ease-standard), color 0.2s var(--ease-standard);
 }
 
+/* 캐릭터 갤러리/선택 화면용 제주 테마 배경 — 은은한 파란빛 + 소금결정 반짝임 패턴 */
+.jeju-cute-bg {
+  position: relative;
+  background:
+    radial-gradient(circle at 12% 15%, rgba(0, 174, 239, 0.14), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(255, 182, 193, 0.1), transparent 38%),
+    radial-gradient(circle at 50% 100%, rgba(0, 174, 239, 0.1), transparent 50%);
+  border-radius: 1rem;
+}
+.jeju-cute-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(0, 174, 239, 0.5) 1.5px, transparent 1.5px);
+  background-size: 30px 30px;
+  opacity: 0.2;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
 #root {
   min-height: 100svh;
   display: flex;

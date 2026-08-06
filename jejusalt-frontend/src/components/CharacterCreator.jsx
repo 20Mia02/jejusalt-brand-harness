@@ -512,7 +512,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
         {libraryLoading ? (
           <p className="text-sm text-dark-text-muted">라이브러리 불러오는 중...</p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 jeju-cute-bg p-3">
             {library.map((libChar) => {
               const refChar = refinementByName[libChar.character_name];
               const isRefining = refiningName === libChar.character_name;
@@ -625,7 +625,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       </div>
 
       {/* 캐릭터 카드 그리드 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 jeju-cute-bg p-3">
         {localCharacters.map((char, idx) => (
           <div
             key={char.id}

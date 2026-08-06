@@ -1081,6 +1081,18 @@ router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
     let videosRowId = null;
     let higgsfieldError = null;
 
+    // ⭐ 진행률 표시 버그 수정: callHiggsfield는 callAgent를 거치지 않아서 generation_logs에
+    // 아무 기록도 남기지 않았다 — 그래서 실제 영상 생성(최대 10분)이 진행되는 동안 GET /status를
+    // 폴링해도 마지막 성공 기록이 Step 8(컴플라이언스, 몇 초짜리)에 멈춰 있어서, 사용자 입장에선
+    // 가장 오래 걸리는 구간에서 아무 진행 표시도 없이 "멈춘 것처럼" 보였다. 호출 직전에
+    // in_progress 기록을 남겨서 폴링이 "지금 영상 생성 중"임을 알 수 있게 한다.
+    await callDatabase("generation_logs", "create", {
+      resource_id: resourceId,
+      step: "higgsfield-video",
+      status: "in_progress",
+      attempt: 1,
+    }).catch((e) => console.error("[진행률 로그 기록 실패]", e));
+
     const higgsfieldResult = await callHiggsfield(
       {
         character: primaryCharacter.character_name,
@@ -1101,9 +1113,24 @@ router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
       videoUrl = higgsfieldResult.data.video_url;
       videosRowId = higgsfieldResult.data.videos_row_id;
       console.log(`[Step 9] 영상 생성 완료: ${videoUrl}`);
+      await callDatabase("generation_logs", "create", {
+        resource_id: resourceId,
+        step: "higgsfield-video",
+        status: "success",
+        attempt: 1,
+      }).catch((e) => console.error("[진행률 로그 기록 실패]", e));
     } else {
       higgsfieldError = higgsfieldResult.error || "Unknown error";
       console.warn(`[Step 9] Higgsfield 호출 실패: ${higgsfieldError}`);
+      await callDatabase("generation_logs", "create", {
+        resource_id: resourceId,
+        step: "higgsfield-video",
+        status: "fail",
+        error_message: higgsfieldResult.message || higgsfieldError,
+        error_code: higgsfieldResult.error || "UNKNOWN",
+        attempt: 1,
+        total_attempts: 1,
+      }).catch((e) => console.error("[진행률 로그 기록 실패]", e));
     }
 
     // ── 최종 상태 업데이트 ──
@@ -1225,6 +1252,30 @@ router.get("/:resourceId/status", async (req, res) => {
     const retryingCount = logs.filter((l) => l.status === "retrying").length;
     const totalSteps = 9; // Step 1~9
 
+    // ⭐ Step 9(Higgsfield 영상 생성)는 최대 10분까지 걸리는데 callHiggsfield 자체는
+    // callAgent를 거치지 않아 그동안 아무 로그도 안 남겼다 — 지금은 호출 직전에 "in_progress"
+    // 기록을 남기므로(POST /copy/:contentId/confirm), 그 기록이 아직 success/fail로
+    // 마무리되지 않았다면 "지금 이 단계가 진행 중"이라고 프론트에 알려준다.
+    const activeStep = [...logs]
+      .filter((l) => l.status === "in_progress")
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    const isActiveStepResolved =
+      activeStep &&
+      logs.some(
+        (l) =>
+          l.step === activeStep.step &&
+          (l.status === "success" || l.status === "fail") &&
+          new Date(l.created_at) >= new Date(activeStep.created_at)
+      );
+    const inProgressStep =
+      activeStep && !isActiveStepResolved
+        ? {
+            step: activeStep.step,
+            started_at: activeStep.created_at,
+            elapsed_ms: Date.now() - new Date(activeStep.created_at).getTime(),
+          }
+        : null;
+
     // 실패 단계 상세 정보 수집
     const failedSteps = logs
       .filter((l) => l.status === "fail")
@@ -1265,6 +1316,8 @@ router.get("/:resourceId/status", async (req, res) => {
       ...(retryingCount > 0 && {
         retryingDetails: retiringSteps,
       }),
+      // 지금 실제로 실행 중인 단계(주로 Step 9 영상 생성) — 경과 시간 표시용
+      ...(inProgressStep && { inProgressStep }),
     });
   } catch (error) {
     console.error("[GET /api/generate/:resourceId/status] 예외:", error);
