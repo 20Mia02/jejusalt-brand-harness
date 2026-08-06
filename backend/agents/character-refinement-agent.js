@@ -181,7 +181,12 @@ async function refineCharacterImage({ characterConfig, maxRetries = MAX_RETRIES 
       feedback: evaluation.feedback,
     });
 
-    finalResult = { genResult, evaluation, attempt };
+    // ⚠️ 버그 수정: 재시도가 항상 이전보다 나아지는 게 아니다(AI 생성은 확률적이라
+    // 오히려 더 낮은 점수가 나올 수 있음) — 그런데도 그냥 "마지막" 시도를 최종으로
+    // 쓰고 있었다. 지금까지의 시도 중 overallScore가 가장 높은 것을 최종으로 채택한다.
+    if (!finalResult || (evaluation.scores?.overallScore ?? -1) > (finalResult.evaluation.scores?.overallScore ?? -1)) {
+      finalResult = { genResult, evaluation, attempt };
+    }
 
     if (!evaluation.shouldRetry || attempt === maxRetries) {
       break;
