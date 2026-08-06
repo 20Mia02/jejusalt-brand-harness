@@ -1595,6 +1595,21 @@ router.post("/character", async (req, res) => {
         referenceImageUrl,
         latestEvaluation?.scores
       );
+
+      // ⚠️ 중요: 캐릭터 선택 화면(CharacterCreator.jsx)과 실제 영상 생성(Step9,
+      // callHiggsfield --start-image)은 characters.json이 아니라 character_library
+      // DB 테이블의 reference_image_url/generation_seed를 읽는다. characters.json만
+      // 갱신하면 화면과 실제 영상 생성 둘 다 리파인 이전의 옛 이미지를 계속 쓰게 되므로,
+      // 같은 이름의 character_library 행도 함께 갱신해서 두 시스템을 동기화한다.
+      const syncResult = await callDatabase(
+        "character_library",
+        "update",
+        { reference_image_url: referenceImageUrl, generation_seed: referenceJobId },
+        { character_name: character.name }
+      );
+      if (!syncResult.success || syncResult.rows.length === 0) {
+        console.warn(`[character-refinement] character_library 동기화 실패/대상 없음: ${character.name}`);
+      }
     }
 
     // 영상까지 요청된 경우, 확정된 레퍼런스 이미지를 --start-image로 재사용해서 1회만 생성한다.
