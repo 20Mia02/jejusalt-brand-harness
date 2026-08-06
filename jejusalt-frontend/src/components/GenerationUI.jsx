@@ -980,7 +980,7 @@ function ScenarioReviewPanel({ resourceId, scenarioData, onConfirm }) {
             </button>
             <button
               onClick={() => setEditing(true)}
-              className="flex-1 px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
+              className="flex-1 px-4 py-2 btn-primary"
             >
               ✏️ 수정하겠습니다
             </button>
@@ -1146,7 +1146,7 @@ function CopyReviewPanel({ resourceId, copyData, onConfirm }) {
             </button>
             <button
               onClick={() => setEditing(true)}
-              className="flex-1 px-4 py-2 bg-dark-chip text-dark-text rounded-lg hover:brightness-125"
+              className="flex-1 px-4 py-2 btn-primary"
             >
               ✏️ 수정하겠습니다
             </button>
