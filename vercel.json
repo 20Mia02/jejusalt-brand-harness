@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "buildCommand": "cd jejusalt-frontend && npm install && npm run build",
+  "outputDirectory": "jejusalt-frontend/dist",
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/docs/:path*",
+      "destination": "/docs/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "backend/**/*.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  }
+}

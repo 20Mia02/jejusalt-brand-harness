@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import apiClient from "../api-client";
 import "./FilterUI.css";
 
 // 사업 우선순위 카테고리 (뷰티 > 헬스케어) — UI에서 ⭐ 우선순위 뱃지로 강조
@@ -137,7 +137,7 @@ export default function FilterUI({ onResourceCreated }) {
       setLoading(true);
       setError(null);
 
-      const response = await axios.post("/api/resources", {
+      const response = await apiClient.post("/api/resources", {
         productName: inputForm.productName,
         productInfo: inputForm.productInfo,
         keywords: inputForm.keywords
@@ -204,7 +204,7 @@ export default function FilterUI({ onResourceCreated }) {
         params.append("focus", filters.focus.join(","));
       }
 
-      const res = await axios.get(`/api/resources/filter?${params.toString()}`);
+      const res = await apiClient.get(`/api/resources/filter?${params.toString()}`);
       setFilteredResources(res.data.resources || []);
     } catch (err) {
       console.error("필터 검색 실패:", err);
