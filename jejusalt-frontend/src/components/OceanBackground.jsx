@@ -16,9 +16,8 @@ export default function OceanBackground({ theme }) {
     const dpr = window.devicePixelRatio || 1;
 
     const resizeCanvas = () => {
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
       ctx.scale(dpr, dpr);
     };
 
@@ -471,5 +470,19 @@ export default function OceanBackground({ theme }) {
     };
   }, [isDarkMode]);
 
-  return <canvas ref={canvasRef} className="ocean-background-canvas" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className="ocean-background-canvas"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        zIndex: -1,
+        pointerEvents: 'none'
+      }}
+    />
+  );
 }
