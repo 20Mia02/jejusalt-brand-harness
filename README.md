@@ -34,14 +34,24 @@ unzip jejusalt-brand-harness-main.zip
 # 폴더명 변경 (매우 중요!)
 mv jejusalt-brand-harness-main harness
 
-# 이제 harness 폴더 열면:
+# 이제 harness 폴더 열면 (최상위에 Harness 요소들이 직접 보임):
 cd harness
 ls
-# harness/          (← Harness 정의)
-# implementation/   (← 코드)
+
+# ⭐ Harness 요소들 (직접 보임):
+# spec/             (← 스펙 & 원칙)
+# skills/           (← 3개 Skill 정의)
+# agents/           (← 4개 Agent 정의)
+# orchestrator/     (← 9단계 파이프라인)
+# config/           (← 검증 규칙 & 설정)
+
+# 📁 주요 폴더들:
+# implementation/   (← 백엔드 + 프론트엔드 + 데이터)
 # docs/             (← 문서)
-# supabase/         (← DB)
-# legacy/           (← 이전 구조)
+# supabase/         (← DB 설정)
+
+# 📦 나머지:
+# 기타/             (← legacy, package.json 등)
 # README.md         (← 이 파일)
 ```
 
