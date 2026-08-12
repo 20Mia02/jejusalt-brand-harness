@@ -1,0 +1,756 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "created_date": "2026-08-13",
+    "updated_date": "2026-08-13",
+    "author": "제주소금 AI 콘텐츠 팀",
+    "description": "식품/뷰티/헬스 3가지 카테고리별 상세 검증 기준 v2.0 (Step 9 QA 전용)",
+    "note": "각 카테고리별 10~15개의 검증 항목 + 자동화/수동 검증 분류"
+  },
+  "compliance_rules": {
+    "food": {
+      "category_name": "식품 (제주소금, 식용 미네랄 제품)",
+      "category_code": "FOOD",
+      "total_checks": 14,
+      "critical_rules": [
+        {
+          "rule_id": "FOOD_001",
+          "rule_name": "의학적 효능 주장 금지",
+          "description": "\"치료\", \"완치\", \"질병 예방\", \"혈압 조절\" 등 의약품 수준의 효능 주장 금지 (식품표시법 제14조)",
+          "risk_level": "critical",
+          "automation": "auto",
+          "keywords_to_block": [
+            "치료",
+            "완치",
+            "처방",
+            "약효",
+            "질병 예방",
+            "혈압을 낮춘",
+            "당뇨를 예방",
+            "암을 치료",
+            "면역력을 강화",
+            "항암",
+            "항염증",
+            "항균",
+            "의학적 효과"
+          ],
+          "compliant_alternatives": [
+            "건강 관리 지원",
+            "영양 보충",
+            "미네랄 공급",
+            "~에 필요한 나트륨/마그네슘 함유",
+            "~을 지원하는 성분 포함"
+          ],
+          "penalty": "불통과",
+          "example_fail": "이 소금으로 고혈압을 치료하세요",
+          "example_pass": "제주 바다의 미네랄이 풍부한 소금입니다"
+        },
+        {
+          "rule_id": "FOOD_002",
+          "rule_name": "원산지/생산지 거짓 표시 금지",
+          "description": "\"제주산\", \"국산\" 표시 시 실제 생산지와 일치해야 함 (식품표시법 제6조)",
+          "risk_level": "critical",
+          "automation": "manual",
+          "checks": [
+            "영상/카피에서 언급된 원산지가 실제 제품 인증서와 일치하는가?",
+            "\"제주산\"이라 표현했는데 실제로 제주 용암해수에서 채취한가?",
+            "수입 성분이 포함된 경우 명시되어 있는가?"
+          ],
+          "penalty": "불통과",
+          "compliant_requirement": "원산지 명시 필수 + 생산지 인증서 첨부"
+        },
+        {
+          "rule_id": "FOOD_003",
+          "rule_name": "영양소 표시 정확성",
+          "description": "나트륨, 마그네슘, 칼슘 등 함량 표시 시 실제 검사 수치와 일치 (식품표시법 제11조)",
+          "risk_level": "critical",
+          "automation": "manual",
+          "checks": [
+            "영상에서 \"마그네슘 함량이 높다\"고 표현했는가?",
+            "제품 포장에 표시된 영양성분 수치와 영상 표현이 일치하는가?",
+            "과학적 근거(검사 성적서, 논문)가 있는가?"
+          ],
+          "compliant_requirement": "국립농산물품질관리원 검사 성적서 또는 식약처 공인 검사기관 증명",
+          "penalty": "불통과"
+        },
+        {
+          "rule_id": "FOOD_004",
+          "rule_name": "식품 위생법 준수",
+          "description": "무균, 살균, 자연산 등의 표현이 적절한가? (식품위생법 제7조)",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"천연 그대로의 소금\"이라 표현했는데 실제 정제/살균 과정이 있는가?",
+            "제조 과정에서 인체 해로운 물질이 검출되지 않았는가?"
+          ],
+          "penalty": "경고"
+        }
+      ],
+      "high_priority_rules": [
+        {
+          "rule_id": "FOOD_005",
+          "rule_name": "과장된 할인율 표시 금지",
+          "description": "\"70% 할인\", \"원가 이하 판매\" 등 과장된 가격 표현 금지 (소비자기본법 제13조)",
+          "risk_level": "high",
+          "automation": "auto",
+          "check": {
+            "discount_range": "0~60%",
+            "max_discount_percent": 60,
+            "forbidden_phrases": [
+              "70% 이상 할인",
+              "원가 이하",
+              "손해를 감수하고",
+              "이 가격은 일시적"
+            ]
+          },
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_006",
+          "rule_name": "애매한 건강 개선 표현",
+          "description": "\"개선할 수 있습니다\", \"도움될 수 있습니다\" 같은 애매한 표현 제한 (의약품과 혼동 위험)",
+          "risk_level": "medium",
+          "automation": "auto",
+          "keywords_to_limit": [
+            "개선할 수 있습니다",
+            "좋아질 수 있습니다",
+            "도움될 수 있습니다",
+            "일 수 있음",
+            "도움이 될 수도"
+          ],
+          "compliant_alternatives": [
+            "~을 지원함",
+            "~에 필요한 성분을 포함",
+            "~을 위한 영양소",
+            "제주 바다의 미네랄"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_007",
+          "rule_name": "비교광고 규정 준수",
+          "description": "다른 소금과의 비교 표현 시 객관적 사실에 기반해야 함",
+          "risk_level": "high",
+          "automation": "manual",
+          "forbidden_comparisons": [
+            "다른 소금은 짜기만 한다",
+            "시판 소금은 위험하다",
+            "우리 소금만 믿을 수 있다",
+            "경쟁사 제품은 효과 없다"
+          ],
+          "compliant_requirement": "\"우리 제품의 나트륨·마그네슘 비율은 X:Y입니다\"처럼 객관적 사실만 표시",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_008",
+          "rule_name": "제조 과정 투명성",
+          "description": "\"정제\", \"살균\", \"결정화\" 등 제조 과정이 정직하게 표현되어 있는가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"자연 그대로\"라고 했는데 실제로 어떤 가공 과정이 있는가?",
+            "70년 기술력에 대한 구체적 설명이 있는가?",
+            "원본(원래 용암해수)과 최종 제품의 차이를 명시했는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_009",
+          "rule_name": "타겟 대상 부적합 표시 금지",
+          "description": "영유아/임산부 같은 특정 취약층에 대한 안전 정보 필수",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"모든 가족이 즐길 수 있는\"이라 했는데 영유아도 포함되는가?",
+            "염분 제한이 필요한 고혈압 환자에 대한 주의사항이 있는가?",
+            "임산부 섭취 권장량 안내가 있는가?"
+          ],
+          "compliant_requirement": "고염분 민감군(고혈압, 신장질환, 임산부 등)에 대한 적절한 주의사항 안내",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_010",
+          "rule_name": "최근성 및 유효성 표시",
+          "description": "\"70년\", \"최신 기술\" 등의 시간 관련 표현이 정확한가?",
+          "risk_level": "medium",
+          "automation": "manual",
+          "checks": [
+            "\"70년 기술\"이 정확히 무엇을 의미하는가?",
+            "최근의 연구/개발인가, 아니면 과거의 기술인가?",
+            "\"최신\"이라 표현했는데 실제로 최근 기술인가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_011",
+          "rule_name": "환경/지속성 표현",
+          "description": "\"환경친화적\", \"지속가능\", \"탄소중립\" 등의 ESG 표현이 검증 가능한가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"환경친화적\"이라 했는데 생산 과정에서 해양 오염이 없는가?",
+            "\"지속가능\" 표현에 실제 환경 보존 활동이 있는가?"
+          ],
+          "compliant_requirement": "제3의 환경 인증 또는 지속가능 보고서",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_012",
+          "rule_name": "가격 기준 합리성",
+          "description": "높은 가격대에 상응하는 정당한 이유가 있는가?",
+          "risk_level": "medium",
+          "automation": "manual",
+          "checks": [
+            "\"프리미엄 소금\"이라 표현했는데 정말 일반 소금보다 가치 있는가?",
+            "가격 정당화 근거(70년 기술, 희소성, 미네랄 함량 등)가 있는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_013",
+          "rule_name": "사용 방법 명확성",
+          "description": "\"어떻게 먹는가?\" \"얼마나 섭취하는가?\"가 명확한가?",
+          "risk_level": "medium",
+          "automation": "manual",
+          "checks": [
+            "하루 권장 섭취량이 명시되어 있는가?",
+            "\"밥 할 때 한 숟가락\" 같은 구체적 사용법이 있는가?",
+            "보관 방법(건조함, 냉장 등)이 안내되어 있는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "FOOD_014",
+          "rule_name": "소비자 리뷰 진위성",
+          "description": "\"고객이 좋아해요\", \"5성 평가\" 등의 평가 표현이 진짜인가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "고객 리뷰/평가를 영상에 노출했는가?",
+            "있다면 실제 구매자의 리뷰인가? 조작된 것은 아닌가?",
+            "별점, 리뷰 수 등의 표현이 실제 판매처 수치와 일치하는가?"
+          ],
+          "compliant_requirement": "실제 판매처(쿠팡, 무신사 등) 링크로 검증 가능해야 함",
+          "penalty": "경고"
+        }
+      ],
+      "qa_checklist": [
+        "의약품 수준의 효능 표현이 없는가? (critical)",
+        "원산지가 명시되고 실제와 일치하는가? (critical)",
+        "영양소 함량이 정확하고 근거 있는가? (critical)",
+        "과도한 할인율(60% 초과)이 없는가? (high)",
+        "다른 제품을 폄하하는 표현이 없는가? (high)",
+        "높은 가격대에 정당한 이유가 있는가? (medium)",
+        "사용 방법이 명확한가? (medium)",
+        "타겟 대상(어린이, 임산부 등)에 부적합한 표현이 없는가? (high)",
+        "제조 과정이 정직하게 표현되었는가? (high)",
+        "비과학적 표현이 없는가? (medium)"
+      ]
+    },
+    "beauty": {
+      "category_name": "뷰티/스킨케어 (미네랄 에센스, 피부 제품)",
+      "category_code": "BEAUTY",
+      "total_checks": 13,
+      "critical_rules": [
+        {
+          "rule_id": "BEAUTY_001",
+          "rule_name": "의학/약사 용어 금지",
+          "description": "\"치료\", \"재생\", \"재생력\", \"피부질환\", \"여드름 제거\" 등의 의약품 수준 표현 금지 (화장품법 제62조)",
+          "risk_level": "critical",
+          "automation": "auto",
+          "forbidden_words": [
+            "치료",
+            "재생력",
+            "재생",
+            "피부질환",
+            "여드름 제거",
+            "흉터 제거",
+            "탈모 방지",
+            "항균",
+            "살균",
+            "항염증",
+            "치유",
+            "개선(피부질환 관련)"
+          ],
+          "compliant_alternatives": [
+            "케어",
+            "관리",
+            "보습",
+            "진정",
+            "개선(피부 결, 윤기 등)",
+            "영양 공급",
+            "매끈함을 위한"
+          ],
+          "penalty": "불통과",
+          "example_fail": "여드름 치료를 위한 스킨케어",
+          "example_pass": "피부 진정 및 보습을 위한 에센스"
+        },
+        {
+          "rule_id": "BEAUTY_002",
+          "rule_name": "천연/유기농 인증 검증",
+          "description": "\"천연\", \"유기농\", \"무첨가\"라 표현했는데 실제 인증이 있는가? (화장품법 제11조)",
+          "risk_level": "critical",
+          "automation": "manual",
+          "certification_required": [
+            "ECOCERT (프랑스 유기농 인증)",
+            "USDA Organic (미국 유기농)",
+            "한국유기동물복지협회",
+            "ECO LABEL (유럽 환경마크)",
+            "국내 화장품안전심사위원회 인증"
+          ],
+          "checks": [
+            "\"천연\" 제품이라 했는데 화학 성분이 몇 %인가?",
+            "\"무방부제\"라 했는데 보존료가 있는가?",
+            "\"무파라벤\"이라 했는데 유사 화학 방부제가 있는가?"
+          ],
+          "compliant_requirement": "인증서 + 전체 성분 공개",
+          "penalty": "불통과"
+        },
+        {
+          "rule_id": "BEAUTY_003",
+          "rule_name": "성분 안전성 검증",
+          "description": "사용한 모든 성분이 화장품법 금지 성분이 아닌가? (화장품법 제8조)",
+          "risk_level": "critical",
+          "automation": "manual",
+          "checks": [
+            "성분표에 수은, 납, 카드뮴 같은 중금속이 없는가?",
+            "알레르기 유발 성분 안내가 있는가?",
+            "민감성 피부를 위한 주의사항이 있는가?"
+          ],
+          "compliant_requirement": "화장품안전심사위원회 인증 + 성분 공개",
+          "penalty": "불통과"
+        },
+        {
+          "rule_id": "BEAUTY_004",
+          "rule_name": "동물실험 여부 명시",
+          "description": "\"동물실험 미수행\", \"크루엘티 프리\" 표현의 진실성",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"동물실험 하지 않음\"이라 했는데 최종 완성품만인가, 성분까지인가?",
+            "PETA, Leaping Bunny 같은 국제 인증이 있는가?",
+            "중국처럼 동물실험 의무국에서 판매되는가?"
+          ],
+          "penalty": "경고"
+        }
+      ],
+      "high_priority_rules": [
+        {
+          "rule_id": "BEAUTY_005",
+          "rule_name": "부작용 공시",
+          "description": "알려진 부작용(자극, 알레르기, 광민감성 등)이 안내되어 있는가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "비타민 A, 산제품 등 자극성 성분의 주의사항이 있는가?",
+            "\"일부 고객에게는 자극을 줄 수 있습니다\" 같은 공정한 표현이 있는가?",
+            "사용 패치 테스트 권고가 있는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "BEAUTY_006",
+          "rule_name": "사용법 및 안내",
+          "description": "\"하루에 몇 번?\", \"피부 타입별로?\", \"언제 쓰나?\"가 명확한가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "단계별 사용 순서가 제시되어 있는가?",
+            "민감성, 여드름성, 건성 피부 각각의 사용법이 다른가?",
+            "자외선 차단제 병행 안내가 있는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "BEAUTY_007",
+          "rule_name": "시각적 이미지 합성 공시",
+          "description": "필터, 보정, CGI 사용 시 \"합성\" 표시 필수",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "영상에 필터가 적용되었는가?",
+            "비포/애프터 사진이 같은 환경/조명에서 촬영되었는가?",
+            "화장(메이크업)의 효과를 제품 효과인 것처럼 보이지는 않는가?",
+            "명시적으로 \"영상/사진 보정\"을 공시했는가?"
+          ],
+          "compliant_requirement": "\"이 영상에는 필터/보정이 포함되어 있습니다\" 명시",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "BEAUTY_008",
+          "rule_name": "임상 시험/근거 표현",
+          "description": "\"임상 99% 효과\", \"피부과 권장\" 같은 표현이 사실인가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"임상 테스트\"라 했는데 공인 연구기관의 시험인가?",
+            "\"피부과 추천\"이라 했는데 실명의 피부과 의사인가?",
+            "통계(\"99% 만족\")의 표본 크기가 충분한가?"
+          ],
+          "compliant_requirement": "제3 기관 임상 보고서 + 피부과 의사 실명 + 통계 근거",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "BEAUTY_009",
+          "rule_name": "인플루언서/셀럽 표현",
+          "description": "\"유명 셀럽도 쓴다\", \"인플루언서 추천\" 등의 표현이 진실인가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "실제로 그 셀럽이 사용했는가? (소유권 증명)",
+            "광고료를 받은 경우 \"광고\" 명시되어 있는가?",
+            "가짜 리뷰를 대여배우에게 읽게 한 것은 아닌가?"
+          ],
+          "compliant_requirement": "\"광고입니다\" 표시 + 실제 사용자만 노출",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "BEAUTY_010",
+          "rule_name": "피부 타입별 안전성",
+          "description": "민감성/건성/지성 등 모든 피부 타입에 안전한가?",
+          "risk_level": "medium",
+          "automation": "manual",
+          "checks": [
+            "\"모든 피부 타입에 사용 가능\"이라 했는데 정말인가?",
+            "민감성 피부 사용자가 안전한가?",
+            "외건성(기름기 있으면서 민감한) 피부도 포함되는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "BEAUTY_011",
+          "rule_name": "제조지 및 원산지",
+          "description": "\"한국산\", \"식약처 허가\" 등의 표현이 정확한가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "제조처가 한국인가, 중국인가? (중국 위탁제조 사실 공시)",
+            "\"식약처 허가\"라 했는데 실제로 화장품 신고서가 있는가?",
+            "원료의 원산지가 제품 원산지와 다른가?"
+          ],
+          "compliant_requirement": "제조사 명시 + 식약처 신고 번호 공개",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "BEAUTY_012",
+          "rule_name": "지속가능성 표현",
+          "description": "\"에코 패키징\", \"환경친화\" 표현이 검증 가능한가?",
+          "risk_level": "medium",
+          "automation": "manual",
+          "checks": [
+            "패키지가 100% 재활용 가능한가?",
+            "\"친환경\"이라 했는데 플라스틱은 없는가?",
+            "생산 과정의 탄소 배출량이 계산되어 있는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "BEAUTY_013",
+          "rule_name": "가격 정당성",
+          "description": "높은 가격에 상응하는 가치가 있는가?",
+          "risk_level": "medium",
+          "automation": "manual",
+          "checks": [
+            "비슷한 제품과 비교해 과도하게 비싼가?",
+            "높은 가격의 정당화 근거(성분, 성능, 희소성)가 있는가?",
+            "\"럭셔리\" 마케팅은 하되, 환상을 팔지는 않는가?"
+          ],
+          "penalty": "경고"
+        }
+      ],
+      "qa_checklist": [
+        "의약품 수준의 표현이 없는가? (critical)",
+        "천연/유기농 인증이 있고 진짜인가? (critical)",
+        "성분이 안전하고 공개되어 있는가? (critical)",
+        "알려진 부작용이 공시되어 있는가? (high)",
+        "사용법이 명확한가? (high)",
+        "필터/보정이 공시되어 있는가? (high)",
+        "임상 근거가 있는가? (high)",
+        "셀럽 광고가 \"광고\" 표시되어 있는가? (high)",
+        "제조지/원산지가 명시되어 있는가? (high)",
+        "전체 성분이 공개되어 있는가? (critical)"
+      ]
+    },
+    "healthcare": {
+      "category_name": "헬스/영양보조제 (미네랄 영양제, 기능식품)",
+      "category_code": "HEALTH",
+      "total_checks": 15,
+      "critical_rules": [
+        {
+          "rule_id": "HEALTH_001",
+          "rule_name": "의학적 효능/치료 효과 금지",
+          "description": "\"치료\", \"완치\", \"질병 예방\", \"처방\", \"의학적 효과\" 등의 의약품 수준 표현 금지 (건강기능식품법 제18조)",
+          "risk_level": "critical",
+          "automation": "auto",
+          "keywords_to_block": [
+            "치료",
+            "완치",
+            "처방",
+            "질병 예방",
+            "의학적 효과",
+            "치유",
+            "암 예방",
+            "당뇨 관리",
+            "혈압 조절",
+            "항암",
+            "항염증",
+            "살균",
+            "약효"
+          ],
+          "compliant_alternatives": [
+            "건강 유지 지원",
+            "영양 보조",
+            "~에 필요한 영양소",
+            "~을 지원하는 성분",
+            "일반적인 건강 관리"
+          ],
+          "penalty": "불통과",
+          "example_fail": "이 제품은 당뇨병을 예방합니다",
+          "example_pass": "혈당 관리에 필요한 마그네슘이 함유되어 있습니다"
+        },
+        {
+          "rule_id": "HEALTH_002",
+          "rule_name": "건강기능식품 인증 검증",
+          "description": "\"기능식품\", \"기능성\", \"효능\" 표현 시 식약처 인증이 필수 (건강기능식품법 제3조)",
+          "risk_level": "critical",
+          "automation": "manual",
+          "checks": [
+            "식약처 건강기능식품 허가 번호가 있는가?",
+            "일반 식품인데 \"기능식품\" 표현한 것은 아닌가?",
+            "인정된 기능성과 실제 마케팅이 일치하는가?"
+          ],
+          "compliant_requirement": "식약처 건강기능식품 허가 + 기능성 한정 안내",
+          "penalty": "불통과"
+        },
+        {
+          "rule_id": "HEALTH_003",
+          "rule_name": "성분 및 함량 표시 정확성",
+          "description": "\"마그네슘 2배\", \"업계 최고 함량\" 같은 표현이 정확한가? (건강기능식품법 제13조)",
+          "risk_level": "critical",
+          "automation": "manual",
+          "checks": [
+            "\"마그네슘 함량이 높다\"는 비교 대상이 명시되어 있는가?",
+            "\"업계 최고\"라 했는데 실제로 검증되었는가?",
+            "1회 섭취량, 일일 권장량, 함량이 명확히 표시되어 있는가?"
+          ],
+          "compliant_requirement": "포장재 영양정보표와 영상 표현 일치 + 제3기관 검사 성적서",
+          "penalty": "불통과"
+        },
+        {
+          "rule_id": "HEALTH_004",
+          "rule_name": "부작용/금기사항 공시",
+          "description": "특정 질환자, 임산부, 약물 상호작용 등에 대한 안내가 있는가?",
+          "risk_level": "critical",
+          "automation": "manual",
+          "checks": [
+            "신장 질환자가 마그네슘 보조제를 복용해도 안전한가?",
+            "임산부/수유부 섭취 가능한가?",
+            "혈액 희석제 복용자와의 상호작용이 없는가?",
+            "\"의약품과 함께 복용하기 전에 의사와 상담하세요\" 안내가 있는가?"
+          ],
+          "compliant_requirement": "의약품 상호작용 정보 + 금기사항 명시",
+          "penalty": "불통과"
+        }
+      ],
+      "high_priority_rules": [
+        {
+          "rule_id": "HEALTH_005",
+          "rule_name": "애매한 건강 개선 표현",
+          "description": "\"개선할 수 있습니다\", \"도움될 수 있습니다\" 같은 표현이 적절한가?",
+          "risk_level": "high",
+          "automation": "auto",
+          "keywords_to_limit": [
+            "개선할 수 있습니다",
+            "좋아질 수 있습니다",
+            "도움될 수 있습니다",
+            "일 수 있음",
+            "가능성이 있습니다"
+          ],
+          "compliant_alternatives": [
+            "~에 필요한 영양소입니다",
+            "~을 지원하는 성분을 포함합니다",
+            "건강한 라이프스타일을 위한"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_006",
+          "rule_name": "과학적 근거 제시",
+          "description": "\"임상 결과\", \"연구 결과\", \"논문\" 같은 근거가 실제인가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"임상 시험 완료\"라 했는데 어디서 한 시험인가?",
+            "논문을 인용했는가? SCI 등재인가?",
+            "통계(\"92% 만족\")의 샘플 크기가 명시되어 있는가?",
+            "부정적 결과나 한계는 언급했는가?"
+          ],
+          "compliant_requirement": "학술 논문 또는 공인 임상 기관의 시험 보고서",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_007",
+          "rule_name": "개인차 고지",
+          "description": "모든 사람에게 동일한 효과가 있다고 암시하지 않았는가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"개인차가 있을 수 있습니다\" 명시되어 있는가?",
+            "\"일부 고객의 경우 효과를 느끼지 못할 수 있습니다\" 안내가 있는가?",
+            "일반화된 표현(\"모두 만족\", \"100% 효과\")이 없는가?"
+          ],
+          "compliant_requirement": "개인차 고지 필수",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_008",
+          "rule_name": "의료 전문가 상담 권유",
+          "description": "특정 상황에서 의사/약사 상담을 권하고 있는가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"기저 질환이 있는 경우 의사와 상담하세요\" 안내가 있는가?",
+            "약물 치료 중인 사람을 위한 안내가 있는가?",
+            "의료 전문가 상담의 중요성이 언급되었는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_009",
+          "rule_name": "섭취 방법 명확성",
+          "description": "\"하루에 몇 개?\", \"식후에?\", \"언제까지?\"가 명확한가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "1일 권장 섭취량이 명시되어 있는가?",
+            "\"최대 섭취량을 초과하지 마세요\" 주의사항이 있는가?",
+            "식사와 함께 섭취해야 하는가?",
+            "얼마나 오래 복용해야 효과를 느낄 수 있는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_010",
+          "rule_name": "비교 광고 규정",
+          "description": "다른 영양제와의 비교 표현이 공정한가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "\"다른 영양제는 효과 없다\"는 표현이 없는가?",
+            "\"우리 제품만 믿을 수 있다\"는 과장이 없는가?",
+            "객관적 수치(성분 함량)로만 비교하고 있는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_011",
+          "rule_name": "셀럽/인플루언서 표현",
+          "description": "\"유명 연예인이 복용\", \"피트니스 인플루언서 추천\"의 진실성",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "실제로 그 인물이 사용했는가?",
+            "광고 계약인 경우 \"광고\" 명시되어 있는가?",
+            "전문가도 아닌데 \"의사 추천\" 표현한 것은 아닌가?"
+          ],
+          "compliant_requirement": "\"광고입니다\" 표시 + 실제 사용자만 노출",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_012",
+          "rule_name": "제조지 및 품질 관리",
+          "description": "\"한국산\", \"GMP 인증\", \"무균실 제조\" 등의 표현이 진실인가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "제조지가 명시되어 있는가?",
+            "GMP(우수의약품제조기준) 인증이 있는가?",
+            "\"무균\" 표현의 근거가 있는가?"
+          ],
+          "compliant_requirement": "GMP 인증서 + 제조처 명시 + 품질 검사 성적서",
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_013",
+          "rule_name": "보관 및 유효기간",
+          "description": "보관 방법, 유효기간, 주의사항이 명확한가?",
+          "risk_level": "medium",
+          "automation": "manual",
+          "checks": [
+            "\"냉장 보관\" or \"실온 보관\"이 명시되어 있는가?",
+            "\"개봉 후 3개월 내 섭취\" 같은 안내가 있는가?",
+            "직사광선 피하라는 주의가 있는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_014",
+          "rule_name": "가격 정당성",
+          "description": "높은 가격에 상응하는 가치가 있는가?",
+          "risk_level": "medium",
+          "automation": "manual",
+          "checks": [
+            "비슷한 제품과 비교해 과도하게 비싼가?",
+            "높은 가격의 정당화(희소 성분, 특수 공정)가 있는가?",
+            "\"프리미엄\", \"럭셔리\" 표현의 근거가 있는가?"
+          ],
+          "penalty": "경고"
+        },
+        {
+          "rule_id": "HEALTH_015",
+          "rule_name": "리뷰/평가 진위성",
+          "description": "\"고객 만족도 95%\", \"5성 평가\" 등의 통계가 진짜인가?",
+          "risk_level": "high",
+          "automation": "manual",
+          "checks": [
+            "통계 수치의 샘플 크기가 명시되어 있는가?",
+            "실제 판매처(쿠팡, 무신사 등) 링크로 검증 가능한가?",
+            "조작된 리뷰는 아닌가?"
+          ],
+          "compliant_requirement": "실제 판매처 링크 제시 + 통계 투명성",
+          "penalty": "경고"
+        }
+      ],
+      "qa_checklist": [
+        "의약품 수준의 표현이 없는가? (critical)",
+        "건강기능식품 인증이 있고 명시되어 있는가? (critical)",
+        "성분과 함량이 정확하고 근거 있는가? (critical)",
+        "부작용/금기사항이 명시되어 있는가? (critical)",
+        "의료 전문가 상담 권유가 있는가? (high)",
+        "개인차 고지가 있는가? (high)",
+        "섭취 방법이 명확한가? (high)",
+        "과학적 근거가 있는가? (high)",
+        "제조지/GMP 인증이 명시되어 있는가? (high)",
+        "셀럽 광고가 \"광고\" 표시되어 있는가? (high)"
+      ]
+    }
+  },
+  "qa_workflow": {
+    "step_9_comprehensive_check": {
+      "title": "Step 9: 종합 품질 검사 (카테고리별 상세 검증)",
+      "description": "Step 8(영상 생성) 완료 후, 카테고리별 검증 기준을 적용하여 최종 QA 수행",
+      "process": [
+        {
+          "phase": 1,
+          "name": "카테고리 분류",
+          "action": "생성된 영상의 카테고리(식품/뷰티/헬스)를 자동으로 감지"
+        },
+        {
+          "phase": 2,
+          "name": "자동 검증 (규칙 기반)",
+          "action": "해당 카테고리의 \"auto\" 규칙(금지 키워드, 금지 표현) 자동 스캔"
+        },
+        {
+          "phase": 3,
+          "name": "수동 검증 (마케터 검토)",
+          "action": "\"manual\" 규칙(원산지, 인증, 근거, 이미지 등) 상세 체크리스트 제공"
+        },
+        {
+          "phase": 4,
+          "name": "최종 판정",
+          "action": "PASS / WARNING / REJECTED 판정 + 상세 피드백 리포트"
+        }
+      ]
+    }
+  }
+}

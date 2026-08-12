@@ -41,9 +41,10 @@ TimelyAI가 Skill을 호출하고 결과를 처리:
    - Shortform Scenario Writer Skill 호출
    - 시나리오 검토 → 확정
 
-4. **Post-Generation QA Agent**
-   - 생성된 영상 품질 검사
-   - 일관성/시간/오류 확인
+4. **QA Agent** (v2.0 - 카테고리별 상세 검증)
+   - 카테고리별 자동 검증 (금지 키워드, 위험 표현)
+   - 카테고리별 수동 체크리스트 (10~15개 항목/카테고리)
+   - 최종 판정: PASS_AUTO / WARNING / REJECTED
 
 ### Orchestrator (마스터 지휘자)
 Step 1 → Step 2 → ... → 최종 결과:
