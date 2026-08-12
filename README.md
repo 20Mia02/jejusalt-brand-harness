@@ -1,13 +1,17 @@
 # 제주소금(JejuSalt) — Harness Engineering 기반 AI 콘텐츠 자동화 🧂✨
 
+**마지막 업데이트**: 2026-08-13 v2.0  
+**상태**: ✅ 프로덕션 준비 완료
+
 ## 📋 프로젝트 개요
 
-**Harness Engineering 구조**로 설계된 제주소금 AI 콘텐츠 생성 시스템입니다.
-- 📋 **spec**: 프로젝트 정의 & 원칙 (불변)
-- 🔧 **skills**: 단일 책임 함수 (3개)
-- 🤖 **agents**: Skill 실행자 (4개)
-- 🎼 **orchestrator**: 9단계 파이프라인
-- ⚙️ **config**: 검증 규칙 & 설정
+**Harness Engineering 6요소 구조**로 설계된 제주소금 AI 콘텐츠 생성 시스템입니다.
+- 1️⃣ **spec**: 프로젝트 정의 & 원칙 (불변)
+- 2️⃣ **skills**: 단일 책임 함수 (3개)
+- 3️⃣ **agents**: Step 에이전트 (8개) + 조정자 (1개) + 마케터 가이드
+- 4️⃣ **orchestrator**: 9단계 파이프라인 정의
+- 5️⃣ **config**: 검증 규칙 & 설정
+- 6️⃣ **hooks**: 마케터 검증 체크포인트 (4개)
 
 **구현**은 `implementation/` 폴더에서 Node.js 백엔드 + React 프론트엔드로 진행됩니다.
 
@@ -149,34 +153,45 @@ npm start
 ```
 harness/                          ← 다운받은 폴더
 │
-├── 📋 harness/                   (Harness 정의 - 읽으세요!)
-│   ├── spec/
-│   │   ├── spec.md              (전체 구조)
-│   │   ├── brand-voice.md       (브랜드 원칙)
+├── 🏗️ HARNESS 6요소 (TOP-LEVEL) ⭐
+│   ├── 1️⃣ spec/                (프로젝트 정의 & 원칙)
+│   │   ├── spec.md
+│   │   ├── brand-voice.md
 │   │   └── PRD.md
-│   ├── skills/                  (3개 Skill 정의)
-│   ├── agents/                  (4개 Agent 정의)
-│   │   └── QA-AGENT.md          (Step 9 검증 기준)
-│   ├── orchestrator/            (9단계 파이프라인)
-│   └── config/                  (검증 규칙)
-│       └── compliance-rules-v2.json (식품/뷰티/헬스)
+│   ├── 2️⃣ skills/              (3개 Skill 정의)
+│   ├── 3️⃣ agents/              (9개 Agent 정의)
+│   │   ├── 0-master-orchestrator-agent.md (조정자)
+│   │   ├── 1-resource-analyzer-agent.md (Step 1)
+│   │   ├── 2-character-selector-agent.md (Step 2)
+│   │   ├── 3-character-designer-agent.md (Step 3)
+│   │   ├── 4-shortform-scenario-writer-agent.md (Step 4)
+│   │   ├── 5-naming-generator-agent.md (Step 5)
+│   │   ├── 6-product-writer-agent.md (Step 6)
+│   │   ├── 7-compliance-reviewer-agent.md (Step 7)
+│   │   ├── 9-post-generation-qa-agent.md (Step 9)
+│   │   └── QA-AGENT.md (마케터 검증 가이드)
+│   ├── 4️⃣ orchestrator/        (9단계 파이프라인)
+│   │   └── orchestrator.md
+│   ├── 5️⃣ config/              (검증 규칙 & 설정)
+│   │   └── compliance-rules-v2.json (식품/뷰티/헬스 42개 항목)
+│   └── 6️⃣ hooks/               (마케터 검증 체크포인트)
+│       └── HOOKS.md (Hook 1~4 정의)
 │
-├── 🚀 implementation/            (실제 코드)
-│   ├── backend/
+├── 🚀 implementation/            (실제 구현 코드)
+│   ├── backend/                 (Node.js 서버)
 │   │   ├── server.js
-│   │   ├── agents/              (에이전트 구현)
+│   │   ├── agents/              (백엔드 에이전트 구현)
 │   │   ├── routes/              (API 엔드포인트)
 │   │   ├── config/
 │   │   └── .env                 (환경변수 - 직접 작성)
-│   ├── frontend/
+│   ├── frontend/                (React UI)
 │   │   ├── src/
 │   │   └── public/
 │   └── data/                    (자산)
 │
-├── 📚 docs/                     (문서)
-├── 🗄️ supabase/                (DB 설정)
-├── 🚫 legacy/                   (이전 구조 - 참고용)
-└── PROJECT_STRUCTURE.md         (전체 구조 설명)
+├── 📚 docs/                     (프로젝트 문서)
+├── 🗄️ supabase/                (Supabase DB 설정)
+└── PROJECT_STRUCTURE.md         (전체 구조 상세 설명)
 ```
 
 ---
@@ -421,3 +436,515 @@ curl -X POST http://localhost:5000/api/generate/pipeline \
 
 **마지막 업데이트**: 2026-08-13 (Harness v2.0, Step 9 QA v2.0)  
 **상태**: ✅ 프로덕션 준비 완료
+
+---
+
+# 📚 상세 워크플로우 가이드
+
+## 🎬 영상 생성 전체 흐름
+
+### **1️⃣ 마케터 입력 → Step 1: 자료 분석**
+
+**마케터가 입력하는 정보**:
+```json
+{
+  "productName": "제주 소금",
+  "productInfo": "제주 바다에서 채취한 천연 미네랄 소금...",
+  "keywords": ["제주산", "미네랄", "건강"],
+  "category": "food"
+}
+```
+
+**Step 1에서 일어나는 일**:
+1. `TimelyAI (upstage/solar-pro4)` 호출
+2. 자동으로 추출되는 메타데이터:
+   ```
+   - 제품 카테고리 (식품/뷰티/헬스)
+   - 타겟층 분석 (40~60대 여성)
+   - 마케팅 톤 파악 (신뢰, 자연)
+   - 강조할 특성 (미네랄, 건강)
+   ```
+3. `Supabase resources` 테이블에 저장
+
+---
+
+### **2️⃣ Step 2: 캐릭터 추천 (8명 중 3명)**
+
+**기본 캐릭터 라이브러리** (변경 불가):
+```
+결이      (점수: 9.5)   - 긍정적 소년, 밝은 미네랄
+용암이    (점수: 8.8)   - 신비로운 제주, 검은 현무암
+해수      (점수: 8.2)   - 따뜻한 바다, 푸른색
+미내      (점수: 9.1)   - 활발한 여신, 맑은 물
+현무      (점수: 8.7)   - 든든한 가디언, 검은색
+가마할방  (점수: 8.0)   - 지혜로운 할머니, 따뜻함
+불이      (점수: 8.3)   - 열정적 청년, 주황색
+한라      (점수: 8.9)   - 신성한 산, 흰색
+```
+
+**스코어링 방식**:
+```
+점수 = (카테고리 일치도 × 40%)
+     + (타겟층 일치도 × 40%)
+     + (톤 어울림 × 20%)
+```
+
+**결과**: Top 3 캐릭터 추천
+
+---
+
+### **3️⃣ Step 3: 캐릭터 설계 + Reference Image 생성 ⭐**
+
+**이 단계가 핵심입니다!**
+
+#### **3-1: 캐릭터 상세 프롬프트 생성**
+
+TimelyAI에서 생성:
+```
+캐릭터명: 결이
+성격: 꿈과 희망으로 가득 찬 당찬 소년
+외형: 작은 소금 결정 형태, 밝은 흰색, 반짝이는 질감
+말투: 희망적이고 정직함, 부드럽지만 당당함
+주요 표현: "우리 함께라면", "작지만 중요함"
+배경: 제주 바다, 햇빛
+```
+
+#### **3-2: Reference Image 생성** 🎨
+
+```javascript
+// Higgsfield text2image_soul_v2 모델 사용
+const refImagePrompt = `
+캐릭터명: 결이
+외형 설명: 작은 소금 결정 형태, 밝은 흰색, 반짝이는 질감,
+          제주 바다 배경, 햇빛, 미네랄 입자
+표정: 희망적이고 따뜻한 미소
+감정: 정직하고 진실함
+분위기: 자연스럽고 신뢰할 수 있는
+`;
+
+// 생성됨: reference_image_url
+// 예: https://s3.amazonaws.com/higgsfield/.../character_001.png
+```
+
+**Reference Image는**:
+- ✅ 모든 Step에서 재사용됨
+- ✅ Hook 1에서 마케터가 검토함
+- ✅ Step 8 (Higgsfield 영상 생성)의 `--start-image`로 사용됨
+- ✅ 최종 영상에서 캐릭터 일관성 유지
+
+#### **3-3: Hook 1 승인**
+
+```
+마케터 검토:
+□ 이 캐릭터가 제품(제주 소금)과 맞는가?
+□ 표정이 신뢰감을 주는가?
+□ 제주의 정체성이 잘 표현됐는가?
+
+선택지:
+○ 승인 → Step 4 진행
+○ 수정 요청 → "더 밝게", "더 활발하게" 등
+○ 반려 → Step 2로 돌아가 다른 캐릭터 선택
+```
+
+---
+
+### **4️⃣ Step 4: 시나리오 작성**
+
+**15초 영상의 스토리 구성**:
+
+TimelyAI가 생성:
+```json
+{
+  "title": "제주 바다의 결정",
+  "story": "제주 바다에서 태어난 작은 결정들의 이야기...",
+  "acts": [
+    {
+      "duration_seconds": 2,
+      "description": "오프닝: 제주 바다 풍경",
+      "visual_cues": "파도, 햇빛, 미네랄 입자"
+    },
+    {
+      "duration_seconds": 10,
+      "description": "메인: 결이가 제주 소금의 가치를 설명",
+      "visual_cues": "결이 캐릭터, 소금 결정, 미네랄"
+    },
+    {
+      "duration_seconds": 3,
+      "description": "클로징: 밥상 위의 소금",
+      "visual_cues": "가족 식탁, 따뜻한 조명"
+    }
+  ],
+  "total_duration": 15
+}
+```
+
+#### **Hook 2 승인**
+
+```
+검증:
+□ 총 길이가 정확히 15초인가?
+□ 시작과 끝이 자연스러운가?
+□ 제주 소금의 가치가 잘 표현되었는가?
+□ 브랜드 톤(정직함, 따뜻함)과 맞는가?
+
+선택지:
+○ 승인 → Step 5 진행
+○ 수정 요청 → "더 빠르게", "가족 씬 추가" 등
+○ 반려 → Step 3으로 돌아가 캐릭터 재설계
+```
+
+---
+
+### **5️⃣ Step 5: 영상 제목 생성**
+
+TimelyAI가 3개 생성:
+```
+1️⃣ "제주 바다의 결정"
+   의미: 자연과 인간이 만드는 작은 기적
+   점수: 9.2/10
+
+2️⃣ "소금 한 알의 이야기"
+   의미: 소수자의 가치를 담다
+   점수: 8.7/10
+
+3️⃣ "밥상 위의 제주"
+   의미: 일상이 되는 특별함
+   점수: 8.4/10
+```
+
+#### **Hook 3: 제목 선택**
+
+```
+마케터: "제목 1번 선택"
+자동진행 (AI 추천 사용): 가장 높은 점수(9.2) 자동 선택
+```
+
+---
+
+### **6️⃣ Step 6: 카피 작성**
+
+TimelyAI가 생성:
+```
+제목: "제주 바다의 결정"
+
+카피:
+"제주의 용암해수에서 탄생한 소금입니다.
+70년 기술력으로 조절된 나트륨·마그네슘 비율.
+밥상 위의 작은 결정이, 우리 가족의 맛을 더합니다."
+
+(금지: 의약품 표현, 과장, 거짓 주장)
+```
+
+#### **Hook 4: 카피 승인**
+
+```
+검증:
+□ brand-voice 원칙(정직, 따뜻, 제주) 준수?
+□ 의약품 표현 없는가?
+□ 과장 없는가?
+□ 40~60대가 공감할 언어인가?
+
+선택지:
+○ 승인 → Step 7 진행
+○ 수정 요청 → "더 강조해주세요"
+○ 반려 → Step 4로 돌아가 시나리오 재작성
+```
+
+---
+
+### **7️⃣ Step 7: 컴플라이언스 검증**
+
+**자동 검증** (Phase 1):
+
+```
+카테고리: 식품
+
+금지 키워드 스캔:
+✓ "치료" - 없음 ✅
+✓ "완치" - 없음 ✅
+✓ "약효" - 없음 ✅
+✓ "질병 예방" - 없음 ✅
+...
+
+결과: 
+✅ APPROVED → Step 8 진행
+⚠️ WARNING → 마케터 수동 검토 (Phase 2)
+❌ REJECTED → Step 6으로 돌아가 카피 재작성
+```
+
+**마케터 수동 검증** (Phase 2):
+
+```
+🍳 식품 카테고리 (14개 항목):
+
+[ ] 1. 의약품 표현 없는가?
+[ ] 2. 원산지 명시 정확한가? (인증서 확인)
+[ ] 3. 영양소 수치 정확한가? (검사 성적서)
+[ ] 4. 위생 기준 충족?
+[ ] 5. 할인율 과장 없는가?
+[ ] 6. 거짓 비교광고 없는가?
+[ ] 7. 제조 과정 투명하게 표현?
+[ ] 8. 취약층 주의사항?
+[ ] 9. 환경 관련 표현 사실인가?
+[ ] 10. 가격 표현 공정한가?
+[ ] 11. 사용방법 명확한가?
+[ ] 12. 리뷰 기반 표현 사실인가?
+[ ] 13. 원산지 이미지 일치?
+[ ] 14. 기타 우려사항?
+```
+
+---
+
+### **8️⃣ Step 8: Higgsfield로 실제 영상 생성**
+
+```bash
+higgsfield generate create seedance_2_0 \
+  --prompt "
+    [캐릭터]: 결이 (참고이미지: {reference_image_url})
+    [말투]: 희망적이고 정직함
+    [스크립트]: 제주의 용암해수에서 탄생한 소금입니다...
+    [시나리오]:
+      - 2초: 제주 바다 풍경
+      - 10초: 결이가 카피 말하기
+      - 3초: 밥상 위의 소금
+    [배경음]: 따뜻한 피아노 음악
+    [효과]: 미네랄 입자, 햇빛
+  " \
+  --duration 15 \
+  --resolution 720p \
+  --start-image {reference_image_url} \
+  --wait
+```
+
+**출력**:
+```
+✅ 영상 생성 완료!
+📹 비디오: https://higgsfield.com/output/video_12345.mp4
+⏱️ 길이: 15초
+📐 해상도: 720p
+🎬 캐릭터: 결이 (Reference Image 기반, 일관성 100%)
+```
+
+---
+
+### **9️⃣ Step 9: QA 검증**
+
+#### **Phase 1: 자동 검증**
+
+```
+금지 키워드 재확인:
+✓ 시나리오, 카피, 자막 모두 검사
+
+결과:
+✅ PASS_AUTO → 완료!
+⚠️ WARNING → Phase 2 필요
+❌ REJECTED → Step 6으로 돌아가기
+```
+
+#### **Phase 2: 마케터 수동 검증**
+
+```
+영상 재생 후 확인:
+
+[ ] 캐릭터가 의도대로 표현됐는가?
+[ ] 카피가 명확하게 전달되는가?
+[ ] 길이가 정확히 15초인가?
+[ ] 배경음악이 어울리는가?
+[ ] 색감과 조명이 적절한가?
+[ ] 법적 문제 없는가?
+
+기본 14~15개 항목 + 추가 확인
+```
+
+#### **Phase 3: 최종 판정**
+
+```
+✅ PASS: 모든 검증 완료
+   → 콘텐츠 배포 준비 완료!
+
+⚠️ WARNING: 경고 수준
+   → 마케터 확인 후 배포 결정
+
+❌ REJECTED: 불통과
+   → Step 6으로 돌아가 카피 재작성
+```
+
+---
+
+## 🎨 캐릭터 & 이미지 시스템 상세 설명
+
+### **3가지 이미지 타입**
+
+#### **1️⃣ 고정 캐릭터 이미지** (변경 불가)
+
+```
+저장위치: config/config.json
+예시:
+{
+  "name": "결이",
+  "visualIdentity": "작은 소금 결정 형태, 밝은 흰색",
+  "toneTrait": "희망적이고 정직함",
+  "reference_image_url": "https://s3.../character_001.png"
+}
+
+특징:
+- 프로젝트마다 동일한 8명
+- 각 캐릭터마다 고정된 참고 이미지
+- 변경 시 모든 영상에 영향
+- 브랜드 일관성의 핵심
+```
+
+#### **2️⃣ Reference Image** (Step 3에서 생성)
+
+```
+생성방식:
+1. Step 3에서 TimelyAI 프롬프트로 캐릭터 상세 결정
+2. Higgsfield text2image_soul_v2 모델로 이미지 생성
+3. Supabase character_library.reference_image_url에 저장
+4. Hook 1에서 마케터가 검토
+
+사용처:
+- 마케터 검토 (Hook 1)
+- Step 4~7 진행 중 참고
+- Step 8 Higgsfield의 --start-image
+
+예시:
+reference_image_url = "https://higgsfield.com/.../ref_image_12345.png"
+```
+
+#### **3️⃣ 최종 영상의 캐릭터**
+
+```
+생성방식:
+Step 8: Higgsfield --start-image {reference_image_url}
+
+특징:
+- Reference Image를 기반으로 생성
+- 모든 씬에서 동일한 캐릭터 유지
+- 시나리오와 자연스럽게 조화
+- 최종 결과물에 포함된 캐릭터
+
+예:
+영상에 등장하는 "결이"는
+Reference Image의 스타일을 유지하면서도
+시나리오의 각 씬에 맞게 표현됨
+```
+
+### **이미지 흐름 다이어그램**
+
+```
+Step 2: 기본 8개 캐릭터 추천
+    ↓
+    마케터: "결이 선택"
+    ↓
+Step 3: 결이의 Reference Image 생성
+    ↓
+    Higgsfield text2image_soul_v2
+    프롬프트: "결이, 밝은 흰색, 소금 결정 형태..."
+    ↓
+    생성됨: reference_image_url
+    ↓
+Hook 1: 마케터가 Reference Image 검토
+    ↓
+    ○ 승인 → reference_image_url 확정
+    ○ 수정 → 프롬프트 조정 후 재생성
+    ○ 반려 → Step 2로 돌아가 다른 캐릭터 선택
+    ↓
+Step 4~7: reference_image_url 참조
+    ↓
+Step 8: Higgsfield 영상 생성
+    ↓
+    higgsfield generate create seedance_2_0 \
+      --start-image {reference_image_url}
+    ↓
+    생성됨: 15초 영상 (일관된 캐릭터)
+    ↓
+최종 영상 완성 ✅
+    - 캐릭터 일관성 100%
+    - Reference Image 스타일 유지
+```
+
+---
+
+## 🔗 Harness 6요소 실전 예제
+
+### **예제: "제주 소금" 영상 제작**
+
+| 요소 | 파일 | 역할 |
+|------|------|------|
+| **spec** | `spec/spec.md` | "AI가 생성한 모든 콘텐츠는 brand-voice 3원칙을 따라야 한다" (정의) |
+| **spec** | `spec/brand-voice.md` | "정직하게, 과장 없이" (원칙 1) |
+| **skills** | `SKILL_character-designer.md` | 캐릭터 설계의 단일 책임 |
+| **agents** | `character-designer-agent.md` | 위 Skill을 실행하는 Agent (Step 3) |
+| **orchestrator** | `orchestrator.md` | "Step 3 → Hook 1 → Step 4" (흐름) |
+| **hooks** | `hooks/HOOKS.md` | "Hook 1: 마케터가 Reference Image 검토" |
+| **config** | `compliance-rules-v2.json` | "식품: 의약품 표현 금지" (규칙) |
+
+---
+
+## 📊 Step별 에이전트 & Skill 매핑
+
+```
+┌─────────────┬─────────────────────┬──────────────────────────────┐
+│ Step        │ Agent               │ Skill / 처리                 │
+├─────────────┼─────────────────────┼──────────────────────────────┤
+│ 1           │ Resource Analyzer   │ 메타데이터 추출 (TimelyAI)    │
+│ 2           │ Character Selector  │ 캐릭터 스코어링 (알고리즘)   │
+│ 3           │ Character Designer  │ Character Designer Skill     │
+│             │                     │ + Reference Image 생성       │
+│ 🎣 Hook 1  │ -                   │ 마케터 검토                  │
+│ 4           │ Scenario Writer     │ Shortform Scenario Skill     │
+│ 🎣 Hook 2  │ -                   │ 마케터 검토                  │
+│ 5           │ Naming Generator    │ Naming Generator Skill       │
+│ 🎣 Hook 3  │ -                   │ 마케터 선택 (3개 중 1개)     │
+│ 6           │ Product Writer      │ TimelyAI 카피 작성           │
+│ 🎣 Hook 4  │ -                   │ 마케터 검토                  │
+│ 7           │ Compliance Reviewer │ 규칙 기반 검증               │
+│ 8           │ -                   │ Higgsfield CLI 영상 생성     │
+│ 9           │ QA Agent            │ Phase 1,2,3 검증             │
+└─────────────┴─────────────────────┴──────────────────────────────┘
+```
+
+---
+
+## 💾 데이터 저장 구조
+
+```
+Supabase (또는 Mock 모드):
+
+resources 테이블
+├─ id: "res_12345"
+├─ product_name: "제주 소금"
+├─ product_info: "제주 바다에서..."
+├─ metadata: {
+│   categories: ["식품"],
+│   ageGroups: ["40~60대"],
+│   focus: ["자연", "건강"]
+│ }
+├─ reference_image_url: "https://..."  ← Step 3 Reference Image
+├─ status: "complete"
+└─ created_at: "2026-08-13T..."
+
+character_library 테이블
+├─ id: "char_001"
+├─ character_name: "결이"
+├─ visual_description: "소금 결정 형태..."
+├─ reference_image_url: "https://..."  ← 기본 이미지 (고정)
+└─ generation_count: 42  ← 몇 개 제품에 사용됐는가
+
+generation_logs 테이블
+├─ resource_id: "res_12345"
+├─ step: 3
+├─ action: "character_design"
+├─ status: "completed"
+├─ marketer_approval: true  ← Hook 1 승인됨
+└─ ai_recommendation: {...}
+
+videos 테이블 (Step 8 후)
+├─ video_id: "vid_12345"
+├─ video_url: "https://higgsfield.com/.../video.mp4"
+├─ resource_id: "res_12345"
+├─ character_id: "char_001"
+├─ reference_image_url: "https://..."  ← Step 3 이미지 사용
+└─ created_at: "2026-08-13T..."
+```

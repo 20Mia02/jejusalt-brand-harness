@@ -4,6 +4,7 @@ import FilterUI from "./components/FilterUI"
 import GenerationUI from "./components/GenerationUI"
 import MetadataReviewUI from "./components/MetadataReviewUI"
 import CharacterCreator from "./components/CharacterCreator"
+import CharacterGallery from "./components/CharacterGallery"
 import AdminMode from "./components/AdminMode"
 import OceanBackground from "./components/OceanBackground"
 import "./App.css"
@@ -152,6 +153,7 @@ function MainFlow({ currentStep, setCurrentStep }) {
 function App() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
+  const isGallery = location.pathname.startsWith('/characters');
   const [currentStep, setCurrentStep] = useState('filter');
   const [brandName, setBrandName] = useState('제주도 라바 씨솔트');
   const [brandNameEn, setBrandNameEn] = useState('JEJU LAVA SEA SALT');
@@ -191,7 +193,7 @@ function App() {
           <div className="logo-section">
             <div className="logo-badge">
               <img
-                src="/assets/logo/jeju-salt-logo.png"
+                src={theme === 'dark' ? `${import.meta.env.BASE_URL}assets/logo/jeju-salt-logo-dark.png` : `${import.meta.env.BASE_URL}assets/logo/jeju-salt-logo.png`}
                 alt="제주소금 JEJU LAVA SEA SALT 로고"
                 className="logo-image"
               />
@@ -203,15 +205,16 @@ function App() {
             <h1>{brandNameEn.split(' ').slice(0, -2).join(' ')}<br/>{brandNameEn.split(' ').slice(-2).join(' ')}</h1>
             <div className="header-divider"></div>
             <nav className="app-header-nav">
-              <Link to="/" className={!isAdmin ? 'active' : ''}>메인</Link>
+              <Link to="/" className={!isAdmin && !isGallery ? 'active' : ''}>메인</Link>
+              <Link to="/characters" className={isGallery ? 'active' : ''}>🎭 캐릭터 갤러리</Link>
               <Link to="/admin" className={isAdmin ? 'active' : ''}>관리자 모드</Link>
             </nav>
             <p className="header-subtitle">
-              {isAdmin ? '관리자 모드' : STEP_LABELS[currentStep]}
+              {isAdmin ? '관리자 모드' : isGallery ? '캐릭터 갤러리' : STEP_LABELS[currentStep]}
             </p>
           </div>
         </div>
-        {!isAdmin && <StepIndicator currentStep={currentStep} />}
+        {!isAdmin && !isGallery && <StepIndicator currentStep={currentStep} />}
       </header>
 
       <Routes>
@@ -219,6 +222,7 @@ function App() {
           path="/"
           element={<MainFlow currentStep={currentStep} setCurrentStep={setCurrentStep} />}
         />
+        <Route path="/characters" element={<CharacterGallery />} />
         <Route path="/admin" element={<AdminMode />} />
       </Routes>
     </div>

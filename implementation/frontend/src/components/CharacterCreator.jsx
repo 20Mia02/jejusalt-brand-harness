@@ -312,7 +312,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
         const res = await axios.get(`/api/resources/${resourceId}`);
         const fetched = res.data.characters || [];
         setLocalCharacters(fetched);
-        setSelectedId(fetched.find((c) => c.selected)?.id || fetched[0]?.id);
+        const preSelected = fetched.filter((c) => c.selected).map((c) => c.id);
+        setSelectedIds(preSelected.length > 0 ? preSelected : (fetched[0] ? [fetched[0].id] : []));
       } catch (err) {
         console.error('캐릭터 목록 조회 실패:', err);
         setError('캐릭터 목록을 불러올 수 없습니다.');
@@ -517,6 +518,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
               const refChar = refinementByName[libChar.character_name];
               const isRefining = refiningName === libChar.character_name;
               const isEvolutionOpen = evolutionOpenName === libChar.character_name;
+              // 캐릭터 갤러리와 동일하게 characters.json의 고정 썸네일을 우선 사용 (DB reference_image_url은 폴백)
+              const thumbnailUrl = refChar?.referenceImageUrl || libChar.reference_image_url;
               return (
               <div
                 key={libChar.id}
@@ -534,12 +537,12 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                     <span className="ml-1 text-xs bg-status-approved/10 text-status-approved px-1 rounded">{refChar.currentVersion}</span>
                   )}
                 </div>
-                {/* 레퍼런스: 있으면 실제 영상, 없으면 "아직 없음" placeholder로 일관성 상태를 항상 보이게 함 */}
+                {/* 레퍼런스: 캐릭터 갤러리와 동일한 고정 썸네일 사용, 없으면 "아직 없음" placeholder */}
                 {/* 정사각 프레임 + object-contain: 캐릭터 전신이 잘리지 않고 다 보이도록 */}
                 <div className="w-full aspect-square bg-dark-chip rounded border border-brand-blue/10 flex items-center justify-center overflow-hidden mb-2">
-                  {libChar.reference_image_url ? (
+                  {thumbnailUrl ? (
                     <ReferenceMedia
-                      url={libChar.reference_image_url}
+                      url={thumbnailUrl}
                       alt={`${libChar.character_name} reference`}
                       className="w-full h-full object-contain"
                     />
@@ -626,7 +629,10 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
 
       {/* 캐릭터 카드 그리드 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 jeju-cute-bg p-3">
-        {localCharacters.map((char, idx) => (
+        {localCharacters.map((char, idx) => {
+          // 캐릭터 갤러리와 동일하게 characters.json의 고정 썸네일을 우선 사용
+          const charThumbnailUrl = refinementByName[char.character_name]?.referenceImageUrl || char.reference_image_url;
+          return (
           <div
             key={char.id}
             role="button"
@@ -788,12 +794,12 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
             </button>
 
             {/* 레퍼런스 (있으면 표시) */}
-            {char.reference_image_url && (
+            {charThumbnailUrl && (
               <div className="mt-3 mb-3">
                 <span className="text-xs font-semibold text-dark-text-muted">🖼️ 레퍼런스:</span>
                 <div className="mt-2 w-full max-w-xs aspect-square bg-dark-chip rounded border border-brand-blue/20 flex items-center justify-center overflow-hidden">
                   <ReferenceMedia
-                    url={char.reference_image_url}
+                    url={charThumbnailUrl}
                     alt={`${char.character_name} reference`}
                     className="w-full h-full object-contain"
                   />
@@ -922,7 +928,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* 선택된 캐릭터 정보 (큰 화면) — 여러 명이면 모두 나열 */}

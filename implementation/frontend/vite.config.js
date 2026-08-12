@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: '/jejusalt-brand-harness/',
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/jejusalt-brand-harness/' : '/',
   plugins: [react(), tailwindcss()],
   server: {
     port: 5176,
@@ -19,6 +19,6 @@ export default defineConfig({
       },
     },
   },
-})
+}))
 
 
