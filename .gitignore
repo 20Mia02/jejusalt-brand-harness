@@ -36,3 +36,17 @@ __pycache__/
 
 # Supabase CLI local link metadata (project ref/org info, churns every db push)
 supabase/.temp/
+
+# Legacy/Archive (이전 프로젝트 구조 - 참고용)
+legacy/
+
+# 중복된 원본 폴더들 (implementation 에 통합됨)
+backend/
+jejusalt-frontend/
+data/
+agents/
+agents-sub/
+skills/
+skill&agent/
+webapp/
+jejusalt-brand-harness/
