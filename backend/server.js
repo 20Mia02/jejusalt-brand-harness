@@ -31,7 +31,7 @@ const requiredEnvVars = [
   "SUPABASE_URL",
   "SUPABASE_SERVICE_KEY",
   "TIMELY_AI_API_KEY",
-  "HIGGSFIELD_API_KEY",
+  // Higgsfield는 로컬 CLI 인증 방식(매일 higgsfield auth login)을 사용하므로 API_KEY 불필요
 ];
 
 const missingEnvVars = requiredEnvVars.filter((env) => !process.env[env]);
@@ -88,7 +88,7 @@ app.get("/health", (req, res) => {
     timestamp: new Date(),
     env: {
       supabase: !!process.env.SUPABASE_URL,
-      higgsfield: !!process.env.HIGGSFIELD_API_KEY,
+      higgsfield: "CLI 로컬 인증 사용 (매일 higgsfield auth login 필요)",
       timelyai: !!process.env.TIMELY_AI_API_KEY,
     },
   });
