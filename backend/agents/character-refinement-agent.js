@@ -127,7 +127,7 @@ cutenessScore < 85 이거나 overallScore < 85면 shouldRetry는 반드시 true�
 
   try {
     const completion = await client.chat.completions.create({
-      model: "openai/gpt-4.1-mini",
+      model: "solar-pro-4",
       messages: [
         { role: "system", content: systemPrompt },
         {

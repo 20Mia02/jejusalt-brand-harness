@@ -297,11 +297,11 @@ async function callTimelyAIAgent(agentName, payload) {
   const outputSpec = getOutputSpecForAgent(agentName, payload);
 
   console.log(`  [OpenAI SDK] 에이전트 호출: ${agentName}`);
-  console.log(`    모델: openai/gpt-4.1-mini`);
+  console.log(`    모델: solar-pro-4`);
 
   try {
     const completion = await client.chat.completions.create({
-      model: "openai/gpt-4.1-mini",
+      model: "solar-pro-4",
       messages: [
         {
           role: "system",
