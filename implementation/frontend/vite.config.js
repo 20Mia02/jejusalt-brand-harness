@@ -4,17 +4,14 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/jejusalt-brand-harness/' : '/',
+  base: '/',
   plugins: [react(), tailwindcss()],
   server: {
-    port: 5176,
+    port: 5173,
+    host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
-      '/docs': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
       },
     },

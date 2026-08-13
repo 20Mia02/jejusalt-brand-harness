@@ -16,7 +16,38 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+
+async function apiGet(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiPut(path, body) {
+  const res = await fetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiDelete(path) {
+  const res = await fetch(path, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 const getVideoTypes = () => {
   if (window.appConfig?.generation?.videoTypes) {
@@ -123,8 +154,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
   const loadLibrary = async () => {
     try {
       setLibraryLoading(true);
-      const res = await axios.get('/api/characters/library');
-      setLibrary(res.data.characters || []);
+      const res = await apiGet('/api/characters/library');
+      setLibrary(res.characters || []);
     } catch (err) {
       console.error('캐릭터 라이브러리 로드 실패:', err);
     } finally {
@@ -135,9 +166,9 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
   // characters.json(귀여움/디테일/일관성 리파인먼트 시스템)의 버전 정보를 이름으로 병합
   const loadRefinementData = async () => {
     try {
-      const res = await axios.get('/api/generate/characters');
+      const res = await apiGet('/api/generate/characters');
       const byName = {};
-      for (const c of res.data.characters || []) {
+      for (const c of res.characters || []) {
         byName[c.name] = c;
       }
       setRefinementByName(byName);
@@ -151,12 +182,12 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
     if (!refChar) return;
     try {
       setRefiningName(refChar.name);
-      const res = await axios.post('/api/generate/character', { characterId: refChar.id, forceRefine: true });
+      const res = await apiPost('/api/generate/character', { characterId: refChar.id, forceRefine: true });
       setRefinementByName((prev) => ({
         ...prev,
-        [refChar.name]: { ...prev[refChar.name], currentVersion: res.data.currentVersion, referenceImageUrl: res.data.referenceImageUrl, versionHistory: res.data.versionHistory },
+        [refChar.name]: { ...prev[refChar.name], currentVersion: res.currentVersion, referenceImageUrl: res.referenceImageUrl, versionHistory: res.versionHistory },
       }));
-      setSuccessMessage(`${refChar.name} ${res.data.currentVersion} 완성! ${res.data.cutenessMessage || ''}`);
+      setSuccessMessage(`${refChar.name} ${res.currentVersion} 완성! ${res.cutenessMessage || ''}`);
       loadLibrary();
     } catch (err) {
       setError(`${refChar.name} 리파인 실패: ${err.response?.data?.message || err.message}`);
@@ -176,8 +207,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
     }
     try {
       setLoading(true);
-      const res = await axios.post(`/api/characters/library/${libChar.id}/use`, { resourceId });
-      const newCharacter = res.data.character;
+      const res = await apiPost(`/api/characters/library/${libChar.id}/use`, { resourceId });
+      const newCharacter = res.character;
       setLocalCharacters((prev) => [...prev, newCharacter]);
       setSelectedIds((prev) => [...prev, newCharacter.id]);
       setSuccessMessage(`"${libChar.character_name}" 캐릭터를 추가했습니다.`);
@@ -205,12 +236,12 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
     try {
       setCreatingCharacter(true);
       setError(null);
-      const res = await axios.post('/api/characters/library', {
+      const res = await apiPost('/api/characters/library', {
         characterName: newCharName.trim(),
         direction: newCharDirection.trim(),
         useAI: true,
       });
-      setLibrary((prev) => [...prev, res.data.character]);
+      setLibrary((prev) => [...prev, res.character]);
       setNewCharName('');
       setNewCharDirection('');
       setSelectedStyles([]);
@@ -254,11 +285,11 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
     try {
       setSurpriseLoading(true);
       setError(null);
-      const res = await axios.post('/api/characters/library', {
+      const res = await apiPost('/api/characters/library', {
         useAI: true,
         surprise: true,
       });
-      setLibrary((prev) => [...prev, res.data.character]);
+      setLibrary((prev) => [...prev, res.character]);
       setSuccessMessage(`"${res.data.character.character_name}" 캐릭터가 AI에 의해 창작되어 라이브러리에 추가되었습니다.`);
     } catch (err) {
       console.error('AI 자동 생성 실패:', err);
@@ -273,7 +304,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
    */
   const handleDeleteLibraryCharacter = async (libId) => {
     try {
-      await axios.delete(`/api/characters/library/${libId}`);
+      await apiDelete(`/api/characters/library/${libId}`);
       setLibrary((prev) => prev.filter((c) => c.id !== libId));
       setDeleteConfirmLibId(null);
       setSuccessMessage('캐릭터가 라이브러리에서 삭제되었습니다.');
@@ -290,8 +321,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
     if (!resourceId) return;
     try {
       setRecommendingVideoType(true);
-      const res = await axios.get(`/api/generate/${resourceId}/recommend-video-type`);
-      setVideoTypeRecommendation(res.data);
+      const res = await apiGet(`/api/generate/${resourceId}/recommend-video-type`);
+      setVideoTypeRecommendation(res);
       setUseCustomVideoType(false);
       setVideoType(res.data.recommended);
     } catch (err) {
@@ -309,8 +340,8 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
     (async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`/api/resources/${resourceId}`);
-        const fetched = res.data.characters || [];
+        const res = await apiGet(`/api/resources/${resourceId}`);
+        const fetched = res.characters || [];
         setLocalCharacters(fetched);
         const preSelected = fetched.filter((c) => c.selected).map((c) => c.id);
         setSelectedIds(preSelected.length > 0 ? preSelected : (fetched[0] ? [fetched[0].id] : []));
@@ -347,7 +378,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       setLoading(true);
 
       // PUT /api/admin/characters/:id → 이 캐릭터의 선택 여부만 변경 (다른 캐릭터는 그대로 유지)
-      await axios.put(`/api/admin/characters/${characterId}`, {
+      await apiPut(`/api/admin/characters/${characterId}`, {
         selected: !isCurrentlySelected,
       });
 
@@ -369,7 +400,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
       setLoading(true);
 
       // PUT /api/admin/characters/:id
-      await axios.put(`/api/admin/characters/${character.id}`, {
+      await apiPut(`/api/admin/characters/${character.id}`, {
         voice_tone: character.voice_tone,
         personality_traits: character.personality_traits,
         edited_by: 'user',

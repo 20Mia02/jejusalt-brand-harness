@@ -21,19 +21,20 @@ Step 1: 자료 분석                 (자동 - AI만 함)
 Step 2: 캐릭터 선택               (자동 - AI가 3개 추천)
    ↓
 Step 3: 캐릭터 설계               (AI 생성)
-   ↓ 🎣 HOOK 1️⃣
+   ↓ 🎣 HOOK 1️⃣ (/api/generate/:rid/character/confirm)
    ↓ [마케터 검토/수정] → 확정
    ↓
+   ↓ (template_select 화면 → AI 추천 or 직접 작성 선택)
 Step 4: 시나리오 작성             (AI 생성)
-   ↓ 🎣 HOOK 2️⃣
+   ↓ 🎣 HOOK 2️⃣ (/api/generate/:rid/scenario/:sid/confirm)
    ↓ [마케터 검토/수정] → 확정
    ↓
 Step 5: 영상 제목 생성            (AI 생성)
-   ↓ 🎣 HOOK 3️⃣
+   ↓ 🎣 HOOK 3️⃣ (/api/generate/:rid/naming/confirm)
    ↓ [마케터 선택 (3개 중)] → 결정
    ↓
 Step 6: 카피 작성                 (AI 생성)
-   ↓ 🎣 HOOK 4️⃣
+   ↓ 🎣 HOOK 4️⃣ (/api/generate/:rid/copy/:cid/confirm)
    ↓ [마케터 검토/수정] → 확정
    ↓
 Step 7: 컴플라이언스 검토         (자동 - 규칙 기반)
@@ -50,14 +51,16 @@ Step 9: 품질 검사                 (자동 + 수동)
    ↓
    ✅ 완료 또는 → 재작업
 ```
+※ 실제 구현에서는 Step4(캐릭터 설계) → Hook1 → template_select → Step5(시나리오) 순서로 진행되며,
+  HOOKS.md의 Step 번호는 구현과 1단계 차이가 있습니다 (이 문서는 개념적 개요임).
 
 ---
 
 ## 🎣 4개 Hook 상세 정의
 
-### Hook 1️⃣: Step 3 → Step 4 (캐릭터 설계 승인)
+### Hook 1️⃣: Step 4 → template_select (캐릭터 설계 승인)
 
-**타이밍**: Step 3 (캐릭터 설계) 완료 후
+**타이밍**: Step 4 (캐릭터 설계, character-designer-agent) 완료 후
 
 **AI가 제공하는 것**:
 ```json
@@ -90,9 +93,9 @@ Step 9: 품질 검사                 (자동 + 수동)
 
 ---
 
-### Hook 2️⃣: Step 4 → Step 5 (시나리오 승인)
+### Hook 2️⃣: Step 5 → Step 6 (시나리오 승인)
 
-**타이밍**: Step 4 (시나리오 작성) 완료 후
+**타이밍**: Step 5 (shortform-scenario-writer-agent, 시나리오 작성) 완료 후
 
 **AI가 제공하는 것**:
 ```json
@@ -127,9 +130,9 @@ Step 9: 품질 검사                 (자동 + 수동)
 
 ---
 
-### Hook 3️⃣: Step 5 → Step 6 (영상 제목 선택)
+### Hook 3️⃣: Step 6 → Step 7 (영상 제목 선택)
 
-**타이밍**: Step 5 (영상 제목 생성) 완료 후
+**타이밍**: Step 6 (naming-generator-agent, 영상 제목 생성) 완료 후
 
 **AI가 제공하는 것**:
 ```json
@@ -167,9 +170,9 @@ Step 9: 품질 검사                 (자동 + 수동)
 
 ---
 
-### Hook 4️⃣: Step 6 → Step 7 (카피 승인)
+### Hook 4️⃣: Step 7 → Step 8 (카피 승인)
 
-**타이밍**: Step 6 (카피 작성) 완료 후
+**타이밍**: Step 7 (product-intro-writer-agent / product-detail-page-writer-agent, 카피 작성) 완료 후
 
 **AI가 제공하는 것**:
 ```
@@ -191,9 +194,9 @@ Step 9: 품질 검사                 (자동 + 수동)
 □ 기타 피드백: _______________
 
 선택:
-○ 승인 → Step 7 (컴플라이언스 검토)로 진행
+○ 승인 → Step 8 (컴플라이언스 검토)로 진행
 ○ 수정 필요 → AI에게 피드백 (재작성) → Hook 4 재진행
-○ 반려 → Step 4로 돌아가서 시나리오 변경
+○ 반려 → Step 5로 돌아가서 시나리오 변경
 ```
 
 ---
@@ -237,10 +240,10 @@ AI: 완전히 새로운 접근으로 재시작
 
 | Hook | Step | 유형 | 소요 시간 |
 |------|------|------|---------|
-| Hook 1️⃣ | 3→4 | 검토/확정 | 3분 |
-| Hook 2️⃣ | 4→5 | 검토/확정 | 5분 |
-| Hook 3️⃣ | 5→6 | 선택 | 2분 |
-| Hook 4️⃣ | 6→7 | 검토/확정 | 3분 |
+| Hook 1️⃣ | 4→template_select | 검토/확정 | 3분 |
+| Hook 2️⃣ | 5→6 | 검토/확정 | 5분 |
+| Hook 3️⃣ | 6→7 | 선택 | 2분 |
+| Hook 4️⃣ | 7→8 | 검토/확정 | 3분 |
 | **합계** | - | - | **13분** |
 
 ---

@@ -8,7 +8,38 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+
+async function apiGet(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiPut(path, body) {
+  const res = await fetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiDelete(path) {
+  const res = await fetch(path, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 export default function AdminMode() {
   const [resources, setResources] = useState([]);
@@ -61,8 +92,8 @@ export default function AdminMode() {
   const loadResources = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('/api/resources');
-      setResources(res.data.resources || []);
+      const res = await apiGet('/api/resources');
+      setResources(res.resources || []);
     } catch (err) {
       console.error('자료 목록 로드 실패:', err);
       setError('자료를 불러올 수 없습니다.');
@@ -80,14 +111,14 @@ export default function AdminMode() {
       setSelectedResource(resource);
 
       // 캐릭터 조회
-      const charRes = await axios.get(`/api/resources/${resource.id}`);
-      setCharacters(charRes.data.characters || []);
+      const charRes = await apiGet(`/api/resources/${resource.id}`);
+      setCharacters(charRes.characters || []);
 
       // 🆕 네이밍 조회
       try {
-        const namingRes = await axios.get(`/api/admin/naming/${resource.id}`);
-        if (namingRes.data.naming) {
-          setNaming(namingRes.data.naming);
+        const namingRes = await apiGet(`/api/admin/naming/${resource.id}`);
+        if (namingRes.naming) {
+          setNaming(namingRes.naming);
           setSelectedProductIdx(0);
           setSelectedContentIdx(0);
         } else {
@@ -99,9 +130,9 @@ export default function AdminMode() {
 
       // 🆕 생성 이력 조회
       try {
-        const logsRes = await axios.get(`/api/generate/${resource.id}/logs`);
-        if (logsRes.data.logs) {
-          setGenerationLogs(logsRes.data.logs);
+        const logsRes = await apiGet(`/api/generate/${resource.id}/logs`);
+        if (logsRes.logs) {
+          setGenerationLogs(logsRes.logs);
         }
       } catch (logsErr) {
         setGenerationLogs([]);
@@ -125,7 +156,7 @@ export default function AdminMode() {
 
     try {
       setLoading(true);
-      await axios.put(`/api/admin/resources/${selectedResource.id}`, {
+      await apiPut(`/api/admin/resources/${selectedResource.id}`, {
         productName: selectedResource.product_name,
         productInfo: selectedResource.product_info,
         metadata: selectedResource.metadata,
@@ -145,7 +176,7 @@ export default function AdminMode() {
   const handleUpdateCharacter = async (characterId, updates) => {
     try {
       setLoading(true);
-      await axios.put(`/api/admin/characters/${characterId}`, {
+      await apiPut(`/api/admin/characters/${characterId}`, {
         ...updates,
         edited_by: 'admin',
       });
@@ -170,7 +201,7 @@ export default function AdminMode() {
   const handleDeleteCharacter = async (characterId) => {
     try {
       setLoading(true);
-      await axios.delete(`/api/admin/characters/${characterId}`);
+      await apiDelete(`/api/admin/characters/${characterId}`);
       setCharacters((prev) => prev.filter((c) => c.id !== characterId));
       setDeleteConfirm(null);
       setSuccessMessage('캐릭터가 삭제되었습니다.');
@@ -193,7 +224,7 @@ export default function AdminMode() {
       const productNameField = `product_name_${selectedProductIdx + 1}`;
       const contentNameField = `content_name_${selectedContentIdx + 1}`;
 
-      await axios.put(`/api/admin/naming/${selectedResource.id}`, {
+      await apiPut(`/api/admin/naming/${selectedResource.id}`, {
         selectedProductName: naming[productNameField],
         selectedContentName: naming[contentNameField],
       });
@@ -212,8 +243,8 @@ export default function AdminMode() {
    */
   const loadComments = async (resourceId) => {
     try {
-      const res = await axios.get(`/api/resources/${resourceId}/comments`);
-      setComments(res.data.comments || []);
+      const res = await apiGet(`/api/resources/${resourceId}/comments`);
+      setComments(res.comments || []);
     } catch (err) {
       // comments 테이블이 아직 마이그레이션되지 않았을 수 있으므로 조용히 빈 목록 처리
       console.warn('코멘트 조회 실패 (마이그레이션 미적용일 수 있음):', err.message);
@@ -229,7 +260,7 @@ export default function AdminMode() {
 
     try {
       setCommentLoading(true);
-      await axios.post(`/api/resources/${selectedResource.id}/comments`, {
+      await apiPost(`/api/resources/${selectedResource.id}/comments`, {
         author: newCommentAuthor.trim() || '담당자',
         message: newCommentMessage.trim(),
       });
@@ -254,8 +285,8 @@ export default function AdminMode() {
     try {
       setComplianceTestLoading(true);
       setComplianceTestError(null);
-      const res = await axios.get('/api/admin/compliance-test');
-      setComplianceTestResults(res.data);
+      const res = await apiGet('/api/admin/compliance-test');
+      setComplianceTestResults(res);
     } catch (err) {
       console.error('컴플라이언스 테스트 실행 실패:', err);
       setComplianceTestError(

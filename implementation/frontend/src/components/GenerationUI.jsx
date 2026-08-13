@@ -21,7 +21,22 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+
+async function apiGet(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 export default function GenerationUI({ resourceId, onSuccess, requestType = 'intro', videoType, duration = 120, referenceMaterials = [] }) {
   // stage: 'idle' | 'loading' | 'character_review' | 'template_select' | 'logline_review' |
@@ -92,8 +107,8 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
 
     pollingInterval.current = setInterval(async () => {
       try {
-        const res = await axios.get(`/api/generate/${resourceId}/status`);
-        const { progress: progressPercent, completedSteps, totalSteps, currentStep: stepName, failureDetails, inProgressStep } = res.data;
+        const res = await apiGet(`/api/generate/${resourceId}/status`);
+        const { progress: progressPercent, completedSteps, totalSteps, currentStep: stepName, failureDetails, inProgressStep } = res;
         const stepLabel = STEP_LABELS[stepName] || stepName;
 
         if (inProgressStep) {
@@ -180,7 +195,7 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     beginLoading('초기화 중...');
 
     try {
-      const res = await axios.post(`/api/generate/${resourceId}/start`, {
+      const res = await apiPost(`/api/generate/${resourceId}/start`, {
         requestType,
         videoType,
         duration,
@@ -189,12 +204,12 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
 
       stopStatusPolling();
 
-      if (!res.data.success) {
-        throw new Error(res.data.message || '생성 실패');
+      if (!res.success) {
+        throw new Error(res.message || '생성 실패');
       }
 
       setCharacterData({
-        characterBriefs: res.data.characterBriefs || [],
+        characterBriefs: res.characterBriefs || [],
       });
       setStage('character_review');
     } catch (err) {
@@ -210,18 +225,18 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     beginLoading('다음 단계 준비 중...');
 
     try {
-      const res = await axios.post(`/api/generate/${resourceId}/character/confirm`, {
+      const res = await apiPost(`/api/generate/${resourceId}/character/confirm`, {
         editedBriefs,
         feedback,
       });
 
       stopStatusPolling();
 
-      if (!res.data.success) {
-        throw new Error(res.data.message || '캐릭터 확정 실패');
+      if (!res.success) {
+        throw new Error(res.message || '캐릭터 확정 실패');
       }
 
-      setTemplateData({ templates: res.data.templates || [] });
+      setTemplateData({ templates: res.templates || [] });
       setStage('template_select');
     } catch (err) {
       stopStatusPolling();
@@ -235,10 +250,10 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const handleSelectTemplate = async (templateId) => {
     beginLoading('스토리 아이디어 구상 중...');
     try {
-      const res = await axios.post(`/api/generate/${resourceId}/scenario/loglines`, { templateId });
+      const res = await apiPost(`/api/generate/${resourceId}/scenario/loglines`, { templateId });
       stopStatusPolling();
-      if (!res.data.success) throw new Error(res.data.message || '로그라인 생성 실패');
-      setLoglineData({ templateId, loglineOptions: res.data.loglineOptions || [] });
+      if (!res.success) throw new Error(res.message || '로그라인 생성 실패');
+      setLoglineData({ templateId, loglineOptions: res.loglineOptions || [] });
       setStage('logline_review');
     } catch (err) {
       stopStatusPolling();
@@ -252,16 +267,16 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const handleSelectLogline = async (selectedLogline) => {
     beginLoading('시나리오 작성 중...');
     try {
-      const res = await axios.post(`/api/generate/${resourceId}/scenario/generate-from-logline`, {
+      const res = await apiPost(`/api/generate/${resourceId}/scenario/generate-from-logline`, {
         templateId: loglineData.templateId,
         selectedLogline,
       });
       stopStatusPolling();
-      if (!res.data.success) throw new Error(res.data.message || '시나리오 생성 실패');
+      if (!res.success) throw new Error(res.message || '시나리오 생성 실패');
       setScenarioData({
-        scenarioId: res.data.scenarioId,
-        scenario: res.data.scenario,
-        timingVerification: res.data.timingVerification,
+        scenarioId: res.scenarioId,
+        scenario: res.scenario,
+        timingVerification: res.timingVerification,
       });
       setStage('scenario_review');
     } catch (err) {
@@ -276,10 +291,10 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const handleSubmitIdea = async (userIdea) => {
     beginLoading('아이디어 검토 중...');
     try {
-      const res = await axios.post(`/api/generate/${resourceId}/scenario/draft-review`, { userIdea });
+      const res = await apiPost(`/api/generate/${resourceId}/scenario/draft-review`, { userIdea });
       stopStatusPolling();
-      if (!res.data.success) throw new Error(res.data.message || '아이디어 검토 실패');
-      setDraftReviewData({ userIdea, review: res.data.review });
+      if (!res.success) throw new Error(res.message || '아이디어 검토 실패');
+      setDraftReviewData({ userIdea, review: res.review });
       setStage('draft_review');
     } catch (err) {
       stopStatusPolling();
@@ -293,13 +308,13 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   const handleAcceptDraft = async (structuredDraft) => {
     beginLoading('시나리오 확정 중...');
     try {
-      const res = await axios.post(`/api/generate/${resourceId}/scenario/finalize-draft`, { structuredDraft });
+      const res = await apiPost(`/api/generate/${resourceId}/scenario/finalize-draft`, { structuredDraft });
       stopStatusPolling();
-      if (!res.data.success) throw new Error(res.data.message || '시나리오 확정 실패');
+      if (!res.success) throw new Error(res.message || '시나리오 확정 실패');
       setScenarioData({
-        scenarioId: res.data.scenarioId,
-        scenario: res.data.scenario,
-        timingVerification: res.data.timingVerification,
+        scenarioId: res.scenarioId,
+        scenario: res.scenario,
+        timingVerification: res.timingVerification,
       });
       setStage('scenario_review');
     } catch (err) {
@@ -315,22 +330,22 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     beginLoading('제품명/콘텐츠명 생성 중...');
 
     try {
-      const res = await axios.post(
+      const res = await apiPost(
         `/api/generate/${resourceId}/scenario/${scenarioData.scenarioId}/confirm`,
         { editedStoryContent, editedActs, feedback }
       );
 
       stopStatusPolling();
 
-      if (!res.data.success) {
-        throw new Error(res.data.message || '시나리오 확정 실패');
+      if (!res.success) {
+        throw new Error(res.message || '시나리오 확정 실패');
       }
 
       setNamingData({
-        namingId: res.data.namingId,
-        realProductName: res.data.realProductName,
-        contentNameOptions: res.data.contentNameOptions || [],
-        fallbackContentName: res.data.fallbackContentName,
+        namingId: res.namingId,
+        realProductName: res.realProductName,
+        contentNameOptions: res.contentNameOptions || [],
+        fallbackContentName: res.fallbackContentName,
       });
       setStage('naming_review');
     } catch (err) {
@@ -346,19 +361,19 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     beginLoading('마케팅 카피 작성 중...');
 
     try {
-      const res = await axios.post(`/api/generate/${resourceId}/naming/confirm`, {
+      const res = await apiPost(`/api/generate/${resourceId}/naming/confirm`, {
         selectedContentName,
       });
 
       stopStatusPolling();
 
-      if (!res.data.success) {
-        throw new Error(res.data.message || '제품명 확정 실패');
+      if (!res.success) {
+        throw new Error(res.message || '제품명 확정 실패');
       }
 
       setCopyData({
-        contentId: res.data.contentId,
-        generatedContent: res.data.generatedContent,
+        contentId: res.contentId,
+        generatedContent: res.generatedContent,
       });
       setStage('copy_review');
     } catch (err) {
@@ -374,21 +389,21 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
     beginLoading('컴플라이언스 검증 중...');
 
     try {
-      const res = await axios.post(`/api/generate/${resourceId}/copy/${copyData.contentId}/confirm`, {
+      const res = await apiPost(`/api/generate/${resourceId}/copy/${copyData.contentId}/confirm`, {
         editedContent,
       });
 
       stopStatusPolling();
 
-      if (!res.data.success) {
-        throw new Error(res.data.message || '카피 확정 실패');
+      if (!res.success) {
+        throw new Error(res.message || '카피 확정 실패');
       }
 
-      setFinalResult(res.data);
+      setFinalResult(res);
       setProgress(100);
       setStage('done');
 
-      if (res.data.videoUrl) {
+      if (res.videoUrl) {
         setSuccessMessage('영상이 생성되었습니다!');
       }
       // ⚠️ 예전에는 여기서 곧바로 onSuccess(res.data)를 호출했는데, onSuccess는 App.jsx의
@@ -629,10 +644,10 @@ function TrendPanel({ resourceId, onInsert }) {
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await axios.get(`/api/generate/${resourceId}/trends`);
-      if (res.data.success) {
-        setTrends(res.data.trends || []);
-        setDisclaimer(res.data.disclaimer || '');
+      const res = await apiGet(`/api/generate/${resourceId}/trends`);
+      if (res.success) {
+        setTrends(res.trends || []);
+        setDisclaimer(res.disclaimer || '');
       } else {
         setFetchError('트렌드 추천을 불러오지 못했습니다.');
       }

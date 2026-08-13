@@ -19,8 +19,78 @@
 - **프론트엔드**: React 18, Tailwind CSS
 - **백엔드**: Node.js/Express
 - **데이터베이스**: Supabase (PostgreSQL)
-- **AI 모델**: TimelyAI (solar-pro-4)
-- **영상 생성**: Higgsfield CLI (로컬 인증, 매일 갱신)
+- **AI 모델**: **Upstage Solar Pro4** — TimelyAI 브리지 / Upstage 공식 API (OpenAI SDK) 둘 다 사용 가능
+- **영상 생성**: Higgsfield CLI (`seedance_2_0`, `text2image_soul_v2`) — 로컬 인증, 매일 갱신
+
+### 🧠 AI가 사용되는 모든 스텝 (Solar Pro4)
+
+| 스텝 | 에이전트 | Skill | Solar Pro4 사용 여부 | 하는 일 |
+|------|----------|-------|---------------------|---------|
+| **Step 1** | Resource Analyzer Agent | 없음 (TimelyAI 직접 호출) | **✅ Solar Pro4** | 마케터 입력 제품 정보 → 카테고리·타겟층·마케팅 톤·강조점 등 정형 메타데이터 추출 |
+| **Step 2** | Character Selector Agent | 없음 (로컬 알고리즘) | ❌ AI 미사용 (스코어링 알고리즘) | 기본 8개 캐릭터 라이브러리에서 (카테고리×40%)+(타겟층×40%)+(톤×20%) 점수 계산 → Top 3 추천 |
+| **Step 3** | Character Designer Agent | **SKILL_character-designer** | **✅ Solar Pro4** | 선택된 캐릭터의 성격·외형·말투·주요 표현·레퍼런스 이미지 프롬프트 상세 생성 + Higgsfield `text2image_soul_v2`로 Reference Image 생성 |
+| **Step 4** | Shortform Scenario Writer Agent | **SKILL_shortform-scenario-writer** | **✅ Solar Pro4** | 캐릭터+제품 정보 → 15초~120초 숏폼 시나리오(4막 구조, duration_seconds, visual_cues) + Higgsfield 영상화 준비 정보(캐릭터 모델 할당, 배경 시퀀스, 음성 스펙)까지 출력 |
+| **Step 5** | Naming Generator Agent | **SKILL_naming-generator** | **✅ Solar Pro4** | 시나리오 바탕 → 제품명 3개 + 콘텐츠명 3개 생성, 각 톤 일치도·세계관 일치도·기억용이성·차별성 점수 계산 → 순위 제시 |
+| **Step 6** | Product Writer Agent | 없음 (TimelyAI 직접 호출) | **✅ Solar Pro4** | 제목+시나리오 → SNS·보도자료용 소개 카피 초안 작성, `brand-voice.md` 3원칙 준수 |
+| **Step 7** | Compliance Reviewer Agent | 없음 (규칙 기반) | **✅ Solar Pro4** | `compliance-rules-v2.json` 로드 → 카테고리별 금지 키워드 자동 스캔 + Solar Pro4가 위반 여부 판단·근거 제시 → APPROVED/WARNING/REJECTED |
+| **Step 8** | — (Higgsfield CLI) | 없음 | ❌ Solar Pro4 아님 (Higgsfield `seedance_2_0`) | 캐릭터(Reference Image)+카피+시나리오 → 실제 15초 숏폼 영상 생성 |
+| **Step 9** | QA Agent (post-generation-qa-agent) | 없음 (Solar Pro4 직접 호출) | **✅ Solar Pro4** | Phase 1 자동 검증(카피·시나리오·자막 금지 키워드 재확인) + Phase 2 마케터 수동 검증(14~15개 체크리스트) + Phase 3 최종 판정 PASS/WARNING/REJECTED |
+
+**결론**: Step 2(캐릭터 선택, 로컬 스코어링 알고리즘)와 Step 8(Higgsfield 영상 생성)을 제외한 **모든 스텝에서 Solar Pro4가 호출**됩니다. 특히 **Skill 3개** — `SKILL_character-designer`, `SKILL_shortform-scenario-writer`, `SKILL_naming-generator` — 는 모두 Solar Pro4로 실행됩니다.
+
+### 🔌 Solar Pro4 사용 방법 (실제 동작 방식)
+
+백엔드 `implementation/backend/agents/backend-agent.js`의 **`callSolarAgent()` 함수**에서 Solar Pro4를 호출합니다.
+
+**1. Upstage 공식 API (OpenAI SDK 방식 — 현재 기본)**
+```javascript
+// backend-agent.js: callSolarAgent() 내부
+const apiKey = process.env.UPSTAGE_API_KEY;
+const baseURL = process.env.UPSTAGE_API_BASE_URL || "https://api.upstage.ai/v1";
+const model = process.env.UPSTAGE_MODEL || "solar-pro4";   // ← 기본값 solar-pro4
+
+const client = new OpenAI({
+  apiKey,
+  baseURL,
+  timeout: 45000,    // 45초 타임아웃 (SDK 기본값 10분 대신 짧게)
+  maxRetries: 0,     // 재시도는 callAgent() 쪽에서 관리 (중복 방지)
+});
+
+// chat.completions.create 호출
+const completion = await client.chat.completions.create({
+  model: model,       // "solar-pro4"
+  messages: [
+    { role: "system", content: `${systemPrompt}\n\n${outputSpec}` },
+    { role: "user", content: JSON.stringify(payload) },
+  ],
+  temperature: 0.7,
+  max_tokens: 2000,
+});
+```
+
+**.env 설정 (Upstage 공식 API 방식)**:
+```bash
+# Upstage Solar 공식 API (백엔드)
+UPSTAGE_API_KEY=up_lCPgW81PAFLNI3HPqK3AAWOWDdtMH
+# UPSTAGE_API_BASE_URL=https://api.upstage.ai/v1  (기본값이므로 생략 가능)
+# UPSTAGE_MODEL=solar-pro4                          (기본값이므로 생략 가능)
+```
+
+**2. TimelyAI 브리지 모드 (OpenAI 호환 API)**
+```bash
+# .env 설정 (TimelyAI 브리지 방식)
+TIMELY_AI_BASE_URL=https://hello.timelygpt.co.kr/api/v2/chat/bridge/openai
+TIMELY_AI_API_KEY=tgpt_sk_...
+TIMELY_AI_MODEL=upstage/solar-pro4
+```
+
+**공통 동작 정책**:
+- **재시도**: 3회, 지수백오프 (1초 → 2초 → 4초)
+- **타임아웃**: 45초 (callSolarAgent 내부) + callAgent()에서 최대 3회 재시도 관리
+- **Mock 모드**: API 키가 없거나 테스트용 키면 더미 응답 반환 → 로컬 개발·테스트 가능
+- **JSON 출력**: 모든 에이전트는 시스템 프롬프트에 출력 스키마(JSON 형태)를 명시하여 반드시 파싱 가능한 JSON으로 응답
+
+> **이전 발표 대비 변경사항**: 이전에는 TimelyAI API만 사용했으나, 이번 버전에서 **Upstage Solar Pro4 모델로 전면 교체**했습니다. Step 1·3·4·5·6·7·9의 모든 AI 호출이 Solar Pro4로 동작하며, 부트캠프 전체 개발 과정에서도 Solar Pro4를 사용해 생산성을 높였습니다.
 
 ---
 
@@ -72,13 +142,24 @@ ls
 
 ### Step 1: 환경 변수 설정 (.env 파일)
 
-`implementation/backend/` 폴더에 `.env` 파일을 생성하세요:
+프로젝트에는 3개의 `.env` 파일이 있으며 용도가 다릅니다:
 
+| 파일 | 용도 | 주요 변수 |
+|------|------|-----------|
+| `/.env` (루트) | 통합 참조용 (백엔드+프론트엔드 환경변수 모두 포함) | SUPABASE_*, TIMELY_AI_*, VITE_*, UPSTAGE_API_KEY |
+| `/implementation/backend/.env` | 백엔드 서버 전용 (서버 시작 시 `dotenv`가 로드) | SUPABASE_*, TIMELY_AI_*, UPSTAGE_API_KEY, PORT |
+| `/implementation/frontend/.env` | 프론트엔드 빌드/개발 전용 (Vite가 로드 — **VITE_ 접두사 필수**) | VITE_API_URL, VITE_SUPABASE_* |
+
+> ⚠️ **중요**: Vite 환경에서는 `REACT_APP_*` 접두사가 **인식되지 않습니다**. 반드시 `VITE_` 접두사를 사용하세요.
+
+#### 필수 환경변수 (백엔드)
 ```bash
-# Supabase 설정
+# Supabase 설정 (service_role 키 — RLS 우회용)
 SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key_here
+
+# Supabase anon key (프론트엔드에서도 사용 가능)
 SUPABASE_ANON_KEY=your_supabase_anon_key_here
-SUPABASE_SERVICE_KEY=your_supabase_service_key_here
 
 # TimelyAI API (백엔드)
 TIMELY_AI_BASE_URL=https://hello.timelygpt.co.kr/api/v2/chat/bridge/openai
@@ -89,15 +170,43 @@ NODE_ENV=development
 PORT=5000
 HOST=localhost
 
-# TimelyAI 모델 (이미 설정됨)
-TIMELY_AI_MODEL=solar-pro-4
-
 # 로깅
 DEBUG=false
 LOG_LEVEL=info
 ```
 
-**⚠️ 주의**: `.env` 파일은 git에서 제외됩니다 (보안).
+#### 필수 환경변수 (프론트엔드 - Vite)
+```bash
+# 백엔드 API (Vite 프록시 경유 — /api → localhost:5000)
+VITE_API_URL=http://localhost:5000
+
+# Supabase (프론트에서 직접 호출 시)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+```
+
+**⚠️ 주의**: `.env` 파일은 git에서 제외됩니다 (보안). `.env.example`을 참고하여 각 환경에 맞게 설정하세요.
+
+### Step 1.5: Supabase 테이블 설정 (처음 한 번만)
+
+Supabase 대시보드의 **SQL Editor**에서 아래 파일을 열어 전체 실행하세요:
+
+```
+supabase/migrations/00_full_setup.sql
+```
+
+이 파일은 다음을 수행합니다:
+- ✅ 누락 테이블 5개 생성: `character_library`, `contents`, `videos`, `scenarios`, `quality_assurance_logs`
+- ✅ `characters` 테이블에 누락된 컬럼 추가: `resource_id`, `is_base_character`, `reason`, `score` 등
+- ✅ `character_library`에 기존 캐릭터 8명 자동 시드
+
+**실행 후 확인**: SQL Editor에서 아래 쿼리를 실행해 테이블이 모두 생성되었는지 확인하세요:
+```sql
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'public'
+AND table_name IN ('character_library', 'contents', 'videos', 'scenarios', 'quality_assurance_logs', 'generation_logs', 'naming', 'comments', 'characters', 'resources')
+ORDER BY table_name;
+```
 
 ### Step 2: Higgsfield 로컬 인증 (매일 필요)
 

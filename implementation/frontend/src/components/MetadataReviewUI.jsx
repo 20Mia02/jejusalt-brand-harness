@@ -12,7 +12,22 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+
+async function apiGet(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiPut(path, body) {
+  const res = await fetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 // 사업 우선순위 카테고리 (뷰티 > 헬스케어) — UI에서 ⭐ 우선순위 뱃지로 강조
 const PRIORITY_CATEGORIES = ['뷰티', '헬스케어'];
@@ -58,9 +73,9 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
   const loadMetadata = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`/api/resources/${resourceId}`);
-      if (res.data.resource && res.data.resource.metadata) {
-        setMetadata(res.data.resource.metadata);
+      const res = await apiGet(`/api/resources/${resourceId}`);
+      if (res.resource && res.resource.metadata) {
+        setMetadata(res.resource.metadata);
       }
     } catch (err) {
       console.error('메타데이터 로드 실패:', err);
@@ -109,7 +124,7 @@ export default function MetadataReviewUI({ resourceId, initialMetadata, onComple
       setLoading(true);
       setError(null);
 
-      await axios.put(`/api/admin/resources/${resourceId}`, {
+      await apiPut(`/api/admin/resources/${resourceId}`, {
         metadata: tempMetadata,
       });
 

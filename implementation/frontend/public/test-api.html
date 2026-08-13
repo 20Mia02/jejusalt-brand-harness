@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head><title>API Test</title></head>
+<body>
+<h1>API 연결 테스트</h1>
+<div id="results"></div>
+<script>
+async function test() {
+  const r = document.getElementById('results');
+  r.innerHTML = '<p>테스트 시작...</p>';
+  
+  // 1. /api/config (GET)
+  try {
+    const res1 = await fetch('/api/config');
+    const data1 = await res1.json();
+    r.innerHTML += `<p>✅ /api/config: ${res1.status} (success: ${data1.success})</p>`;
+  } catch(e) {
+    r.innerHTML += `<p>❌ /api/config: ${e.message}</p>`;
+  }
+  
+  // 2. /api/generate/characters (GET)
+  try {
+    const res2 = await fetch('/api/generate/characters');
+    const data2 = await res2.json();
+    r.innerHTML += `<p>✅ /api/generate/characters: ${res2.status} (count: ${data2.characters?.length || '?'})</p>`;
+  } catch(e) {
+    r.innerHTML += `<p>❌ /api/generate/characters: ${e.message}</p>`;
+  }
+  
+  // 3. /api/resources (POST)
+  try {
+    const res3 = await fetch('/api/resources', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        productName: '브라우저 테스트',
+        productInfo: '브라우저에서 직접 API 테스트 중입니다. 제주 청정 해역에서 채취한 천연 소금입니다.',
+        keywords: [],
+        trendKeywords: [],
+        customStyle: null,
+        referenceMaterials: []
+      })
+    });
+    const data3 = await res3.json();
+    r.innerHTML += `<p>✅ /api/resources POST: ${res3.status} (success: ${data3.success}, resourceId: ${data3.resourceId?.slice(0,8)}...)</p>`;
+  } catch(e) {
+    r.innerHTML += `<p>❌ /api/resources POST: ${e.message}</p>`;
+  }
+  
+  r.innerHTML += '<p>테스트 완료</p>';
+}
+test();
+</script>
+</body>
+</html>

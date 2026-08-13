@@ -22,35 +22,35 @@ Step 2: 캐릭터 선택 (character-selector-agent)
     ↓ [마케터 선택]
 
     ↓
-Step 3: 캐릭터 설계 (character-designer-agent)
+Step 4: 캐릭터 설계 (character-designer-agent)
 ├── 입력: 선택된 캐릭터, 제품정보
 ├── Skill 호출: Character Designer Skill
 └── 출력: 캐릭터 브리프 (성격, 외형, 말투)
-    ↓ [마케터 검토/수정]
+    ↓ [마케터 검토/수정] ← 🎣 Hook 1 (/api/generate/:rid/character/confirm)
 
-    ↓
-Step 4: 시나리오 작성 (shortform-scenario-writer-agent)
+    ↓ (template_select → AI 추천 or 직접 작성)
+Step 5: 시나리오 작성 (shortform-scenario-writer-agent)
 ├── 입력: 캐릭터 브리프, 제품정보, 길이선택
 ├── Skill 호출: Shortform Scenario Writer Skill
 └── 출력: 시나리오 (제목, 스토리, Act[] with duration)
-    ↓ [마케터 검토/수정]
+    ↓ [마케터 검토/수정] ← 🎣 Hook 2 (/api/generate/:rid/scenario/:sid/confirm)
 
     ↓
-Step 5: 영상 제목 생성 (naming-generator-agent)
+Step 6: 영상 제목 생성 (naming-generator-agent)
 ├── 입력: 시나리오, 강조점
 ├── Skill 호출: Naming Generator Skill
 └── 출력: 영상 제목 3개 (제목, 의미, 점수)
-    ↓ [마케터 선택]
+    ↓ [마케터 선택] ← 🎣 Hook 3 (/api/generate/:rid/naming/confirm)
 
     ↓
-Step 6: 카피 작성 (product-writer-agent)
+Step 7: 카피 작성 (product-intro-writer-agent / product-detail-page-writer-agent)
 ├── 입력: 제품명, 카피타입(intro/detail), 시나리오
 ├── 처리: AI가 제품 소개/상세 페이지 카피 작성
 └── 출력: 생성된 카피
-    ↓ [마케터 검토/수정]
+    ↓ [마케터 검토/수정] ← 🎣 Hook 4 (/api/generate/:rid/copy/:cid/confirm)
 
     ↓
-Step 7: 컴플라이언스 검토 (compliance-reviewer-agent)
+Step 8: 컴플라이언스 검토 (compliance-reviewer-agent)
 ├── 입력: 생성된 카피
 ├── 처리: 카테고리별 규칙으로 검증
 └── 출력: APPROVED / WARNING / REJECTED
@@ -94,10 +94,10 @@ Step 9: 종합 품질 검사 (qa-agent) 🆕
 
 | Hook | Step | 마케터 작업 | 파일 |
 |------|------|-----------|------|
-| 🎣 Hook 1 | 3→4 | 캐릭터 설계 승인/수정/반려 | `hooks/HOOKS.md` |
-| 🎣 Hook 2 | 4→5 | 시나리오 작성 승인/수정/반려 | `hooks/HOOKS.md` |
-| 🎣 Hook 3 | 5→6 | 영상 제목 선택 (3개 중) | `hooks/HOOKS.md` |
-| 🎣 Hook 4 | 6→7 | 카피 작성 승인/수정/반려 | `hooks/HOOKS.md` |
+| 🎣 Hook 1 | 4→template_select | 캐릭터 설계 승인/수정/반려 | `hooks/HOOKS.md` |
+| 🎣 Hook 2 | 5→6 | 시나리오 작성 승인/수정/반려 | `hooks/HOOKS.md` |
+| 🎣 Hook 3 | 6→7 | 영상 제목 선택 (3개 중) | `hooks/HOOKS.md` |
+| 🎣 Hook 4 | 7→8 | 카피 작성 승인/수정/반려 | `hooks/HOOKS.md` |
 
 **상세 정의**: `hooks/HOOKS.md` 참조
 

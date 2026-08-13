@@ -6,9 +6,14 @@
  * 데이터를 그대로 보여준다 — 별도 자료(resource) 선택 없이 바로 진입 가능.
  */
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 
 const isVideoUrl = (url) => /\.(mp4|webm|mov)(\?|$)/i.test(url || '');
+
+async function apiGet(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 function ReferenceMedia({ url, className, alt }) {
   if (!url) return null;
@@ -16,6 +21,28 @@ function ReferenceMedia({ url, className, alt }) {
     return <video src={url} className={className} muted loop autoPlay playsInline />;
   }
   return <img src={url} alt={alt} className={className} onError={(e) => { e.target.style.display = 'none'; }} />;
+}
+
+function transformCharacter(raw) {
+  // API 응답 필드를 UI 표시용 필드로 변환
+  const traits = Array.isArray(raw.personality_traits) ? raw.personality_traits : [];
+  const roleTags = raw.role ? raw.role.split('·').map(s => s.trim()).filter(Boolean) : [];
+  const allKeywords = [...traits, ...roleTags];
+
+  return {
+    id: raw.id,
+    name: raw.character_name,
+    description: raw.character_profile || raw.visual_description || raw.visualIdentity || '',
+    referenceImageUrl: raw.reference_image_url,
+    personalityKeywords: allKeywords,
+    currentVersion: raw.source === 'default' ? null : '사용자 생성',
+    tone: raw.tone_trait || raw.role || '',
+    generationCount: raw.generation_count || 0,
+    role: raw.role || '',
+    gender: raw.gender || '',
+    ageGroup: raw.ageGroup || '',
+    type: raw.type || '',
+  };
 }
 
 export default function CharacterGallery() {
@@ -27,9 +54,11 @@ export default function CharacterGallery() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await axios.get('/api/generate/characters');
-        setCharacters(res.data.characters || []);
+        const data = await apiGet('/api/characters/library');
+        const rawChars = data.characters || [];
+        setCharacters(rawChars.map(transformCharacter));
       } catch (err) {
+        console.error('캐릭터 갤러리 API 호출 실패:', err);
         setError('캐릭터 목록을 불러오지 못했습니다.');
       } finally {
         setLoading(false);
@@ -88,21 +117,15 @@ export default function CharacterGallery() {
                     ))}
                   </div>
                   <div className="text-xs text-dark-text-muted space-y-1">
-                    <div><strong>머리:</strong> {char.accessories?.hair || '-'}</div>
-                    <div><strong>의상:</strong> {char.accessories?.clothing || '-'}</div>
-                    {char.accessories?.scarf && char.accessories.scarf !== '없음' && (
-                      <div><strong>스카프/리본:</strong> {char.accessories.scarf}</div>
-                    )}
-                    {char.accessories?.others && (
-                      <div><strong>기타:</strong> {char.accessories.others}</div>
-                    )}
+                    <div><strong>역할:</strong> {char.role || '-'}</div>
+                    <div><strong>톤:</strong> {char.tone || '-'}</div>
+                    <div><strong>성별:</strong> {char.gender || '-'}</div>
+                    <div><strong>연령대:</strong> {char.ageGroup || '-'}</div>
+                    <div><strong>유형:</strong> {char.type || '-'}</div>
                   </div>
-                  {char.versionHistory?.length > 0 && (
-                    <div className="text-xs text-status-approved">
-                      최근 평가: 종합 {char.versionHistory[char.versionHistory.length - 1]?.scores?.overallScore ?? '-'}점
-                      (귀여움 {char.versionHistory[char.versionHistory.length - 1]?.scores?.cutenessScore ?? '-'})
-                    </div>
-                  )}
+                  <div className="text-xs text-status-approved">
+                    생성 횟수: {char.generationCount}회
+                  </div>
                 </div>
               )}
             </div>
