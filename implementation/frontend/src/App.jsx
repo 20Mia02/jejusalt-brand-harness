@@ -193,7 +193,7 @@ function App() {
           <div className="logo-section">
             <div className="logo-badge">
               <img
-                src={theme === 'dark' ? `${import.meta.env.BASE_URL}assets/logo/jeju-salt-logo-dark.png` : `${import.meta.env.BASE_URL}assets/logo/jeju-salt-logo.png`}
+                src={`${import.meta.env.BASE_URL}assets/logo/jeju-salt-logo.png`}
                 alt="제주소금 JEJU LAVA SEA SALT 로고"
                 className="logo-image"
               />

@@ -233,7 +233,7 @@ export default function FilterUI({ onResourceCreated }) {
       {/* 로고 */}
       <div className="filter-ui-logo-section">
         <img
-          src={isDarkMode ? `${import.meta.env.BASE_URL}assets/logo/jeju-salt-logo-dark.png` : `${import.meta.env.BASE_URL}assets/logo/jeju-salt-logo.png`}
+          src={`${import.meta.env.BASE_URL}assets/logo/jeju-salt-logo.png`}
           alt="제주소금 JEJU LAVA SEA SALT 로고"
           className="h-20 w-auto"
         />
