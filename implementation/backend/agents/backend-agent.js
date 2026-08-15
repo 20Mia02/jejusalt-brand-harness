@@ -1150,6 +1150,25 @@ function getOutputSpecForAgent(agentName, payload) {
 // [함수 2] callHiggsfield - Higgsfield API 영상 생성 요청
 // ============================================================================
 
+/**
+ * Higgsfield CLI 에러를 사람이 읽을 수 있는 사유로 분류한다.
+ * ⭐ 크레딧 소진("not_enough_credits")은 코드 버그가 아니라 운영상 정상적으로
+ * 반복되는 상황이므로(크레딧 충전 전까지는 항상 이 에러가 남), 다른 CLI 에러와
+ * 구분해서 반환해야 프론트/마케터가 "고쳐야 할 버그"와 "충전하면 되는 상황"을
+ * 헷갈리지 않는다. 이 분류 결과가 없으면 매번 원인 불명의 HIGGSFIELD_CLI_ERROR로만
+ * 보여서 재현성 테스트 중 실제 버그와 크레딧 부족을 구분할 수 없었다.
+ */
+function classifyHiggsfieldError(error) {
+  const raw = error?.message || String(error);
+  if (/not_enough_credits/i.test(raw)) {
+    return {
+      error: "HIGGSFIELD_CREDITS_EXHAUSTED",
+      message: "Higgsfield 크레딧이 부족합니다. 워크스페이스 크레딧을 충전한 뒤 다시 시도하세요 (기능 자체는 정상 동작하며, 충전 후 그대로 재생성 가능합니다).",
+    };
+  }
+  return { error: "HIGGSFIELD_CLI_ERROR", message: raw };
+}
+
 async function callHiggsfield(videoConfig, resourceId, contentId) {
   try {
     const { getConfig } = require("../utils/config-loader");
@@ -1268,12 +1287,13 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
       },
     };
   } catch (error) {
-    console.error(`[✗] Higgsfield CLI 실패: ${error.message}`);
+    const classified = classifyHiggsfieldError(error);
+    console.error(`[✗] Higgsfield CLI 실패 (${classified.error}): ${error.message}`);
 
     return {
       success: false,
-      error: "HIGGSFIELD_CLI_ERROR",
-      message: error.message,
+      error: classified.error,
+      message: classified.message,
       statusCode: error.code,
     };
   }
@@ -1328,8 +1348,9 @@ async function generateCharacterReferenceImage({ characterName, voiceTone, visua
     console.log(`[✓] ${characterName} 레퍼런스 이미지 생성 완료: ${imageUrl} (job id: ${jobId})`);
     return { success: true, image_url: imageUrl, image_job_id: jobId };
   } catch (error) {
-    console.error(`[✗] ${characterName} 레퍼런스 이미지 생성 실패: ${error.message}`);
-    return { success: false, error: "HIGGSFIELD_CLI_ERROR", message: error.message };
+    const classified = classifyHiggsfieldError(error);
+    console.error(`[✗] ${characterName} 레퍼런스 이미지 생성 실패 (${classified.error}): ${error.message}`);
+    return { success: false, error: classified.error, message: classified.message };
   }
 }
 
@@ -1362,8 +1383,9 @@ async function generateImageFromPrompt(fullPrompt) {
     console.log(`[✓] 이미지 생성 완료: ${imageUrl} (job id: ${jobId})`);
     return { success: true, image_url: imageUrl, image_job_id: jobId };
   } catch (error) {
-    console.error(`[✗] 이미지 생성 실패: ${error.message}`);
-    return { success: false, error: "HIGGSFIELD_CLI_ERROR", message: error.message };
+    const classified = classifyHiggsfieldError(error);
+    console.error(`[✗] 이미지 생성 실패 (${classified.error}): ${error.message}`);
+    return { success: false, error: classified.error, message: classified.message };
   }
 }
 
