@@ -1412,8 +1412,14 @@ async function callFalVideo(videoConfig, resourceId, contentId) {
       },
     };
   } catch (error) {
-    const rawMessage = error.response?.data?.detail?.[0]?.msg || error.response?.data?.message || error.message;
-    const isBalanceError = /balance|insufficient|credit/i.test(rawMessage || "");
+    // fal.ai 에러 응답은 detail이 문자열(예: "User is locked...")일 때도 있고
+    // 배열([{msg: "..."}])일 때도 있어서(밸리데이션 에러) 둘 다 처리한다.
+    const detail = error.response?.data?.detail;
+    const rawMessage =
+      (typeof detail === "string" ? detail : detail?.[0]?.msg) ||
+      error.response?.data?.message ||
+      error.message;
+    const isBalanceError = /balance|insufficient|credit|locked/i.test(rawMessage || "");
     console.error(`[✗] 테스트 모드(fal.ai) 영상 생성 실패 (${isBalanceError ? "FAL_CREDITS_EXHAUSTED" : "FAL_API_ERROR"}): ${rawMessage}`);
     return {
       success: false,
