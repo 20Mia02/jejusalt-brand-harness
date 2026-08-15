@@ -279,7 +279,7 @@ const AI_PROVIDERS = {
     label: "Gemini (무료 티어)",
     apiKeyEnv: "GEMINI_API_KEY",
     baseURL: process.env.GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai/",
-    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+    model: process.env.GEMINI_MODEL || "gemini-flash-latest",
     supportsJsonMode: true,
   },
   upstage: {
