@@ -1678,14 +1678,19 @@ router.post("/character", async (req, res) => {
 
     // ⚠️ forceRefine은 위에서 이미 차단했다 — 여기서는 기본 캐릭터가 애초에 레퍼런스
     // 이미지가 없는 예외 상황(최초 셋업 등)만 처리한다. 이 경우에도 AI 평가 재시도 루프
-    // (refineCharacterImage)는 쓰지 않고, 고정된 higgsfieldPrompt 그대로 1회만 생성한다
+    // (refineCharacterImage)는 쓰지 않고, 고정된 프롬프트 그대로 1회만 생성한다
     // (평가자가 프롬프트를 다시 쓰게 두면 기본 캐릭터 디자인이 브리프에서 벗어날 수 있음).
+    // 정지 이미지(썸네일)이므로 appearancePrompt(정체성) + thumbnailStagingPrompt(전신
+    // 구도/제주 배경) 둘 다 합쳐서 사용 — 영상 생성(아래)은 appearancePrompt만 쓴다.
     const needsBootstrap = !currentVersion || !referenceImageUrl;
 
     if (needsBootstrap) {
       console.log(`[character-bootstrap] ${character.name} 기본 캐릭터 최초 레퍼런스 이미지 생성 (AI 재작성 없이 고정 프롬프트 그대로 1회 생성)`);
 
-      const genResult = await generateImageFromPrompt(character.higgsfieldPrompt);
+      const bootstrapPrompt = character.thumbnailStagingPrompt
+        ? `${character.appearancePrompt}, ${character.thumbnailStagingPrompt}`
+        : character.appearancePrompt;
+      const genResult = await generateImageFromPrompt(bootstrapPrompt);
 
       if (!genResult.success) {
         return res.status(502).json({
@@ -1718,7 +1723,7 @@ router.post("/character", async (req, res) => {
     }
 
     // 영상까지 요청된 경우, 확정된 레퍼런스 이미지를 --start-image로 재사용해서 1회만 생성한다.
-    // (testMode=true면 Higgsfield 대신 Kling 사용 — /copy/:contentId/confirm과 동일한 분기)
+    // (testMode=true면 Higgsfield 대신 fal.ai 사용 — /copy/:contentId/confirm과 동일한 분기)
     let videoResult = null;
     const isTestMode = !!testMode;
     if (resourceId && videoType) {
@@ -1727,7 +1732,7 @@ router.post("/character", async (req, res) => {
           character: character.name,
           generatedContent: character.description,
           voiceTone: (character.personalityKeywords || []).join(", "),
-          visualDescription: character.higgsfieldPrompt,
+          visualDescription: character.appearancePrompt,
           referenceJobId,
           duration: duration || 15,
         },

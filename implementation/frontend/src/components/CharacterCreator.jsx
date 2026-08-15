@@ -946,13 +946,23 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                   </div>
                 )}
 
-                {/* 프롬프트 */}
-                {char.higgsfieldPrompt && (
-                  <div className="bg-dark-bg p-3 rounded text-xs">
-                    <h5 className="font-semibold text-dark-text mb-2">📝 생성 프롬프트</h5>
+                {/* 프롬프트 — appearancePrompt(캐릭터 정체성, 썸네일/영상 공통)와
+                    thumbnailStagingPrompt(썸네일 전용 구도/배경)를 구분해서 표시 */}
+                {char.appearancePrompt && (
+                  <div className="bg-dark-bg p-3 rounded text-xs mb-2">
+                    <h5 className="font-semibold text-dark-text mb-2">📝 캐릭터 정체성 프롬프트 (썸네일+영상 공통)</h5>
                     <pre className="whitespace-pre-wrap text-dark-text-muted overflow-hidden">
-                      {char.higgsfieldPrompt.substring(0, 300)}
-                      {char.higgsfieldPrompt.length > 300 ? '...' : ''}
+                      {char.appearancePrompt.substring(0, 300)}
+                      {char.appearancePrompt.length > 300 ? '...' : ''}
+                    </pre>
+                  </div>
+                )}
+                {char.thumbnailStagingPrompt && (
+                  <div className="bg-dark-bg p-3 rounded text-xs">
+                    <h5 className="font-semibold text-dark-text mb-2">🖼️ 썸네일 전용 구도/배경 프롬프트</h5>
+                    <pre className="whitespace-pre-wrap text-dark-text-muted overflow-hidden">
+                      {char.thumbnailStagingPrompt.substring(0, 300)}
+                      {char.thumbnailStagingPrompt.length > 300 ? '...' : ''}
                     </pre>
                   </div>
                 )}

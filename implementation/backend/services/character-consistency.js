@@ -55,7 +55,7 @@ function getCharacterReferenceData(characterId, versionOverride) {
       character,
       version: character.currentVersion,
       referenceImageUrl: character.reference_image_url,
-      promptTemplate: character.higgsfieldPrompt,
+      promptTemplate: character.appearancePrompt,
     };
   }
 
@@ -68,7 +68,7 @@ function getCharacterReferenceData(characterId, versionOverride) {
     character,
     version: historyEntry.version,
     referenceImageUrl: historyEntry.referenceImageUrl,
-    promptTemplate: historyEntry.prompt || character.higgsfieldPrompt,
+    promptTemplate: historyEntry.prompt || character.appearancePrompt,
   };
 }
 

@@ -68,7 +68,8 @@ router.get("/library", async (req, res) => {
           animationNotes: char.animationNotes,
           symbolism: char.symbolism,
           visualIdentity: char.visualIdentity,
-          higgsfieldPrompt: char.higgsfieldPrompt,
+          appearancePrompt: char.appearancePrompt,
+          thumbnailStagingPrompt: char.thumbnailStagingPrompt,
           reference_image_url: char.reference_image_url,
         },
       ])

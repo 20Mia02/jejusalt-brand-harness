@@ -1177,7 +1177,11 @@ function buildVideoPromptText(videoConfig, config) {
   const visualDescription = videoConfig.visualDescription || "";
 
   const libraryChar = (config.characters || []).find((c) => c.name === character);
-  const characterVisual = libraryChar?.higgsfieldPrompt || visualDescription;
+  // ⭐ 영상 생성에는 appearancePrompt(캐릭터 정체성 — 썸네일과 100% 동일)만 쓰고,
+  // thumbnailStagingPrompt(전신 구도/제주 배경/단독 샷 지시)는 쓰지 않는다 — 영상은
+  // storySnippet(아래)이 실제 장면/배경을 이미 지정하므로, 썸네일용 고정 배경 지시를
+  // 같이 넣으면 "이 영상의 실제 장면"과 "일반 배경" 지시가 충돌해서 결과가 불안정해진다.
+  const characterVisual = libraryChar?.appearancePrompt || visualDescription;
 
   const mascotAnchor =
     "3D pixar-style plush toy mascot character, non-human, stylized cute cartoon figure, toy-like material, NOT a real human, not photorealistic, must exactly match the provided start-image reference character design in every scene (same face, same body shape, same proportions, only pose/background changes), keep a round cute chibi mascot body with a clearly visible friendly face at all times, do NOT turn into a rock/lava/fire elemental creature or any existing famous animated character, texture details (rocky/flame patterns) are surface decoration only and must not change the character's overall silhouette";
