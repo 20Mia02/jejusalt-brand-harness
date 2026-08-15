@@ -63,6 +63,7 @@ router.get("/library", async (req, res) => {
           type: char.type,
           role: char.role,
           toneTrait: char.toneTrait,
+          worldviewStory: char.worldviewStory,
           bodyStructure: char.bodyStructure,
           genderExpression: char.genderExpression,
           animationNotes: char.animationNotes,

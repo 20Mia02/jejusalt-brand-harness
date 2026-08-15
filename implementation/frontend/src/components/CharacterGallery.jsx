@@ -42,6 +42,10 @@ function transformCharacter(raw) {
     gender: raw.gender || '',
     ageGroup: raw.ageGroup || '',
     type: raw.type || '',
+    // ⭐ 특징(toneTrait)과 세계관 스토리(worldviewStory) — 갤러리 카드에서 썸네일 바로
+    // 아래 항상 보이도록 표시한다 (커스텀 캐릭터는 worldviewStory가 없을 수 있음)
+    toneTrait: raw.toneTrait || raw.tone_trait || '',
+    worldviewStory: raw.worldviewStory || '',
   };
 }
 
@@ -105,7 +109,19 @@ export default function CharacterGallery() {
                   </span>
                 )}
               </div>
-              <div className="text-xs text-dark-text-muted line-clamp-2">{char.description}</div>
+              {/* 썸네일 바로 아래 항상 보이는 특징/세계관 스토리 */}
+              <div className="text-xs space-y-1 mt-1">
+                {char.toneTrait && (
+                  <div className="text-dark-text-muted">
+                    <span className="font-semibold text-dark-text">특징:</span> {char.toneTrait}
+                  </div>
+                )}
+                {char.worldviewStory && (
+                  <div className="text-dark-text-muted line-clamp-2">
+                    <span className="font-semibold text-dark-text">세계관 스토리:</span> {char.worldviewStory}
+                  </div>
+                )}
+              </div>
 
               {expanded && (
                 <div className="mt-3 space-y-2 animate-fade-in">

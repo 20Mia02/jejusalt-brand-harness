@@ -581,8 +581,23 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                     <span className="text-[10px] text-dark-text-muted text-center">🖼️ 레퍼런스 없음<br/>(첫 생성 후 저장됨)</span>
                   )}
                 </div>
-                <div className="text-xs text-dark-text-muted mb-2 line-clamp-2">
-                  {libChar.character_profile || libChar.role || '-'}
+                {/* 썸네일 바로 아래 특징/세계관 스토리 (캐릭터 갤러리와 동일한 구성) */}
+                <div className="text-xs space-y-1 mb-2">
+                  {libChar.toneTrait && (
+                    <div className="text-dark-text-muted">
+                      <span className="font-semibold text-dark-text">특징:</span> {libChar.toneTrait}
+                    </div>
+                  )}
+                  {libChar.worldviewStory && (
+                    <div className="text-dark-text-muted line-clamp-2">
+                      <span className="font-semibold text-dark-text">세계관 스토리:</span> {libChar.worldviewStory}
+                    </div>
+                  )}
+                  {!libChar.toneTrait && !libChar.worldviewStory && (
+                    <div className="text-dark-text-muted line-clamp-2">
+                      {libChar.character_profile || libChar.role || '-'}
+                    </div>
+                  )}
                 </div>
                 {libChar.generation_count > 0 && (
                   <div className="text-xs text-status-approved mb-2">✓ {libChar.generation_count}회 생성됨 (일관된 스타일 유지)</div>
