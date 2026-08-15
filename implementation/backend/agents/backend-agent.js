@@ -1253,15 +1253,18 @@ function buildVideoPromptText(videoConfig, config) {
  * 같은 수정을 반영해야 완전히 동기화된다.)
  */
 function getCommonAppearanceRulesText() {
-  // ⭐ 압축(dense) 버전 — 예전에 훨씬 장황한 문구를 썼을 때, 실제 Higgsfield 생성
-  // 테스트(해수)에서 프롬프트가 너무 길어서(5000자+) 가슴 보석/얼굴 마크 같은 핵심
-  // 요소가 통째로 누락되는 걸 확인했다. 같은 정보를 더 짧고 밀도 있게 전달한다.
+  // ⭐ 압축(dense) 버전 — 프롬프트가 너무 길면(5000자+) 뒤쪽 요소가 누락된다는 게
+  // 실제 생성 테스트로 반복 확인됨. 같은 정보를 짧고 밀도 있게 전달한다.
+  // ⭐⭐ "인간형 인형(리본 베이비 돌)처럼 보인다"는 반복 피드백 반영 — CRITICAL BODY에
+  // 인간 아기/리본 인형 부정을 명시적으로 추가.
   return [
-    "CRITICAL BODY: a simple round non-anatomical chibi toy body — one continuous pear/egg-shaped torso with NO visible waist, shoulders, or joints, short stubby limbs, tiny rounded feet, like a soft beanbag plush toy, NOT a slender human figure, head at least 55% of total height",
+    "CRITICAL BODY: a simple round non-anatomical chibi toy body — one continuous pear/egg-shaped torso with NO visible waist, shoulders, or joints, short stubby limbs, tiny rounded feet, like a soft beanbag plush toy — NOT a slender human figure, NOT a human baby, NOT a reborn baby doll, NOT a realistic baby/toddler face, an entirely non-human fantasy creature, head at least 55% of total height",
     "EYES: large glossy doll eyes with a black outline and mostly dark iris, a small bright blue (#00AEEF) dot at the very center of each pupil only (NOT the whole eye colored blue), a white sparkle highlight, and long eyelashes",
     "pink blush cheeks",
+    "FACE VISIBILITY: the face is always clearly visible and front-facing enough to read the full expression — never obscured by hair, accessories, or body angle",
     "an expressive face (big eyes, mobile eyebrows, open mouth shape) so emotion reads clearly even in motion — never blank or stiff",
-    "simple mitten-like hands with just a few soft rounded fingers barely defined (enough to hold a product), no fingernails or realistic hand detail, same finger count every time",
+    "DYNAMIC POSE: body and limbs posed in a dynamic, lively stance — capable of naturally holding, lifting, presenting, or interacting with a product — never stiff or static, always with a sense of movement and personality even at rest",
+    "hands with a few short, soft rounded fingers separated by shallow grooves (NOT a smooth fingerless mitten blob, NOT realistic human fingers), no fingernails, same finger count every time",
     "GEM: a LARGE glowing hexagonal salt-crystal gem naturally integrated at the center of the chest — sewn into the clothing as a decorative centerpiece or grown directly from the body as fits this character's own design, looking like it truly belongs there (NOT a sticker or object floating on top), sized to about 30% of the width of the upper torso, cut in this character's own signature accent color with bright specular highlights — this exact gem must always be present and clearly visible, same shape on every sibling, only the color differs",
     "the exact surface material and any clothing/accessories must be specific and concretely detailed (fabric weave, stitching, gem facets, fur strands, etc. as appropriate) to match this character's own elemental theme, NOT a generic uniform material shared identically with the other siblings — only the small face area is a soft neutral skin-tone, no bare human-looking skin elsewhere on the body",
     "rendered as a glossy premium chibi doll-like 3D character (Kakao Friends / Pixar-quality soft-shaded 3D render), NOT a flat 2D illustration, NOT a sticker, NOT a photo of a real toy",

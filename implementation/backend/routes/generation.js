@@ -1682,13 +1682,16 @@ router.post("/character", async (req, res) => {
     // (평가자가 프롬프트를 다시 쓰게 두면 기본 캐릭터 디자인이 브리프에서 벗어날 수 있음).
     // 정지 이미지(썸네일)이므로 appearancePrompt(정체성) + thumbnailStagingPrompt(전신
     // 구도/제주 배경) 둘 다 합쳐서 사용 — 영상 생성(아래)은 appearancePrompt만 쓴다.
+    // ⚠️ thumbnailStagingPrompt(구도/배경)를 항상 뒤에 붙였더니, appearancePrompt가 길어서
+    // (3000자+) 배경이 매번 통째로 무시되는 게 실제 생성 테스트로 반복 확인됨 —
+    // 구도/배경을 먼저 배치해서 모델이 캔버스 전체(배경+구도)를 먼저 정하게 한다.
     const needsBootstrap = !currentVersion || !referenceImageUrl;
 
     if (needsBootstrap) {
       console.log(`[character-bootstrap] ${character.name} 기본 캐릭터 최초 레퍼런스 이미지 생성 (AI 재작성 없이 고정 프롬프트 그대로 1회 생성)`);
 
       const bootstrapPrompt = character.thumbnailStagingPrompt
-        ? `${character.appearancePrompt}, ${character.thumbnailStagingPrompt}`
+        ? `${character.thumbnailStagingPrompt}, ${character.appearancePrompt}`
         : character.appearancePrompt;
       const genResult = await generateImageFromPrompt(bootstrapPrompt);
 
