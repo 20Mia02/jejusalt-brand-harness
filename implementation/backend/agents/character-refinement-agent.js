@@ -173,7 +173,7 @@ cutenessScore < 85 이거나 overallScore < 85면 shouldRetry는 반드시 true�
  * 최대 MAX_RETRIES회 반복하고, 최종 결과와 시도 이력을 반환한다.
  */
 async function refineCharacterImage({ characterConfig, maxRetries = MAX_RETRIES }) {
-  let currentPrompt = characterConfig.higgsfieldPromptTemplate;
+  let currentPrompt = characterConfig.higgsfieldPrompt;
   const attempts = [];
   let finalResult = null;
 

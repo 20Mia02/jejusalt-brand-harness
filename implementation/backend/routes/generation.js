@@ -22,14 +22,14 @@
 const express = require("express");
 const router = express.Router();
 
-const { callAgent, callHiggsfield, generateVideo, getComplianceRulesForCategory } = require("../agents/backend-agent");
+const { callAgent, callHiggsfield, generateVideo, generateImageFromPrompt, getComplianceRulesForCategory } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
 const { getGenerationConfig } = require("../utils/config-loader");
 const scenarioTemplates = require("../config/scenario-templates.json");
-const { refineCharacterImage } = require("../agents/character-refinement-agent");
+// ⚠️ refineCharacterImage(AI가 프롬프트를 자유롭게 다시 쓰는 재시도 루프)는 기본 캐릭터에는
+// 더 이상 쓰지 않는다(POST /character 참고) — 커스텀 캐릭터 리파인 기능을 만들 때 다시 사용.
 const {
   getCharacterReferenceData,
-  addVersionToPrompt,
   updateCharacterVersion,
   nextVersion,
 } = require("../services/character-consistency");
@@ -1650,6 +1650,19 @@ router.post("/character", async (req, res) => {
     return res.status(400).json({ success: false, message: "characterId가 필요합니다" });
   }
 
+  // ⭐⭐ 이 라우트는 config/config.json에 고정 등록된 8개 기본 캐릭터만 다룬다(id 1~8) —
+  // 즉 여기서 다루는 캐릭터는 항상 "기본 캐릭터"다. 기본 캐릭터는 브랜드의 고정 자산이라
+  // 절대 리파인(AI가 프롬프트를 자유롭게 다시 써서 반복 생성)으로 매번 다른 모습이 되면
+  // 안 된다 — 리파인은 기업이 새로 만들어서 라이브러리에 저장한 커스텀 캐릭터
+  // (character_library, is_base_character=false)에만 적용되어야 한다.
+  if (forceRefine) {
+    return res.status(400).json({
+      success: false,
+      message: "기본 캐릭터는 리파인할 수 없습니다. 기본 캐릭터의 시각적 일관성을 위해 고정된 프롬프트만 사용합니다. 새로 만든 커스텀 캐릭터를 리파인하려면 다른 기능을 이용하세요.",
+      code: "BASE_CHARACTER_REFINE_BLOCKED",
+    });
+  }
+
   try {
     const refData = getCharacterReferenceData(characterId, versionOverride);
     if (!refData.success) {
@@ -1663,45 +1676,30 @@ router.post("/character", async (req, res) => {
     let latestEvaluation = null;
     let attempts = [];
 
-    const needsRefinement = forceRefine || !currentVersion || !referenceImageUrl;
+    // ⚠️ forceRefine은 위에서 이미 차단했다 — 여기서는 기본 캐릭터가 애초에 레퍼런스
+    // 이미지가 없는 예외 상황(최초 셋업 등)만 처리한다. 이 경우에도 AI 평가 재시도 루프
+    // (refineCharacterImage)는 쓰지 않고, 고정된 higgsfieldPrompt 그대로 1회만 생성한다
+    // (평가자가 프롬프트를 다시 쓰게 두면 기본 캐릭터 디자인이 브리프에서 벗어날 수 있음).
+    const needsBootstrap = !currentVersion || !referenceImageUrl;
 
-    if (needsRefinement) {
-      console.log(`[character-refinement] ${character.name} 캐릭터 리파인 시작 (기존 버전: ${currentVersion || "없음"})`);
-      const promptWithVersion = currentVersion
-        ? addVersionToPrompt(character.higgsfieldPromptTemplate, character.id, currentVersion)
-        : character.higgsfieldPromptTemplate;
+    if (needsBootstrap) {
+      console.log(`[character-bootstrap] ${character.name} 기본 캐릭터 최초 레퍼런스 이미지 생성 (AI 재작성 없이 고정 프롬프트 그대로 1회 생성)`);
 
-      const refined = await refineCharacterImage({
-        characterConfig: { ...character, higgsfieldPromptTemplate: promptWithVersion },
-        // ⚠️ AI 평가자가 자유롭게 다시 쓰는 improvedPrompt로 2-3차 재시도를 거치면서
-        // 브랜드 브리프에서 크게 벗어나거나(실제 인간 얼굴, 저작권 캐릭터 등장) 심지어
-        // 저작권 침해로 이어지는 사례가 발견됨 — 필요할 때 1회만(직접 작성한 고정 템플릿
-        // 그대로) 시도하도록 강제할 수 있게 외부에서 제어 가능하게 열어둔다.
-        ...(maxRetries ? { maxRetries } : {}),
-      });
-      attempts = refined.attempts;
+      const genResult = await generateImageFromPrompt(character.higgsfieldPrompt);
 
-      if (!refined.final) {
+      if (!genResult.success) {
         return res.status(502).json({
           success: false,
-          message: "캐릭터 이미지 생성에 반복적으로 실패했습니다",
-          attempts,
+          message: "캐릭터 이미지 생성에 실패했습니다",
+          detail: genResult,
         });
       }
 
-      latestEvaluation = refined.final.evaluation;
-      referenceImageUrl = refined.final.genResult.image_url;
-      referenceJobId = refined.final.genResult.image_job_id;
+      referenceImageUrl = genResult.image_url;
+      referenceJobId = genResult.image_job_id;
 
-      const bumpMajor = forceRefine === "major";
-      currentVersion = nextVersion(currentVersion, bumpMajor);
-      updateCharacterVersion(
-        character.id,
-        currentVersion,
-        latestEvaluation?.feedback?.cutenessStrengths || "자동 리파인",
-        referenceImageUrl,
-        latestEvaluation?.scores
-      );
+      currentVersion = nextVersion(currentVersion);
+      updateCharacterVersion(character.id, currentVersion, "최초 레퍼런스 이미지 생성 (고정 프롬프트)", referenceImageUrl, null);
 
       // ⚠️ 중요: 캐릭터 선택 화면(CharacterCreator.jsx)과 실제 영상 생성(Step9,
       // callHiggsfield --start-image)은 characters.json이 아니라 character_library
@@ -1729,7 +1727,7 @@ router.post("/character", async (req, res) => {
           character: character.name,
           generatedContent: character.description,
           voiceTone: (character.personalityKeywords || []).join(", "),
-          visualDescription: character.higgsfieldPromptTemplate,
+          visualDescription: character.higgsfieldPrompt,
           referenceJobId,
           duration: duration || 15,
         },

@@ -14,15 +14,15 @@ const { loadCharactersFile } = require("../services/character-consistency");
 async function main() {
   const data = loadCharactersFile();
   for (const character of data.characters) {
-    if (!character.referenceImageUrl) {
-      console.log(`[skip] ${character.name}: referenceImageUrl 없음`);
+    if (!character.reference_image_url) {
+      console.log(`[skip] ${character.name}: reference_image_url 없음`);
       continue;
     }
-    const jobId = character.referenceImageUrl.match(/([0-9a-f-]{36})\.png/i)?.[1] || null;
+    const jobId = character.reference_image_url.match(/([0-9a-f-]{36})\.png/i)?.[1] || null;
     const result = await callDatabase(
       "character_library",
       "update",
-      { reference_image_url: character.referenceImageUrl, generation_seed: jobId },
+      { reference_image_url: character.reference_image_url, generation_seed: jobId },
       { character_name: character.name }
     );
     console.log(

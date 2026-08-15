@@ -227,6 +227,16 @@ function getConfig() {
   return loadConfig();
 }
 
+/**
+ * 캐시를 비우고 config.json을 디스크에서 다시 읽는다. character-consistency.js처럼
+ * 서버가 실행 중에 config.json에 직접 쓰는 코드가 있을 때, 그 다음 getConfig() 호출부터
+ * 방금 쓴 내용이 반영되도록 쓴다 (안 부르면 서버 재시작 전까지 이전 캐시가 유지됨).
+ */
+function reloadConfig() {
+  cachedConfig = null;
+  return loadConfig();
+}
+
 function getBrandName() {
   return getConfig().brand.nameKorean;
 }
@@ -254,6 +264,7 @@ function getApiEndpoints() {
 module.exports = {
   loadConfig,
   getConfig,
+  reloadConfig,
   getBrandName,
   getBrandNameEnglish,
   getCharacters,
