@@ -1217,7 +1217,7 @@ function CopyReviewPanel({ resourceId, copyData, onConfirm }) {
       </div>
 
       {/* ⭐ 테스트 모드: Higgsfield 크레딧 소진 중에도 파이프라인 연동/테스트를 계속하기 위한
-          대체 경로 (Kling API). 워터마크+비상업용이라 반드시 명확히 경고를 보여준다. */}
+          대체 경로 (fal.ai API). 체험 크레딧 소모성 + 상업적 이용 불가 취급이라 반드시 명확히 경고를 보여준다. */}
       <div className={`rounded-lg p-4 border ${testMode ? 'bg-status-pending/10 border-status-pending/40' : 'bg-dark-bg border-dark-chip'}`}>
         <label className="flex items-start gap-3 cursor-pointer">
           <input
@@ -1228,7 +1228,7 @@ function CopyReviewPanel({ resourceId, copyData, onConfirm }) {
           />
           <div>
             <div className="font-semibold text-sm">
-              🧪 테스트 모드로 생성 (Kling AI 사용)
+              🧪 테스트 모드로 생성 (fal.ai 사용)
             </div>
             <div className="text-xs text-dark-text-muted mt-1">
               Higgsfield 크레딧이 부족할 때 파이프라인 연동 확인용으로만 사용하세요.
@@ -1301,7 +1301,7 @@ function DoneScreen({ finalResult, onRestart, onRetryVideo, onGoHome }) {
 
   const TestModeBanner = () => (
     <div className="bg-status-pending/10 border-2 border-status-pending/50 rounded-lg p-3 text-sm font-semibold text-status-pending">
-      ⚠️ 테스트 모드로 생성된 영상입니다 (Kling AI, 워터마크 포함) — 상업적 이용 불가, 파이프라인 검증용으로만 사용하세요.
+      ⚠️ 테스트 모드로 생성된 영상입니다 (fal.ai) — 상업적 이용 불가, 파이프라인 검증용으로만 사용하세요.
     </div>
   );
 

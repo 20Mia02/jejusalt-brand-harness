@@ -16,7 +16,6 @@ const { exec } = require("child_process");
 const util = require("util");
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
 const execPromise = util.promisify(exec);
 const { callDatabase } = require("./database-agent");
 
@@ -1303,117 +1302,88 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
 }
 
 // ============================================================================
-// [함수 2-0] 테스트 모드 — Kling API로 영상 생성 (Higgsfield 크레딧 소진 중에도
-// 파이프라인 연동/테스트를 계속하기 위한 대체 경로)
+// [함수 2-0] 테스트 모드 — fal.ai(다중 영상모델 프록시 API)로 영상 생성
+// (Higgsfield 크레딧 소진 중에도 파이프라인 연동/테스트를 계속하기 위한 대체 경로)
 // ----------------------------------------------------------------------------
-// ⚠️⚠️ 중요: Kling 무료 티어는 워터마크가 포함되고 상업적 사용이 금지된다.
-// 그래서 이 경로는 반드시 "테스트 모드"에서만 호출되어야 하며 (routes/generation.js의
-// testMode 플래그로 분기), 실제 마케팅용 최종 영상에는 절대 사용해서는 안 된다.
-// 프론트엔드는 이 결과를 받으면 반드시 "테스트 모드 / 상업적 이용 불가" 경고를 표시한다.
+// ⚠️⚠️ 중요: Kling 자체 개발자 API는 실제로는 유료(선불 크레딧 구매 필요)였고, 소비자
+// 웹앱에만 있는 "하루 무료 크레딧"은 API 쪽으로 넘어오지 않는다는 것을 실제 키로
+// 확인함 (계정 잔액 0에서도 인증은 성공하고 "Account balance not enough"만 반환됨).
+// 대신 fal.ai는 신규 가입 시 실제로 청구되는 개발자 API에 $10 상당의 체험 크레딧을
+// 주는 것으로 확인되어 이걸 사용한다 (여러 영상 모델을 하나의 큐 API로 프록시).
+// 그래도 이 크레딧은 소모성이며, 대상 모델의 무료/저가 여부와 무관하게 프론트엔드는
+// "테스트 모드 / 상업적 이용 불가" 경고를 표시한다(모델별 라이선스가 제각각이라
+// 상업적 사용 가능 여부를 코드에서 신뢰성 있게 판단할 수 없기 때문).
 // ============================================================================
 
-function base64url(input) {
-  return Buffer.from(input)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-/**
- * Kling API 인증용 JWT(HS256)를 직접 서명한다 (jsonwebtoken 패키지 없이 crypto만 사용 —
- * 헤더+페이로드+HMAC-SHA256 서명뿐이라 별도 의존성을 추가할 필요가 없다).
- * 토큰 유효시간은 Kling 문서 기준 30분이지만, 폴링 도중 만료될 일이 없도록 매 호출마다 새로 서명한다.
- */
-function signKlingJwt(accessKey, secretKey) {
-  const header = { alg: "HS256", typ: "JWT" };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = { iss: accessKey, exp: now + 1800, nbf: now - 5 };
-  const encodedHeader = base64url(JSON.stringify(header));
-  const encodedPayload = base64url(JSON.stringify(payload));
-  const signature = crypto
-    .createHmac("sha256", secretKey)
-    .update(`${encodedHeader}.${encodedPayload}`)
-    .digest("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
-}
-
-async function callKlingVideo(videoConfig, resourceId, contentId) {
+async function callFalVideo(videoConfig, resourceId, contentId) {
   try {
-    const accessKey = process.env.KLING_ACCESS_KEY;
-    const secretKey = process.env.KLING_SECRET_KEY;
-    if (!accessKey || !secretKey) {
+    const falKey = process.env.FAL_KEY;
+    if (!falKey) {
       throw new Error(
-        "KLING_ACCESS_KEY/KLING_SECRET_KEY가 설정되지 않았습니다 (테스트 모드는 Kling API 키가 필요합니다 — kling.ai/dev/api-key 에서 발급)"
+        "FAL_KEY가 설정되지 않았습니다 (테스트 모드는 fal.ai API 키가 필요합니다 — fal.ai/dashboard/keys 에서 발급, 신규 가입 시 체험 크레딧 제공)"
       );
     }
 
     const { getConfig } = require("../utils/config-loader");
     const config = getConfig();
 
-    const baseURL = process.env.KLING_API_BASE_URL || "https://api.klingai.com";
-    const model = process.env.KLING_MODEL || "kling-v2-6";
+    const model = process.env.FAL_MODEL || "fal-ai/pixverse/v5.5/text-to-video";
 
-    // Kling text2video는 duration을 "5" 또는 "10"(문자열) 중 하나만 받는다 — Higgsfield처럼
+    // fal의 pixverse 엔드포인트는 duration을 "5" 또는 "8"(문자열)만 받는다 — Higgsfield처럼
     // 임의 초 단위를 그대로 못 쓰므로 요청 길이를 가장 가까운 허용값으로 반올림한다.
+    // (FAL_MODEL을 다른 모델로 바꾸면 이 값의 의미도 그 모델 스펙에 맞게 확인해야 함)
     const rawDuration = Number(videoConfig.duration);
     const requestedDuration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 5;
-    const duration = requestedDuration > 7 ? "10" : "5";
+    const duration = requestedDuration > 6 ? "8" : "5";
 
-    // 프롬프트 자체는 buildVideoPromptText로 Higgsfield와 완전히 공유 — 셸 이스케이프는
-    // 필요 없고(JSON 바디로 전송) 공백만 정리한다.
+    // 프롬프트 자체는 buildVideoPromptText로 Higgsfield와 완전히 공유 — 공백만 정리한다.
     const prompt = buildVideoPromptText(videoConfig, config).replace(/\s+/g, " ").trim();
 
-    console.log(`[테스트 모드] Kling API 호출 시작 (모델: ${model}, duration: ${duration}초)`);
+    console.log(`[테스트 모드] fal.ai 호출 시작 (모델: ${model}, duration: ${duration}초)`);
     console.log(`  프롬프트: ${prompt}`);
 
-    const token = signKlingJwt(accessKey, secretKey);
-    const createRes = await axios.post(
-      `${baseURL}/v1/videos/text2video`,
-      {
-        model_name: model,
-        prompt,
-        duration,
-        mode: "std",
-        aspect_ratio: "9:16",
-      },
-      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, timeout: 30000 }
+    const authHeader = { Authorization: `Key ${falKey}` };
+    const submitRes = await axios.post(
+      `https://queue.fal.run/${model}`,
+      { prompt, duration, resolution: "540p", aspect_ratio: "9:16" },
+      { headers: { ...authHeader, "Content-Type": "application/json" }, timeout: 30000 }
     );
 
-    const taskId = createRes.data?.data?.task_id;
-    if (!taskId) {
-      throw new Error(`Kling 작업 생성 응답에 task_id가 없습니다: ${JSON.stringify(createRes.data)}`);
+    const requestId = submitRes.data?.request_id;
+    const statusUrl = submitRes.data?.status_url || `https://queue.fal.run/${model}/requests/${requestId}/status`;
+    const responseUrl = submitRes.data?.response_url || `https://queue.fal.run/${model}/requests/${requestId}`;
+    if (!requestId) {
+      throw new Error(`fal.ai 작업 생성 응답에 request_id가 없습니다: ${JSON.stringify(submitRes.data)}`);
     }
 
-    // 5초 간격으로 최대 5분 폴링 (Kling text2video는 보통 1~3분 내 완료됨)
+    // 5초 간격으로 최대 5분 폴링
     const maxAttempts = 60;
-    let videoUrl = null;
+    let completed = false;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 5000));
 
-      const statusToken = signKlingJwt(accessKey, secretKey);
-      const statusRes = await axios.get(`${baseURL}/v1/videos/text2video/${taskId}`, {
-        headers: { Authorization: `Bearer ${statusToken}` },
-        timeout: 15000,
-      });
-
-      const taskStatus = statusRes.data?.data?.task_status;
-      if (taskStatus === "succeed") {
-        const videos = statusRes.data?.data?.task_result?.videos || [];
-        videoUrl = videos[0]?.url || videos[0]?.watermark_url || null;
+      const statusRes = await axios.get(statusUrl, { headers: authHeader, timeout: 15000 });
+      const status = statusRes.data?.status;
+      if (status === "COMPLETED") {
+        completed = true;
         break;
       }
-      if (taskStatus === "failed") {
-        throw new Error(`Kling 작업 실패: ${statusRes.data?.data?.task_status_msg || "알 수 없는 오류"}`);
+      if (status === "FAILED" || status === "ERROR") {
+        throw new Error(`fal.ai 작업 실패: ${JSON.stringify(statusRes.data)}`);
       }
-      console.log(`  [테스트 모드] Kling 진행 중... (${attempt}/${maxAttempts})`);
+      console.log(`  [테스트 모드] fal.ai 진행 중... (${attempt}/${maxAttempts}, status=${status})`);
     }
 
+    if (!completed) {
+      throw new Error("fal.ai 영상 생성 타임아웃 (5분 초과)");
+    }
+
+    // ⚠️ 출력 스키마는 모델마다 다르다 (video.url / output.video.url 등) — FAL_MODEL을
+    // 바꿨는데 여기서 못 찾으면 raw 응답을 로그로 남겨서 실제 스키마를 확인할 수 있게 한다.
+    const resultRes = await axios.get(responseUrl, { headers: authHeader, timeout: 15000 });
+    const videoUrl = resultRes.data?.video?.url || resultRes.data?.output?.video?.url || null;
     if (!videoUrl) {
-      throw new Error("Kling 영상 생성 타임아웃 (5분 초과)");
+      throw new Error(`fal.ai 결과에서 영상 URL을 찾지 못했습니다: ${JSON.stringify(resultRes.data)}`);
     }
 
     console.log(`[✓] 테스트 모드 영상 생성 완료: ${videoUrl}`);
@@ -1436,17 +1406,21 @@ async function callKlingVideo(videoConfig, resourceId, contentId) {
         generation_progress: 100,
         videos_row_id: videoResult.rows?.[0]?.id,
         testMode: true,
-        provider: "kling",
+        provider: "fal",
+        model,
         commercialUseAllowed: false,
-        watermarked: true,
       },
     };
   } catch (error) {
-    console.error(`[✗] 테스트 모드(Kling) 영상 생성 실패: ${error.message}`);
+    const rawMessage = error.response?.data?.detail?.[0]?.msg || error.response?.data?.message || error.message;
+    const isBalanceError = /balance|insufficient|credit/i.test(rawMessage || "");
+    console.error(`[✗] 테스트 모드(fal.ai) 영상 생성 실패 (${isBalanceError ? "FAL_CREDITS_EXHAUSTED" : "FAL_API_ERROR"}): ${rawMessage}`);
     return {
       success: false,
-      error: "KLING_API_ERROR",
-      message: error.response?.data?.message || error.message,
+      error: isBalanceError ? "FAL_CREDITS_EXHAUSTED" : "FAL_API_ERROR",
+      message: isBalanceError
+        ? "fal.ai 체험 크레딧이 소진되었습니다. fal.ai 대시보드에서 크레딧을 충전한 뒤 다시 시도하세요."
+        : rawMessage,
       statusCode: error.response?.status,
     };
   }
@@ -1455,14 +1429,14 @@ async function callKlingVideo(videoConfig, resourceId, contentId) {
 /**
  * 영상 생성 단일 진입점 — routes/generation.js는 이 함수 하나만 호출한다.
  * testMode=false(기본 모드): Higgsfield(유료, 상업적 사용 가능)
- * testMode=true(테스트 모드): Kling(무료지만 워터마크+비상업용, 파이프라인 검증 전용)
+ * testMode=true(테스트 모드): fal.ai(체험 크레딧으로 사용, 상업적 사용 불가 취급, 파이프라인 검증 전용)
  * 두 모드 모두 buildVideoPromptText를 공유하므로, 캐릭터/브랜드 프롬프트를 고치는 기능
  * 수정은 이 함수를 거치지 않고 바로 두 모드 모두에 반영된다.
  */
 async function generateVideo(videoConfig, resourceId, contentId, options = {}) {
   const testMode = !!options.testMode;
   if (testMode) {
-    return callKlingVideo(videoConfig, resourceId, contentId);
+    return callFalVideo(videoConfig, resourceId, contentId);
   }
   return callHiggsfield(videoConfig, resourceId, contentId);
 }
@@ -1599,7 +1573,7 @@ async function pollHiggsfield(higgsfieldId, videoRowId) {
 module.exports = {
   callAgent,
   callHiggsfield,
-  callKlingVideo,
+  callFalVideo,
   generateVideo,
   pollHiggsfield,
   generateCharacterReferenceImage,
