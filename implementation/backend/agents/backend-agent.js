@@ -266,22 +266,15 @@ async function callAgent(agentName, payload, context = {}) {
  * - SDK가 없으면: REST API (axios) 폴백
  */
 // ============================================================================
-// [AI 프로바이더 선택] 유료(Upstage) ↔ 무료(Groq/Gemini) 전환
+// [AI 프로바이더 선택] 무료(Gemini) 기본 ↔ 유료(Upstage) 수동 전환
 // ============================================================================
 /**
  * 여러 OpenAI 호환 프로바이더 중 어떤 것을 쓸지 결정한다.
- * - AI_PROVIDER 환경변수로 명시 지정 가능 (groq|gemini|upstage)
- * - 미지정 시: 무료 API(Groq → Gemini)를 먼저 찾고, 없으면 Upstage, 그마저 없으면 Mock.
- *   (Higgsfield 크레딧과 달리 Groq/Gemini 무료 티어는 매일 재충전되므로 기본값을 무료 쪽으로 둔다)
+ * - AI_PROVIDER 환경변수로 명시 지정 가능 (gemini|upstage)
+ * - 미지정 시: 무료(Gemini)를 먼저 찾고, 없으면 Upstage, 그마저 없으면 Mock.
+ *   (Higgsfield 크레딧과 달리 Gemini 무료 티어는 매일 재충전되므로 기본값을 무료 쪽으로 둔다)
  */
 const AI_PROVIDERS = {
-  groq: {
-    label: "Groq (무료 티어)",
-    apiKeyEnv: "GROQ_API_KEY",
-    baseURL: process.env.GROQ_API_BASE_URL || "https://api.groq.com/openai/v1",
-    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
-    supportsJsonMode: true,
-  },
   gemini: {
     label: "Gemini (무료 티어)",
     apiKeyEnv: "GEMINI_API_KEY",
@@ -312,8 +305,8 @@ function resolveAiProvider() {
     console.warn(`[AI_PROVIDER=${forced}] 지정되었지만 ${forcedConfig.apiKeyEnv}가 없어 자동 선택으로 대체합니다`);
   }
 
-  // 자동 선택 우선순위: 무료(Groq → Gemini) → 유료(Upstage) → Mock
-  for (const key of ["groq", "gemini", "upstage"]) {
+  // 자동 선택 우선순위: 무료(Gemini) → 유료(Upstage) → Mock
+  for (const key of ["gemini", "upstage"]) {
     const config = AI_PROVIDERS[key];
     if (!isPlaceholderKey(process.env[config.apiKeyEnv])) {
       return { key, ...config };
@@ -327,7 +320,7 @@ async function callSolarAgent(agentName, payload) {
 
   // Mock 모드: 어떤 프로바이더의 API 키도 설정되어 있지 않은 경우
   if (!provider) {
-    console.warn(`[Mock Mode] ${agentName} - 테스트 더미 응답 반환 (GROQ_API_KEY/GEMINI_API_KEY/UPSTAGE_API_KEY 모두 미설정)`);
+    console.warn(`[Mock Mode] ${agentName} - 테스트 더미 응답 반환 (GEMINI_API_KEY/UPSTAGE_API_KEY 모두 미설정)`);
     return getMockResponseForAgent(agentName, payload);
   }
 
