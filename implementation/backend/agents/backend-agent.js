@@ -1181,7 +1181,12 @@ function buildVideoPromptText(videoConfig, config) {
   // thumbnailStagingPrompt(전신 구도/제주 배경/단독 샷 지시)는 쓰지 않는다 — 영상은
   // storySnippet(아래)이 실제 장면/배경을 이미 지정하므로, 썸네일용 고정 배경 지시를
   // 같이 넣으면 "이 영상의 실제 장면"과 "일반 배경" 지시가 충돌해서 결과가 불안정해진다.
-  const characterVisual = libraryChar?.appearancePrompt || visualDescription;
+  // ⭐ libraryChar가 없다는 건(config.json의 8개 기본 캐릭터가 아니라는 건) 기업이 새로
+  // 만든 커스텀 캐릭터라는 뜻 — 이 경우 visualDescription(AI가 자유 문장으로 쓴 설명)에도
+  // 기본 캐릭터와 동일한 공통 요소를 리터럴로 강제 추가해서, 새 캐릭터의 영상도 레퍼런스
+  // 이미지 생성 때와 동일한 공통 규칙을 따르게 한다.
+  const characterVisual = libraryChar?.appearancePrompt
+    || (visualDescription ? `${visualDescription}, ${getCommonAppearanceRulesText()}` : visualDescription);
 
   const mascotAnchor =
     "3D pixar-style plush toy mascot character, non-human, stylized cute cartoon figure, toy-like material, NOT a real human, not photorealistic, must exactly match the provided start-image reference character design in every scene (same face, same body shape, same proportions, only pose/background changes), keep a round cute chibi mascot body with a clearly visible friendly face at all times, do NOT turn into a rock/lava/fire elemental creature or any existing famous animated character, texture details (rocky/flame patterns) are surface decoration only and must not change the character's overall silhouette";
@@ -1201,6 +1206,33 @@ function buildVideoPromptText(videoConfig, config) {
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+/**
+ * 8개 기본 캐릭터의 appearancePrompt에 이미 문자 그대로(리터럴) 박혀있는 "공통 요소" 10가지를
+ * 새로 만들어지는 커스텀 캐릭터에도 똑같이 강제하기 위한 공유 문구.
+ *
+ * ⭐⭐ 왜 필요한가: 새 캐릭터는 character-creator-agent가 자유 문장으로 visual_description을
+ * 써주는데, 시스템 프롬프트에 공통 요소를 "참고하라"고만 안내하면 AI가 매번 다르게
+ * 요약/누락한다 — 그래서 실제 이미지 생성 호출(generateCharacterReferenceImage)에
+ * 이 문구를 리터럴 그대로 이어붙여서, AI가 뭐라고 쓰든 최종 프롬프트에는 반드시
+ * 정확히 같은 문장으로 들어가게 한다. (기본 8개 캐릭터를 위해 손으로 다듬은 문구와
+ * 100% 동일 — 이 문구를 고칠 땐 config.json의 8개 caracter.appearancePrompt에도
+ * 같은 수정을 반영해야 완전히 동기화된다.)
+ */
+function getCommonAppearanceRulesText() {
+  return [
+    "rendered as an adorable, detailed chibi 2-heads-tall doll-like 3D character, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy)",
+    "the exact surface material and any clothing/accessories (a solid-colored body all over, a fitted robe/garment, or a themed mix of both) must be specific and richly detailed to match this character's own elemental theme, NOT a generic uniform material or costume shared identically with the other siblings — only the small face area is a soft neutral skin-tone, with no bare/exposed human-looking skin anywhere else on the body",
+    "warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions)",
+    "a small round non-human chibi creature with a simple round potato-shaped body just like the other Jeju Lava Sea Salt mascot siblings (same basic family silhouette, just recolored/re-themed)",
+    "large glowing bright blue (#00AEEF) eyes with clearly visible eyelashes",
+    "pink blush cheeks",
+    "simple cute stylized hands with a few soft rounded fingers clearly visible (enough to naturally hold or gesture with a product) — no fingernails, wrinkles, or realistic human hand detail, keep the fingers soft, chubby, and toy-like, never more or fewer than the same number of fingers in every generation",
+    "chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio matches every other Jeju Lava Sea Salt mascot sibling for family consistency)",
+    "a LARGE glowing multi-faceted hexagonal salt-crystal gem, sized to about 30% of the width of the upper torso, worn at the center of the chest, cut in this character's own signature accent color with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by every Jeju Lava Sea Salt mascot sibling as their shared family emblem (only the gem color differs per character)",
+    "must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon/Pikachu-style creatures, Kakao Friends [Ryan, Apeach, Muzi, Tube, Neo], LINE Friends [Brown, Cony, Sally, Leonard], Hello Kitty or any Sanrio character [My Melody, Cinnamoroll, Kuromi, Gudetama, Pompompurin], Rilakkuma or any San-X character [Sumikko Gurashi, Molang], Moomin, Miffy, Care Bears, Chiikawa, BT21, Kumamon or any Japanese local yuru-chara mascot, Pororo and friends [뽀로로, 에디, 크롱, 루피, 해리], Tayo the Little Bus, Pinkfong/Baby Shark, Minions, Winnie the Pooh, Paddington Bear, Peanuts/Snoopy, Doraemon, Studio Ghibli characters [Totoro], or any Disney/Pixar/anime/manga character)",
+  ].join(", ");
 }
 
 async function callHiggsfield(videoConfig, resourceId, contentId) {
@@ -1474,9 +1506,14 @@ async function generateVideo(videoConfig, resourceId, contentId, options = {}) {
 async function generateCharacterReferenceImage({ characterName, voiceTone, visualDescription }) {
   try {
     const noTextInstruction = "no on-screen text, no readable words or captions, no signage text, clean text-free visual";
+    // ⭐ 신규(커스텀) 캐릭터도 기본 8개 캐릭터와 동일한 공통 요소(눈 색상, 볼터치, 보석,
+    // 손 모양, 비율, 저작권 방지 등)를 반드시 갖도록 리터럴 텍스트를 강제로 이어붙인다 —
+    // AI가 visualDescription에 이 내용을 빠뜨리거나 다르게 요약해도 최종 프롬프트에는
+    // 항상 동일하게 들어간다.
+    const commonRules = getCommonAppearanceRulesText();
     const metadata = visualDescription
-      ? `${characterName} character, ${visualDescription}, ${voiceTone || ""} tone, cute mascot reference shot, single character centered, plain background, ${noTextInstruction}`
-      : `${characterName} character, ${voiceTone || "friendly"} tone, cute mascot reference shot, ${noTextInstruction}`;
+      ? `${characterName} character, ${visualDescription}, ${commonRules}, ${voiceTone || ""} tone, cute mascot reference shot, single character centered, plain background, ${noTextInstruction}`
+      : `${characterName} character, ${commonRules}, ${voiceTone || "friendly"} tone, cute mascot reference shot, ${noTextInstruction}`;
 
     console.log(`[라이브러리 레퍼런스 이미지 생성] ${characterName}`);
     console.log(`  프롬프트: ${metadata}`);
@@ -1588,6 +1625,7 @@ module.exports = {
   pollHiggsfield,
   generateCharacterReferenceImage,
   generateImageFromPrompt,
+  getCommonAppearanceRulesText,
   evaluateComplianceContent,
   getComplianceRulesForCategory,
 };
