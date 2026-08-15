@@ -544,7 +544,7 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
         {libraryLoading ? (
           <p className="text-sm text-dark-text-muted">라이브러리 불러오는 중...</p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 jeju-cute-bg p-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 jeju-cute-bg p-3">
             {library.map((libChar) => {
               const refChar = refinementByName[libChar.character_name];
               const isRefining = refiningName === libChar.character_name;
@@ -581,20 +581,30 @@ export default function CharacterCreator({ characters = [], resourceId, onSelect
                     <span className="text-[10px] text-dark-text-muted text-center">🖼️ 레퍼런스 없음<br/>(첫 생성 후 저장됨)</span>
                   )}
                 </div>
-                {/* 썸네일 바로 아래 특징/세계관 스토리 (캐릭터 갤러리와 동일한 구성) */}
-                <div className="text-xs space-y-1 mb-2">
+                {/* 썸네일 바로 아래 특징/세계관 스토리 (캐릭터 갤러리와 동일한 구성) — 줄 간격
+                    넉넉하게, 전문 표시(잘림 없음), 세계관 스토리 속 인용구는 강조 표시 */}
+                <div className="text-sm space-y-2.5 mb-2">
                   {libChar.toneTrait && (
-                    <div className="text-dark-text-muted">
-                      <span className="font-semibold text-dark-text">특징:</span> {libChar.toneTrait}
+                    <div className="text-dark-text-muted leading-relaxed">
+                      <span className="font-semibold text-dark-text">특징</span>
+                      <br />
+                      {libChar.toneTrait}
                     </div>
                   )}
                   {libChar.worldviewStory && (
-                    <div className="text-dark-text-muted line-clamp-2">
-                      <span className="font-semibold text-dark-text">세계관 스토리:</span> {libChar.worldviewStory}
+                    <div className="text-dark-text-muted leading-relaxed">
+                      <span className="font-semibold text-dark-text">세계관 스토리</span>
+                      <br />
+                      {libChar.worldviewStory}
+                      {libChar.worldviewQuote && (
+                        <div className="mt-1.5 pl-3 border-l-2 border-brand-blue/50 italic text-brand-blue">
+                          "{libChar.worldviewQuote}"
+                        </div>
+                      )}
                     </div>
                   )}
                   {!libChar.toneTrait && !libChar.worldviewStory && (
-                    <div className="text-dark-text-muted line-clamp-2">
+                    <div className="text-dark-text-muted leading-relaxed">
                       {libChar.character_profile || libChar.role || '-'}
                     </div>
                   )}

@@ -64,6 +64,7 @@ router.get("/library", async (req, res) => {
           role: char.role,
           toneTrait: char.toneTrait,
           worldviewStory: char.worldviewStory,
+          worldviewQuote: char.worldviewQuote,
           bodyStructure: char.bodyStructure,
           genderExpression: char.genderExpression,
           animationNotes: char.animationNotes,
@@ -452,6 +453,9 @@ router.post("/library/:id/generate-reference", async (req, res) => {
       characterName: lib.character_name,
       voiceTone: lib.voice_tone,
       visualDescription: referencePrompt || lib.visual_description,
+      // referencePrompt로 완성된 프롬프트(appearancePrompt+thumbnailStagingPrompt 등)를
+      // 직접 넘길 때는 공통 요소가 이미 다 포함되어 있으므로 중복 삽입을 막는다.
+      skipCommonRules: !!referencePrompt,
     });
 
     if (!genResult.success) {

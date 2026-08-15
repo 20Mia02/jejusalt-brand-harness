@@ -12,12 +12,44 @@
  */
 
 const axios = require("axios");
-const { exec } = require("child_process");
+const { execFile } = require("child_process");
 const util = require("util");
 const fs = require("fs");
 const path = require("path");
-const execPromise = util.promisify(exec);
+// ⚠️ exec()는 cmd.exe(Windows)/sh(Unix)에 문자열 전체를 넘기는데, Windows cmd.exe는
+// 명령줄 길이 제한이 약 8191자라서 캐릭터 프롬프트를 상세하게 쓸수록(우리가 지향하는
+// 방향) 금방 "명령줄이 너무 깁니다" 오류로 실패한다. execFile()은 인자 배열을 셸을
+// 거치지 않고 프로세스에 직접 넘겨서 이 제한을 받지 않는다(윈도우 프로세스 자체 한도는
+// 약 32,767자로 훨씬 넉넉함) — 실제로 결이/해수 등 5000자 넘는 프롬프트에서 재현 확인.
+const execFilePromise = util.promisify(execFile);
 const { callDatabase } = require("./database-agent");
+
+/**
+ * `higgsfield` CLI를 셸(cmd.exe) 없이 직접 실행할 수 있는 (command, prefixArgs)를 찾는다.
+ * Windows에서 전역 npm 설치는 `higgsfield.cmd` 셸 스크립트를 만드는데, execFile이 이걸
+ * 직접 실행하려면 shell:true가 필요하고 그러면 다시 cmd.exe의 명령줄 길이 제한(~8191자)에
+ * 걸린다. 이 셸 스크립트는 실제로 `node <경로>/@higgsfield/cli/bin/higgsfield.js`를
+ * 호출할 뿐이므로, 그 JS 파일을 직접 찾아서 node로 실행하면 셸을 완전히 우회할 수 있다.
+ */
+function resolveHiggsfieldExecutable() {
+  if (process.env.HIGGSFIELD_JS_PATH && fs.existsSync(process.env.HIGGSFIELD_JS_PATH)) {
+    return { command: process.execPath, prefixArgs: [process.env.HIGGSFIELD_JS_PATH] };
+  }
+  if (process.platform === "win32") {
+    const candidates = [
+      path.join(process.env.APPDATA || "", "npm", "node_modules", "@higgsfield", "cli", "bin", "higgsfield.js"),
+      path.join(process.env.APPDATA || "", "npm", "node_modules", "higgsfield", "bin", "higgsfield.js"),
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) {
+        return { command: process.execPath, prefixArgs: [candidate] };
+      }
+    }
+  }
+  // 폴백: Unix는 보통 셔뱅(#!/usr/bin/env node)이 있는 실행 파일이라 셸 없이도 바로 실행됨.
+  // Windows에서 위 경로를 못 찾은 경우에만 shell:true로 최후 수단 시도(길이 제한 위험 있음).
+  return { command: "higgsfield", prefixArgs: [], needsShell: process.platform === "win32" };
+}
 
 // OpenAI SDK (TimelyAI OpenAI 호환 모드) ✅
 const OpenAI = require("openai");
@@ -1222,15 +1254,15 @@ function buildVideoPromptText(videoConfig, config) {
  */
 function getCommonAppearanceRulesText() {
   return [
-    "rendered as an adorable, detailed chibi 2-heads-tall doll-like 3D character, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy)",
-    "the exact surface material and any clothing/accessories (a solid-colored body all over, a fitted robe/garment, or a themed mix of both) must be specific and richly detailed to match this character's own elemental theme, NOT a generic uniform material or costume shared identically with the other siblings — only the small face area is a soft neutral skin-tone, with no bare/exposed human-looking skin anywhere else on the body",
-    "warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions)",
-    "a small round non-human chibi creature with a simple round potato-shaped body just like the other Jeju Lava Sea Salt mascot siblings (same basic family silhouette, just recolored/re-themed)",
-    "large glowing bright blue (#00AEEF) eyes with clearly visible eyelashes",
+    "CRITICAL BODY SHAPE: an extremely simple, rounded, non-anatomical chibi toy body — one continuous soft round pear/egg-shaped torso with NO visible waistline, NO visible collarbone, shoulders, elbows, or knee joints, merging directly into two short stubby legs ending in tiny rounded feet; arms are short stubby rounded flipper-like limbs attached directly to the upper torso — like a soft beanbag plush toy, absolutely NOT a slender articulated humanoid figure, NOT a human body shape, head is dramatically larger than the tiny compact body (the head is at least 55% of total body height, matching every other Jeju Lava Sea Salt mascot sibling for family consistency)",
+    "rendered as an adorable, detailed chibi doll-like 3D character, in the polished style of a Kakao Friends or Pixar/DreamWorks 3D character render (a true dimensional 3D render with soft rounded volumetric shading and gentle global illumination, NOT a flat 2D illustration with a simple drop-shadow, NOT a flat sticker, NOT a photograph of a real physical toy)",
+    "the exact surface material and any clothing/accessories (a solid-colored body all over, a fitted robe/garment, or a themed mix of both) must be specific and richly detailed with concrete visible texture (fabric weave, stitching, gem facets, fur strands, etc. as appropriate) to match this character's own elemental theme, NOT a generic uniform material or costume shared identically with the other siblings — only the small face area is a soft neutral skin-tone, with no bare/exposed human-looking skin anywhere else on the body",
+    "large glossy round doll-like eyes with a thick black outline and a mostly dark/black iris — a small bright blue (#00AEEF) circular accent right at the very center of each pupil only (the rest of the eye stays dark, NOT the whole eye colored blue), plus a white sparkle highlight dot in each eye and clearly visible long eyelashes",
     "pink blush cheeks",
-    "simple cute stylized hands with a few soft rounded fingers clearly visible (enough to naturally hold or gesture with a product) — no fingernails, wrinkles, or realistic human hand detail, keep the fingers soft, chubby, and toy-like, never more or fewer than the same number of fingers in every generation",
-    "chibi 2-heads-tall proportions (the head is at least 55% of total body height, dramatically bigger than the tiny compact body — this exact giant-head-tiny-body ratio matches every other Jeju Lava Sea Salt mascot sibling for family consistency)",
-    "a LARGE glowing multi-faceted hexagonal salt-crystal gem, sized to about 30% of the width of the upper torso, worn at the center of the chest, cut in this character's own signature accent color with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by every Jeju Lava Sea Salt mascot sibling as their shared family emblem (only the gem color differs per character)",
+    "the face is built with clearly expressive features (large expressive eyes, mobile eyebrows, an open expressive mouth shape) so that emotions and personality read clearly even during dynamic motion in video — never a stiff, blank, or neutral expression",
+    "simple cute stylized hands — short stubby rounded mitten-like hands with only a few soft rounded fingers just barely defined (enough to naturally hold or gesture with a product), no fingernails, wrinkles, or realistic human hand detail, never more or fewer fingers than the same fixed count in every generation",
+    "a LARGE glowing multi-faceted hexagonal salt-crystal gem, sized to about 30% of the width of the upper torso, worn at the center of the chest — this exact gem MUST always be present and clearly visible, cut in this character's own signature accent color with bright specular highlights so it stands out clearly against the body color — the same hexagonal-crystal brooch SHAPE worn identically by every Jeju Lava Sea Salt mascot sibling as their shared family emblem (only the gem color differs per character)",
+    "warm and appealing with absolutely no uncanny or unsettling AI-artifact appearance (no asymmetric eyes, no distorted or melted facial features, no extra fingers, no warped proportions)",
     "must NOT resemble, copy, or evoke the design, silhouette, color scheme, or signature features of any existing character or franchise (e.g. Pokémon/Pikachu-style creatures, Kakao Friends [Ryan, Apeach, Muzi, Tube, Neo], LINE Friends [Brown, Cony, Sally, Leonard], Hello Kitty or any Sanrio character [My Melody, Cinnamoroll, Kuromi, Gudetama, Pompompurin], Rilakkuma or any San-X character [Sumikko Gurashi, Molang], Moomin, Miffy, Care Bears, Chiikawa, BT21, Kumamon or any Japanese local yuru-chara mascot, Pororo and friends [뽀로로, 에디, 크롱, 루피, 해리], Tayo the Little Bus, Pinkfong/Baby Shark, Minions, Winnie the Pooh, Paddington Bear, Peanuts/Snoopy, Doraemon, Studio Ghibli characters [Totoro], or any Disney/Pixar/anime/manga character)",
   ].join(", ");
 }
@@ -1254,28 +1286,30 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
       );
     }
 
-    const metadata = sanitizeForShell(buildVideoPromptText(videoConfig, config));
+    const metadata = buildVideoPromptText(videoConfig, config).replace(/\s+/g, " ").trim();
 
     console.log(`[Step 9] Higgsfield CLI 호출 시작`);
     console.log(`  명령: higgsfield generate create ${MODEL}`);
     console.log(`  메타데이터: ${metadata}`);
     console.log(`  duration: ${duration}초 (요청: ${requestedDuration}초)`);
 
-    const baseCommand = `higgsfield generate create ${MODEL} --prompt "${metadata}" --duration ${duration} --resolution 720p`;
-    let command = baseCommand;
+    const baseArgs = ["generate", "create", MODEL, "--prompt", metadata, "--duration", String(duration), "--resolution", "720p"];
+    let args = baseArgs;
     if (videoConfig.referenceJobId) {
-      const safeReferenceJobId = sanitizeForShell(videoConfig.referenceJobId);
+      const safeReferenceJobId = String(videoConfig.referenceJobId).trim();
       console.log(`  레퍼런스 이미지(start-image job id): ${safeReferenceJobId}`);
-      command += ` --start-image "${safeReferenceJobId}"`;
+      args = [...args, "--start-image", safeReferenceJobId];
     }
-    command += ` --wait`;
+    args = [...args, "--wait"];
 
     console.log(`[Step 9] 명령 실행 중...`);
+    const { command, prefixArgs, needsShell } = resolveHiggsfieldExecutable();
     let stdout;
     try {
-      ({ stdout } = await execPromise(command, {
+      ({ stdout } = await execFilePromise(command, [...prefixArgs, ...args], {
         timeout: 600000,
-        maxBuffer: 10 * 1024 * 1024
+        maxBuffer: 10 * 1024 * 1024,
+        shell: needsShell,
       }));
     } catch (execError) {
       const isReferenceParamRejected =
@@ -1286,10 +1320,11 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
       }
 
       console.warn(`[Step 9] 레퍼런스 이미지 파라미터가 거부됨 → 레퍼런스 없이 재시도 (일관성 저하 가능)`);
-      const fallbackCommand = `${baseCommand} --wait`;
-      ({ stdout } = await execPromise(fallbackCommand, {
+      const fallbackArgs = [...baseArgs, "--wait"];
+      ({ stdout } = await execFilePromise(command, [...prefixArgs, ...fallbackArgs], {
         timeout: 600000,
-        maxBuffer: 10 * 1024 * 1024
+        maxBuffer: 10 * 1024 * 1024,
+        shell: needsShell,
       }));
     }
 
@@ -1503,26 +1538,36 @@ async function generateVideo(videoConfig, resourceId, contentId, options = {}) {
  * callHiggsfield와 달리 특정 resource/content에 종속되지 않으므로 videos 테이블에는
  * 기록하지 않고, 결과만 반환한다 (호출한 쪽에서 character_library에 직접 저장).
  */
-async function generateCharacterReferenceImage({ characterName, voiceTone, visualDescription }) {
+async function generateCharacterReferenceImage({ characterName, voiceTone, visualDescription, skipCommonRules = false }) {
   try {
     const noTextInstruction = "no on-screen text, no readable words or captions, no signage text, clean text-free visual";
     // ⭐ 신규(커스텀) 캐릭터도 기본 8개 캐릭터와 동일한 공통 요소(눈 색상, 볼터치, 보석,
     // 손 모양, 비율, 저작권 방지 등)를 반드시 갖도록 리터럴 텍스트를 강제로 이어붙인다 —
     // AI가 visualDescription에 이 내용을 빠뜨리거나 다르게 요약해도 최종 프롬프트에는
-    // 항상 동일하게 들어간다.
-    const commonRules = getCommonAppearanceRulesText();
+    // 항상 동일하게 들어간다. 단, 호출부가 appearancePrompt+thumbnailStagingPrompt처럼
+    // 이미 공통 요소를 전부 포함한 완성된 프롬프트를 직접 넘길 때는(기본 8개 캐릭터
+    // 썸네일 재생성 등) skipCommonRules:true로 중복 삽입을 막는다 — 중복돼도 틀린 건
+    // 아니지만 프롬프트만 쓸데없이 길어진다.
+    const commonRules = skipCommonRules ? null : getCommonAppearanceRulesText();
+    // ⚠️ "plain background"는 skipCommonRules일 때(=호출부가 thumbnailStagingPrompt처럼
+    // 이미 배경까지 상세히 지정한 완성된 프롬프트를 직접 넘길 때) 절대 넣으면 안 된다 —
+    // 프롬프트 맨 끝에 붙는 문구라 뒤에 오는 지시가 우선시되는 경향이 있어서, 상세하게
+    // 지정한 배경을 이 한 줄이 통째로 무시시켜 버린 사례가 실제로 있었다(해수 v1 생성).
+    const backgroundInstruction = skipCommonRules ? null : "single character centered, plain background";
     const metadata = visualDescription
-      ? `${characterName} character, ${visualDescription}, ${commonRules}, ${voiceTone || ""} tone, cute mascot reference shot, single character centered, plain background, ${noTextInstruction}`
-      : `${characterName} character, ${commonRules}, ${voiceTone || "friendly"} tone, cute mascot reference shot, ${noTextInstruction}`;
+      ? [`${characterName} character`, visualDescription, commonRules, voiceTone ? `${voiceTone} tone` : null, "cute mascot reference shot", backgroundInstruction, noTextInstruction].filter(Boolean).join(", ")
+      : [`${characterName} character`, commonRules, `${voiceTone || "friendly"} tone`, "cute mascot reference shot", noTextInstruction].filter(Boolean).join(", ");
 
     console.log(`[라이브러리 레퍼런스 이미지 생성] ${characterName}`);
     console.log(`  프롬프트: ${metadata}`);
 
-    const command = `higgsfield --json generate create text2image_soul_v2 --prompt "${metadata}" --wait`;
+    const { command, prefixArgs, needsShell } = resolveHiggsfieldExecutable();
+    const args = [...prefixArgs, "--json", "generate", "create", "text2image_soul_v2", "--prompt", metadata, "--wait"];
 
-    const { stdout } = await execPromise(command, {
+    const { stdout } = await execFilePromise(command, args, {
       timeout: 600000,
       maxBuffer: 10 * 1024 * 1024,
+      shell: needsShell,
     });
 
     const parsed = JSON.parse(stdout.trim());
@@ -1551,13 +1596,14 @@ async function generateCharacterReferenceImage({ characterName, voiceTone, visua
 // ============================================================================
 async function generateImageFromPrompt(fullPrompt) {
   try {
-    const sanitizeForShell = (s) => String(s || "").replace(/["'`$\\;|&<>%^()\n\r]/g, " ").replace(/\s+/g, " ").trim();
-    const safePrompt = sanitizeForShell(fullPrompt);
-    const command = `higgsfield --json generate create text2image_soul_v2 --prompt "${safePrompt}" --wait`;
+    const safePrompt = String(fullPrompt || "").replace(/\s+/g, " ").trim();
+    const { command, prefixArgs, needsShell } = resolveHiggsfieldExecutable();
+    const args = [...prefixArgs, "--json", "generate", "create", "text2image_soul_v2", "--prompt", safePrompt, "--wait"];
 
-    const { stdout } = await execPromise(command, {
+    const { stdout } = await execFilePromise(command, args, {
       timeout: 600000,
       maxBuffer: 10 * 1024 * 1024,
+      shell: needsShell,
     });
 
     const parsed = JSON.parse(stdout.trim());

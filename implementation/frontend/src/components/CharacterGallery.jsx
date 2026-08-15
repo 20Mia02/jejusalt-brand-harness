@@ -46,6 +46,7 @@ function transformCharacter(raw) {
     // 아래 항상 보이도록 표시한다 (커스텀 캐릭터는 worldviewStory가 없을 수 있음)
     toneTrait: raw.toneTrait || raw.tone_trait || '',
     worldviewStory: raw.worldviewStory || '',
+    worldviewQuote: raw.worldviewQuote || '',
   };
 }
 
@@ -83,42 +84,53 @@ export default function CharacterGallery() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* ⭐ 2~3열로 좁혀서 카드 폭을 넉넉하게 확보 — 세계관 스토리 전문이 잘리지 않고
+          자연스럽게 줄바꿈되도록. 카드마다 높이가 달라도 grid가 알아서 처리함 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {characters.map((char) => {
           const expanded = expandedId === char.id;
           return (
             <div
               key={char.id}
-              className={`border rounded-xl p-3 bg-dark-bg transition cursor-pointer ${
-                expanded ? 'border-brand-blue col-span-2 row-span-2' : 'border-brand-blue/10 hover:border-brand-blue/40'
+              className={`border rounded-xl p-4 bg-dark-bg transition cursor-pointer ${
+                expanded ? 'border-brand-blue sm:col-span-2' : 'border-brand-blue/10 hover:border-brand-blue/40'
               }`}
               onClick={() => setExpandedId(expanded ? null : char.id)}
             >
-              <div className="w-full aspect-square bg-dark-chip rounded-lg overflow-hidden mb-2 flex items-center justify-center">
+              <div className="w-full aspect-square bg-dark-chip rounded-lg overflow-hidden mb-3 flex items-center justify-center">
                 {char.referenceImageUrl ? (
                   <ReferenceMedia url={char.referenceImageUrl} alt={char.name} className="w-full h-full object-contain" />
                 ) : (
                   <span className="text-xs text-dark-text-muted">아직 생성 안 됨</span>
                 )}
               </div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-semibold text-sm">{char.name}</span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-base">{char.name}</span>
                 {char.currentVersion && (
                   <span className="text-[10px] bg-status-approved/10 text-status-approved px-1.5 py-0.5 rounded">
                     {char.currentVersion}
                   </span>
                 )}
               </div>
-              {/* 썸네일 바로 아래 항상 보이는 특징/세계관 스토리 */}
-              <div className="text-xs space-y-1 mt-1">
+              {/* 썸네일 바로 아래 항상 보이는 특징/세계관 스토리 — 줄 간격 넉넉하게, 전문 표시 */}
+              <div className="text-sm space-y-2.5">
                 {char.toneTrait && (
-                  <div className="text-dark-text-muted">
-                    <span className="font-semibold text-dark-text">특징:</span> {char.toneTrait}
+                  <div className="text-dark-text-muted leading-relaxed">
+                    <span className="font-semibold text-dark-text">특징</span>
+                    <br />
+                    {char.toneTrait}
                   </div>
                 )}
                 {char.worldviewStory && (
-                  <div className="text-dark-text-muted line-clamp-2">
-                    <span className="font-semibold text-dark-text">세계관 스토리:</span> {char.worldviewStory}
+                  <div className="text-dark-text-muted leading-relaxed">
+                    <span className="font-semibold text-dark-text">세계관 스토리</span>
+                    <br />
+                    {char.worldviewStory}
+                    {char.worldviewQuote && (
+                      <div className="mt-1.5 pl-3 border-l-2 border-brand-blue/50 italic text-brand-blue">
+                        "{char.worldviewQuote}"
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
