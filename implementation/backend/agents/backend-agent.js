@@ -16,6 +16,7 @@ const { exec } = require("child_process");
 const util = require("util");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const execPromise = util.promisify(exec);
 const { callDatabase } = require("./database-agent");
 
@@ -1162,11 +1163,47 @@ function classifyHiggsfieldError(error) {
   return { error: "HIGGSFIELD_CLI_ERROR", message: raw };
 }
 
+const sanitizeForShell = (s) => String(s || "").replace(/["'`$\\;|&<>%^()\n\r]/g, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * 영상 생성 프롬프트(캐릭터 일관성 앵커 + 브랜드 컨텍스트 + 텍스트-오버레이 금지 지시)를
+ * 만드는 공통 로직. Higgsfield(기본 모드)와 Kling(테스트 모드)이 이 함수를 공유하므로,
+ * 캐릭터 묘사/브랜드 반영 방식을 한 번만 고치면 두 모드에 동일하게 적용된다
+ * (기본 모드만 고치고 테스트 모드는 그대로 있는 식의 불일치를 방지).
+ */
+function buildVideoPromptText(videoConfig, config) {
+  const brand = config.brand || {};
+  const character = videoConfig.character || "character";
+  const voiceTone = videoConfig.voiceTone || "friendly";
+  const visualDescription = videoConfig.visualDescription || "";
+
+  const libraryChar = (config.characters || []).find((c) => c.name === character);
+  const characterVisual = libraryChar?.higgsfieldPrompt || visualDescription;
+
+  const mascotAnchor =
+    "3D pixar-style plush toy mascot character, non-human, stylized cute cartoon figure, toy-like material, NOT a real human, not photorealistic, must exactly match the provided start-image reference character design in every scene (same face, same body shape, same proportions, only pose/background changes), keep a round cute chibi mascot body with a clearly visible friendly face at all times, do NOT turn into a rock/lava/fire elemental creature or any existing famous animated character, texture details (rocky/flame patterns) are surface decoration only and must not change the character's overall silhouette";
+
+  const brandContext = `${brand.nameKorean || "제주소금"} brand, Jeju volcanic sea salt heritage`;
+  const storySnippet = (videoConfig.generatedContent || "").trim().slice(0, 200);
+  const noTextInstruction = "no on-screen text, no readable words or captions, no signage text, clean text-free visual";
+
+  return [
+    `${character} character`,
+    characterVisual,
+    mascotAnchor,
+    `${voiceTone} tone`,
+    brandContext,
+    storySnippet ? `scene: ${storySnippet}` : null,
+    noTextInstruction,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 async function callHiggsfield(videoConfig, resourceId, contentId) {
   try {
     const { getConfig } = require("../utils/config-loader");
     const config = getConfig();
-    const brand = config.brand || {};
 
     const MODEL = "seedance_2_0";
     const MAX_CLIP_SECONDS = 15;
@@ -1182,34 +1219,7 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
       );
     }
 
-    const character = videoConfig.character || 'character';
-    const voiceTone = videoConfig.voiceTone || 'friendly';
-    const visualDescription = videoConfig.visualDescription || '';
-
-    const libraryChar = (config.characters || []).find((c) => c.name === character);
-    const characterVisual = libraryChar?.higgsfieldPrompt || visualDescription;
-
-    const mascotAnchor =
-      "3D pixar-style plush toy mascot character, non-human, stylized cute cartoon figure, toy-like material, NOT a real human, not photorealistic, must exactly match the provided start-image reference character design in every scene (same face, same body shape, same proportions, only pose/background changes), keep a round cute chibi mascot body with a clearly visible friendly face at all times, do NOT turn into a rock/lava/fire elemental creature or any existing famous animated character, texture details (rocky/flame patterns) are surface decoration only and must not change the character's overall silhouette";
-
-    const brandContext = `${brand.nameKorean || "제주소금"} brand, Jeju volcanic sea salt heritage`;
-    const storySnippet = (videoConfig.generatedContent || "").trim().slice(0, 200);
-    const noTextInstruction = "no on-screen text, no readable words or captions, no signage text, clean text-free visual";
-
-    const sanitizeForShell = (s) => String(s || "").replace(/["'`$\\;|&<>%^()\n\r]/g, " ").replace(/\s+/g, " ").trim();
-    const metadata = sanitizeForShell(
-      [
-        `${character} character`,
-        characterVisual,
-        mascotAnchor,
-        `${voiceTone} tone`,
-        brandContext,
-        storySnippet ? `scene: ${storySnippet}` : null,
-        noTextInstruction,
-      ]
-        .filter(Boolean)
-        .join(", ")
-    );
+    const metadata = sanitizeForShell(buildVideoPromptText(videoConfig, config));
 
     console.log(`[Step 9] Higgsfield CLI 호출 시작`);
     console.log(`  명령: higgsfield generate create ${MODEL}`);
@@ -1290,6 +1300,171 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
       statusCode: error.code,
     };
   }
+}
+
+// ============================================================================
+// [함수 2-0] 테스트 모드 — Kling API로 영상 생성 (Higgsfield 크레딧 소진 중에도
+// 파이프라인 연동/테스트를 계속하기 위한 대체 경로)
+// ----------------------------------------------------------------------------
+// ⚠️⚠️ 중요: Kling 무료 티어는 워터마크가 포함되고 상업적 사용이 금지된다.
+// 그래서 이 경로는 반드시 "테스트 모드"에서만 호출되어야 하며 (routes/generation.js의
+// testMode 플래그로 분기), 실제 마케팅용 최종 영상에는 절대 사용해서는 안 된다.
+// 프론트엔드는 이 결과를 받으면 반드시 "테스트 모드 / 상업적 이용 불가" 경고를 표시한다.
+// ============================================================================
+
+function base64url(input) {
+  return Buffer.from(input)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+/**
+ * Kling API 인증용 JWT(HS256)를 직접 서명한다 (jsonwebtoken 패키지 없이 crypto만 사용 —
+ * 헤더+페이로드+HMAC-SHA256 서명뿐이라 별도 의존성을 추가할 필요가 없다).
+ * 토큰 유효시간은 Kling 문서 기준 30분이지만, 폴링 도중 만료될 일이 없도록 매 호출마다 새로 서명한다.
+ */
+function signKlingJwt(accessKey, secretKey) {
+  const header = { alg: "HS256", typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = { iss: accessKey, exp: now + 1800, nbf: now - 5 };
+  const encodedHeader = base64url(JSON.stringify(header));
+  const encodedPayload = base64url(JSON.stringify(payload));
+  const signature = crypto
+    .createHmac("sha256", secretKey)
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
+}
+
+async function callKlingVideo(videoConfig, resourceId, contentId) {
+  try {
+    const accessKey = process.env.KLING_ACCESS_KEY;
+    const secretKey = process.env.KLING_SECRET_KEY;
+    if (!accessKey || !secretKey) {
+      throw new Error(
+        "KLING_ACCESS_KEY/KLING_SECRET_KEY가 설정되지 않았습니다 (테스트 모드는 Kling API 키가 필요합니다 — kling.ai/dev/api-key 에서 발급)"
+      );
+    }
+
+    const { getConfig } = require("../utils/config-loader");
+    const config = getConfig();
+
+    const baseURL = process.env.KLING_API_BASE_URL || "https://api.klingai.com";
+    const model = process.env.KLING_MODEL || "kling-v2-6";
+
+    // Kling text2video는 duration을 "5" 또는 "10"(문자열) 중 하나만 받는다 — Higgsfield처럼
+    // 임의 초 단위를 그대로 못 쓰므로 요청 길이를 가장 가까운 허용값으로 반올림한다.
+    const rawDuration = Number(videoConfig.duration);
+    const requestedDuration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 5;
+    const duration = requestedDuration > 7 ? "10" : "5";
+
+    // 프롬프트 자체는 buildVideoPromptText로 Higgsfield와 완전히 공유 — 셸 이스케이프는
+    // 필요 없고(JSON 바디로 전송) 공백만 정리한다.
+    const prompt = buildVideoPromptText(videoConfig, config).replace(/\s+/g, " ").trim();
+
+    console.log(`[테스트 모드] Kling API 호출 시작 (모델: ${model}, duration: ${duration}초)`);
+    console.log(`  프롬프트: ${prompt}`);
+
+    const token = signKlingJwt(accessKey, secretKey);
+    const createRes = await axios.post(
+      `${baseURL}/v1/videos/text2video`,
+      {
+        model_name: model,
+        prompt,
+        duration,
+        mode: "std",
+        aspect_ratio: "9:16",
+      },
+      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, timeout: 30000 }
+    );
+
+    const taskId = createRes.data?.data?.task_id;
+    if (!taskId) {
+      throw new Error(`Kling 작업 생성 응답에 task_id가 없습니다: ${JSON.stringify(createRes.data)}`);
+    }
+
+    // 5초 간격으로 최대 5분 폴링 (Kling text2video는 보통 1~3분 내 완료됨)
+    const maxAttempts = 60;
+    let videoUrl = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+
+      const statusToken = signKlingJwt(accessKey, secretKey);
+      const statusRes = await axios.get(`${baseURL}/v1/videos/text2video/${taskId}`, {
+        headers: { Authorization: `Bearer ${statusToken}` },
+        timeout: 15000,
+      });
+
+      const taskStatus = statusRes.data?.data?.task_status;
+      if (taskStatus === "succeed") {
+        const videos = statusRes.data?.data?.task_result?.videos || [];
+        videoUrl = videos[0]?.url || videos[0]?.watermark_url || null;
+        break;
+      }
+      if (taskStatus === "failed") {
+        throw new Error(`Kling 작업 실패: ${statusRes.data?.data?.task_status_msg || "알 수 없는 오류"}`);
+      }
+      console.log(`  [테스트 모드] Kling 진행 중... (${attempt}/${maxAttempts})`);
+    }
+
+    if (!videoUrl) {
+      throw new Error("Kling 영상 생성 타임아웃 (5분 초과)");
+    }
+
+    console.log(`[✓] 테스트 모드 영상 생성 완료: ${videoUrl}`);
+
+    const videoResult = await callDatabase("videos", "create", {
+      resource_id: resourceId,
+      content_id: contentId,
+      generation_status: "completed",
+      generation_progress: 100,
+      video_url: videoUrl,
+      generation_start_time: new Date(),
+      generation_end_time: new Date(),
+    });
+
+    return {
+      success: true,
+      data: {
+        video_url: videoUrl,
+        generation_status: "completed",
+        generation_progress: 100,
+        videos_row_id: videoResult.rows?.[0]?.id,
+        testMode: true,
+        provider: "kling",
+        commercialUseAllowed: false,
+        watermarked: true,
+      },
+    };
+  } catch (error) {
+    console.error(`[✗] 테스트 모드(Kling) 영상 생성 실패: ${error.message}`);
+    return {
+      success: false,
+      error: "KLING_API_ERROR",
+      message: error.response?.data?.message || error.message,
+      statusCode: error.response?.status,
+    };
+  }
+}
+
+/**
+ * 영상 생성 단일 진입점 — routes/generation.js는 이 함수 하나만 호출한다.
+ * testMode=false(기본 모드): Higgsfield(유료, 상업적 사용 가능)
+ * testMode=true(테스트 모드): Kling(무료지만 워터마크+비상업용, 파이프라인 검증 전용)
+ * 두 모드 모두 buildVideoPromptText를 공유하므로, 캐릭터/브랜드 프롬프트를 고치는 기능
+ * 수정은 이 함수를 거치지 않고 바로 두 모드 모두에 반영된다.
+ */
+async function generateVideo(videoConfig, resourceId, contentId, options = {}) {
+  const testMode = !!options.testMode;
+  if (testMode) {
+    return callKlingVideo(videoConfig, resourceId, contentId);
+  }
+  return callHiggsfield(videoConfig, resourceId, contentId);
 }
 
 // ============================================================================
@@ -1424,6 +1599,8 @@ async function pollHiggsfield(higgsfieldId, videoRowId) {
 module.exports = {
   callAgent,
   callHiggsfield,
+  callKlingVideo,
+  generateVideo,
   pollHiggsfield,
   generateCharacterReferenceImage,
   generateImageFromPrompt,

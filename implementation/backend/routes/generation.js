@@ -22,7 +22,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { callAgent, callHiggsfield, getComplianceRulesForCategory } = require("../agents/backend-agent");
+const { callAgent, callHiggsfield, generateVideo, getComplianceRulesForCategory } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
 const { getGenerationConfig } = require("../utils/config-loader");
 const scenarioTemplates = require("../config/scenario-templates.json");
@@ -1003,7 +1003,10 @@ router.post("/:resourceId/naming/confirm", async (req, res) => {
 // ─────────────────────────────────────────────────────
 router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
   const { resourceId, contentId } = req.params;
-  const { editedContent } = req.body;
+  // ⭐ testMode: true면 Higgsfield(기본, 유료, 상업적 사용 가능) 대신 Kling(무료지만
+  // 워터마크+비상업용)으로 영상을 생성한다 — Higgsfield 크레딧 소진 중에도 파이프라인
+  // 연동/테스트를 계속하기 위한 용도이며, 절대 실제 마케팅 영상 대체용이 아니다.
+  const { editedContent, testMode } = req.body;
 
   try {
     const contentResult = await callDatabase("contents", "read", null, { id: contentId });
@@ -1111,25 +1114,29 @@ router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
       .map((c) => `${c.character_name}(${c.visual_description || "설명 없음"})`)
       .join(", ");
 
-    // ── Step 9: Higgsfield 호출 ──
-    console.log(`[Step 9] Higgsfield 영상 생성 요청... (대표 캐릭터: ${primaryCharacter.character_name}${coCharacters.length ? `, 공동출연: ${coCharacters.map((c) => c.character_name).join(", ")}` : ""})`);
+    // ── Step 9: 영상 생성 (기본 모드=Higgsfield / 테스트 모드=Kling) ──
+    const isTestMode = !!testMode;
+    console.log(
+      `[Step 9] ${isTestMode ? "테스트 모드(Kling)" : "Higgsfield"} 영상 생성 요청... (대표 캐릭터: ${primaryCharacter.character_name}${coCharacters.length ? `, 공동출연: ${coCharacters.map((c) => c.character_name).join(", ")}` : ""})`
+    );
     let videoUrl = null;
     let videosRowId = null;
     let higgsfieldError = null;
 
-    // ⭐ 진행률 표시 버그 수정: callHiggsfield는 callAgent를 거치지 않아서 generation_logs에
-    // 아무 기록도 남기지 않았다 — 그래서 실제 영상 생성(최대 10분)이 진행되는 동안 GET /status를
-    // 폴링해도 마지막 성공 기록이 Step 8(컴플라이언스, 몇 초짜리)에 멈춰 있어서, 사용자 입장에선
-    // 가장 오래 걸리는 구간에서 아무 진행 표시도 없이 "멈춘 것처럼" 보였다. 호출 직전에
-    // in_progress 기록을 남겨서 폴링이 "지금 영상 생성 중"임을 알 수 있게 한다.
+    // ⭐ 진행률 표시 버그 수정: callHiggsfield/callKlingVideo는 callAgent를 거치지 않아서
+    // generation_logs에 아무 기록도 남기지 않았다 — 그래서 실제 영상 생성(최대 10분)이 진행되는
+    // 동안 GET /status를 폴링해도 마지막 성공 기록이 Step 8(컴플라이언스, 몇 초짜리)에 멈춰
+    // 있어서, 사용자 입장에선 가장 오래 걸리는 구간에서 아무 진행 표시도 없이 "멈춘 것처럼"
+    // 보였다. 호출 직전에 in_progress 기록을 남겨서 폴링이 "지금 영상 생성 중"임을 알 수 있게 한다.
     await callDatabase("generation_logs", "create", {
       resource_id: resourceId,
       step: "higgsfield-video",
       status: "in_progress",
       attempt: 1,
+      details: { testMode: isTestMode },
     }).catch((e) => console.error("[진행률 로그 기록 실패]", e));
 
-    const higgsfieldResult = await callHiggsfield(
+    const higgsfieldResult = await generateVideo(
       {
         character: primaryCharacter.character_name,
         generatedContent: finalContent,
@@ -1138,11 +1145,13 @@ router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
           ? `${primaryCharacter.visual_description || ""}, 함께 등장하는 캐릭터: ${coCharacterDescriptions}`
           : primaryCharacter.visual_description || "",
         // ⭐ 재현성: --start-image는 URL이 아니라 job id(generation_seed)를 받는다
+        // (테스트 모드/Kling은 참조 이미지를 사용하지 않으므로 무시됨)
         referenceJobId: primaryCharacter.generation_seed || null,
         duration: targetDuration,
       },
       resourceId,
-      contentId
+      contentId,
+      { testMode: isTestMode }
     );
 
     if (higgsfieldResult.success) {
@@ -1250,6 +1259,10 @@ router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
       videoUrl: higgsfieldResult.success ? higgsfieldResult.data.video_url : null,
       videoStatus: higgsfieldResult.success ? "completed" : "failed",
       higgsfieldError: higgsfieldError,
+      // ⭐ 테스트 모드(Kling)로 생성된 영상은 워터마크가 있고 상업적으로 사용할 수 없다 —
+      // 프론트엔드는 이 값이 true면 반드시 경고 배너를 표시해야 한다.
+      testMode: isTestMode,
+      commercialUseAllowed: !isTestMode,
       qaResult,
     });
   } catch (error) {
@@ -1631,7 +1644,7 @@ router.post("/:resourceId/retry-from/:step", async (req, res) => {
 // body: { characterId, resourceId?, versionOverride?, videoType?, duration?, forceRefine? }
 // ─────────────────────────────────────────────────────
 router.post("/character", async (req, res) => {
-  const { characterId, resourceId, versionOverride, videoType, duration, forceRefine, maxRetries } = req.body || {};
+  const { characterId, resourceId, versionOverride, videoType, duration, forceRefine, maxRetries, testMode } = req.body || {};
 
   if (!characterId) {
     return res.status(400).json({ success: false, message: "characterId가 필요합니다" });
@@ -1707,9 +1720,11 @@ router.post("/character", async (req, res) => {
     }
 
     // 영상까지 요청된 경우, 확정된 레퍼런스 이미지를 --start-image로 재사용해서 1회만 생성한다.
+    // (testMode=true면 Higgsfield 대신 Kling 사용 — /copy/:contentId/confirm과 동일한 분기)
     let videoResult = null;
+    const isTestMode = !!testMode;
     if (resourceId && videoType) {
-      videoResult = await callHiggsfield(
+      videoResult = await generateVideo(
         {
           character: character.name,
           generatedContent: character.description,
@@ -1719,7 +1734,8 @@ router.post("/character", async (req, res) => {
           duration: duration || 15,
         },
         resourceId,
-        null
+        null,
+        { testMode: isTestMode }
       );
     }
 
@@ -1735,6 +1751,8 @@ router.post("/character", async (req, res) => {
       referenceImageUrl: finalData.character.referenceImageUrl,
       videoUrl: videoResult?.success ? videoResult.data.video_url : null,
       higgsfieldError: videoResult && !videoResult.success ? videoResult.message : null,
+      testMode: isTestMode,
+      commercialUseAllowed: !isTestMode,
       cutenessMessage:
         cuteness == null
           ? "기존 확정 버전을 그대로 사용했습니다 (일관성 유지)"
