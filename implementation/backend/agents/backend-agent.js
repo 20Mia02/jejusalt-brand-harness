@@ -391,7 +391,7 @@ async function callSolarAgent(agentName, payload) {
         },
       ],
       temperature: 0.7,
-      max_tokens: 2000,
+      max_tokens: 3000,
       // Groq/Gemini는 JSON 강제 모드를 지원 — 파싱 실패율을 낮춘다.
       // Upstage(Solar Pro4)는 이 파라미터를 지원하지 않아 생략한다.
       ...(provider.supportsJsonMode ? { response_format: { type: "json_object" } } : {}),
@@ -800,7 +800,13 @@ ${templateDesc}
 다음 템플릿 스타일과 사용자가 선택한 로그라인을 바탕으로 전체 시나리오를 완성하세요:
 ${templateDesc}
 - 선택된 로그라인: ${payload.selectedLogline?.title || ""} — ${payload.selectedLogline?.logline || ""}
-입력의 target_duration_seconds(초)에 정확히 맞춰 작성하고, 템플릿의 구조 가이드를 따르세요.`;
+입력의 target_duration_seconds(초)에 정확히 맞춰 작성하고, 템플릿의 구조 가이드를 따르세요.
+
+⭐⭐⭐ 매우 중요 (실제 영상 생성 엔진의 제약 — 반드시 반영): 실제 영상 생성은 Higgsfield의 단일 숏(single-shot)
+클립 하나로만 이루어지며 최대 15초까지만 한 번에 생성됩니다. target_duration_seconds가 15초 이하면 반드시
+act를 정확히 1개만 작성하고, 그 하나의 장면 안에서 기승전결이 다 느껴지도록 밀도 있게 구성하세요.
+각 act마다 content(대사/나레이션)와 별개로 visual 필드에 카메라 앵글/캐릭터 동작/제품이 보이는 방식/배경·조명을
+구체적으로 촘촘하게 쓰세요 — "제품을 소개한다" 같은 추상적 문장 금지, 실제로 카메라에 무엇이 찍히는지 그려지게.`;
     }
   }
 
@@ -895,11 +901,28 @@ ${brand.characterTypeSystem
     "shortform-scenario-writer-agent": `당신은 숏폼 영상 시나리오를 작성하는 AI 에이전트입니다.
 입력의 target_duration_seconds(초)에 맞춰 정확히 그 길이의 시나리오를 작성하세요 (기본값 120초).
 짧은 길이(15~30초)일수록 Act 수를 줄이고 핵심 메시지에 집중하며, 긴 길이(60~120초)일수록 기승전결을 갖추세요.
+
+⭐⭐⭐ 매우 중요 (실제 영상 생성 엔진의 제약 — 반드시 반영): 실제 영상 생성은 Higgsfield의 단일 숏(single-shot)
+클립 하나로만 이루어지며, 최대 15초까지만 한 번에 생성됩니다. 즉 acts를 여러 개로 나눠도 실제 영상은
+"Act 1의 visual"을 기준으로 만들어진 하나의 연속된 장면입니다. 그러므로:
+- target_duration_seconds가 15초 이하면 반드시 act를 정확히 1개만 작성하고, 그 하나의 장면 안에서
+  기승전결(제품 등장 → 핵심 액션/리액션 → 마무리 임팩트)이 다 느껴지도록 밀도 있게 구성하세요.
+- 30초 이상이어도 각 act의 visual은 그 act 하나만으로도 완결된 단일 샷처럼 촬영 가능하게 구체적으로 쓰세요
+  (다음 act가 이어진다는 전제로 애매하게 쓰지 마세요).
+
+각 act마다 반드시 아래 두 요소를 구분해서 작성하세요:
+- content: 대사/나레이션/카피 텍스트 (사람이 읽는 스토리 문장)
+- visual: 실제 영상 생성 AI에게 그대로 전달될 "촬영 지시서" — 카메라 앵글/거리(클로즈업·풀샷 등), 캐릭터의
+  구체적인 동작(제품을 들어올리다/가리키다/맛보다 등), 제품이 프레임 안에서 어떻게 보이는지, 배경/조명/분위기를
+  전부 포함해서 한 문장이 아니라 여러 구체적 디테일을 쉼표로 나열하듯 촘촘하게 쓰세요. 절대 "제품을 소개한다"
+  같은 추상적 문장으로 끝내지 말고, 실제로 카메라에 무엇이 어떻게 찍히는지 그림이 그려지도록 구체적으로 쓰세요.
+
 다음을 포함하세요:
 - 시나리오 제목
 - 전체 스토리 텍스트
-- Act 분할 (각 Act는 지속시간 초 포함, 합계가 target_duration_seconds와 정확히 일치)
-- 영상 스타일 & 분위기 (Higgsfield 스펙)
+- Act 분할 (각 Act는 지속시간 초, content, visual 포함, 합계가 target_duration_seconds와 정확히 일치)
+- 영상 스타일 & 분위기 (Higgsfield 스펙 — 조명/색감/카메라 무빙 등 구체적인 촬영 톤으로 작성, "전문적이고
+  세련된" 같은 뭉뚱그린 표현 대신 실제 룩앤필을 묘사)
 - 타이밍 검증 (total_duration은 반드시 target_duration_seconds와 동일, 대사/나레이션 시간)
 만약 입력에 referenceMaterials(참고자료)가 포함되어 있다면, 그 내용을 반드시 스토리와 대사에 반영하세요.`,
 
@@ -991,16 +1014,16 @@ function getOutputSpecForAgent(agentName, payload) {
 }`;
     }
     if (payload.mode === "full_scenario") {
-      return `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 반드시 입력받은 target_duration_seconds와 정확히 동일해야 함):
+      return `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 반드시 입력받은 target_duration_seconds와 정확히 동일해야 함, 15초 이하면 acts는 정확히 1개만):
 {
   "scenario": {
     "title": "시나리오 제목",
     "story_content": "전체 스토리 텍스트...",
     "acts": [
-      { "act": 1, "duration_seconds": 10, "content": "..." }
+      { "act": 1, "duration_seconds": 10, "content": "대사/나레이션...", "visual": "카메라 앵글/캐릭터 동작/제품 등장 방식/배경·조명을 구체적으로 촘촘하게 서술..." }
     ]
   },
-  "higgsfield_specifications": { "style": "...", "mood": "..." },
+  "higgsfield_specifications": { "style": "구체적인 촬영 스타일/색감/카메라 무빙", "mood": "구체적인 분위기" },
   "timing_verification": { "total_duration": 30, "dialogue_seconds": 20, "narration_seconds": 10 }
 }`;
     }
@@ -1014,7 +1037,7 @@ function getOutputSpecForAgent(agentName, payload) {
     "structuredDraft": {
       "title": "시나리오 제목",
       "story_content": "전체 스토리 텍스트...",
-      "acts": [{ "act": 1, "duration_seconds": 30, "content": "..." }]
+      "acts": [{ "act": 1, "duration_seconds": 30, "content": "대사/나레이션...", "visual": "카메라 앵글/캐릭터 동작/제품 등장 방식/배경·조명을 구체적으로 촘촘하게 서술..." }]
     }
   }
 }`;
@@ -1071,20 +1094,20 @@ function getOutputSpecForAgent(agentName, payload) {
   ]
 }`,
 
-    "shortform-scenario-writer-agent": `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 반드시 입력받은 target_duration_seconds와 정확히 동일해야 함):
+    "shortform-scenario-writer-agent": `반드시 아래 JSON 형태로만 응답하세요 (total_duration은 반드시 입력받은 target_duration_seconds와 정확히 동일해야 함, 15초 이하 요청이면 acts는 정확히 1개만):
 {
   "scenario": {
     "title": "시나리오 제목",
     "story_content": "전체 스토리 텍스트...",
     "acts": [
-      { "act": 1, "duration_seconds": 40, "content": "오프닝..." },
-      { "act": 2, "duration_seconds": 50, "content": "메인..." },
-      { "act": 3, "duration_seconds": 30, "content": "클로징..." }
+      { "act": 1, "duration_seconds": 40, "content": "오프닝 대사/나레이션...", "visual": "클로즈업으로 시작, 캐릭터가 제품을 양손으로 들어올려 카메라에 정면으로 보여줌, 뒤로는 파스텔톤 제주 하늘 배경, 부드러운 아침 햇살 조명, 캐릭터 표정은 환하게 웃으며..." },
+      { "act": 2, "duration_seconds": 50, "content": "메인 대사/나레이션...", "visual": "카메라가 살짝 줌아웃되며 캐릭터가 제품을 여는 동작, 제품 라벨이 선명하게 보이는 각도, 반짝이는 파티클 효과..." },
+      { "act": 3, "duration_seconds": 30, "content": "클로징 대사/나레이션...", "visual": "풀샷으로 전환, 캐릭터가 제품을 가슴 앞에 안고 카메라를 향해 손을 흔듦, 따뜻한 노을빛 배경..." }
     ]
   },
   "higgsfield_specifications": {
-    "style": "전문적이고 세련된",
-    "mood": "신뢰감 있고 따뜻함"
+    "style": "구체적인 촬영 스타일 (예: 부드러운 파스텔 색감의 클레이메이션풍 3D 렌더, 얕은 피사계심도)",
+    "mood": "구체적인 분위기 (예: 아침 햇살 아래 산뜻하고 신뢰감 있는 분위기)"
   },
   "timing_verification": {
     "total_duration": 120,
@@ -1222,7 +1245,13 @@ function buildVideoPromptText(videoConfig, config) {
     "3D pixar-style plush toy mascot character, non-human, stylized cute cartoon figure, toy-like material, NOT a real human, not photorealistic, must exactly match the provided start-image reference character design in every scene (same face, same body shape, same proportions, only pose/background changes), keep a round cute chibi mascot body with a clearly visible friendly face at all times, do NOT turn into a rock/lava/fire elemental creature or any existing famous animated character, texture details (rocky/flame patterns) are surface decoration only and must not change the character's overall silhouette";
 
   const brandContext = `${brand.nameKorean || "제주소금"} brand, Jeju volcanic sea salt heritage`;
-  const storySnippet = (videoConfig.generatedContent || "").trim().slice(0, 200);
+  // ⭐ generatedContent는 이제(Step 9 호출부 수정 이후) 마케팅 카피가 아니라 시나리오
+  // Act 1의 실제 촬영 지시서(visual) + 대사(content)로 구성된 장면 묘사다 — 예전의 200자
+  // 제한은 마케팅 카피의 앞부분만 대충 잘라 쓰던 시절의 값이라, 구체적인 촬영 디테일이
+  // 잘리지 않도록 넉넉하게 늘린다.
+  const storySnippet = (videoConfig.generatedContent || "").trim().slice(0, 500);
+  const styleSnippet = (videoConfig.sceneStyle || "").trim();
+  const moodSnippet = (videoConfig.sceneMood || "").trim();
   const noTextInstruction = "no on-screen text, no readable words or captions, no signage text, clean text-free visual";
 
   return [
@@ -1232,6 +1261,8 @@ function buildVideoPromptText(videoConfig, config) {
     `${voiceTone} tone`,
     brandContext,
     storySnippet ? `scene: ${storySnippet}` : null,
+    styleSnippet ? `cinematography style: ${styleSnippet}` : null,
+    moodSnippet ? `mood: ${moodSnippet}` : null,
     noTextInstruction,
   ]
     .filter(Boolean)

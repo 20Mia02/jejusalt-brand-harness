@@ -24,7 +24,7 @@ const router = express.Router();
 
 const { callAgent, callHiggsfield, generateVideo, generateImageFromPrompt, getComplianceRulesForCategory } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
-const { getGenerationConfig } = require("../utils/config-loader");
+const { getGenerationConfig, getCharacterByName } = require("../utils/config-loader");
 const scenarioTemplates = require("../config/scenario-templates.json");
 // ⚠️ refineCharacterImage(AI가 프롬프트를 자유롭게 다시 쓰는 재시도 루프)는 기본 캐릭터에는
 // 더 이상 쓰지 않는다(POST /character 참고) — 커스텀 캐릭터 리파인 기능을 만들 때 다시 사용.
@@ -422,7 +422,7 @@ function normalizeActsToTargetDuration(acts, targetDuration) {
 // scenario_review 단계 응답 형태로 반환한다.
 // (AI 추천 경로의 generate-from-logline과 직접 작성 경로의 finalize-draft가 공유)
 // ─────────────────────────────────────────────────────
-async function saveScenarioAndBuildResponse({ resourceId, characterId, scenario, timingVerification, targetDuration }) {
+async function saveScenarioAndBuildResponse({ resourceId, characterId, scenario, timingVerification, targetDuration, higgsfieldSpecifications }) {
   if (timingVerification?.total_duration !== targetDuration) {
     console.warn(
       `⚠️ 시나리오가 ${targetDuration}초 요청에 ${timingVerification?.total_duration}초로 응답함 → Act별 길이를 ${targetDuration}초 기준으로 비례 재조정`
@@ -438,7 +438,9 @@ async function saveScenarioAndBuildResponse({ resourceId, characterId, scenario,
     character_id: characterId,
     scenario_title: scenario.title,
     story_content: scenario.story_content || scenario.content || "",
-    scenario_json: scenario.acts || scenario,
+    // ⭐ acts뿐 아니라 higgsfield_specifications(촬영 스타일/분위기)도 함께 보존한다 — 예전에는
+    // acts 배열만 저장해서 Step 9(실제 영상 생성)에서 스타일/분위기 정보가 통째로 유실됐다.
+    scenario_json: { acts: scenario.acts || [], higgsfield_specifications: scenario.higgsfield_specifications || higgsfieldSpecifications || null },
     total_duration_seconds: timingVerification.total_duration,
     dialogue_seconds: timingVerification?.dialogue_seconds || null,
     narration_seconds: timingVerification?.narration_seconds || null,
@@ -581,6 +583,7 @@ router.post("/:resourceId/scenario/generate-from-logline", async (req, res) => {
       scenario: result.data.scenario,
       timingVerification: result.data.timing_verification,
       targetDuration,
+      higgsfieldSpecifications: result.data.higgsfield_specifications,
     });
     if (!saved.success) {
       return res.status(500).json({ success: false, message: "시나리오 저장에 실패했습니다" });
@@ -737,14 +740,15 @@ router.post("/:resourceId/scenario/:scenarioId/confirm", async (req, res) => {
 
     // 사용자가 수정했으면 반영, 아니면 AI 초안 그대로 확정
     const finalStoryContent = editedStoryContent || scenarioRow.story_content;
-    const finalActs = editedActs || scenarioRow.scenario_json;
+    const finalActs = editedActs || scenarioRow.scenario_json?.acts || [];
 
     await callDatabase(
       "scenarios",
       "update",
       {
         story_content: finalStoryContent,
-        scenario_json: finalActs,
+        // ⭐ 사용자가 acts만 수정해도 higgsfield_specifications(촬영 스타일/분위기)는 그대로 보존한다.
+        scenario_json: { acts: finalActs, higgsfield_specifications: scenarioRow.scenario_json?.higgsfield_specifications || null },
         marketer_approved: true,
         marketer_feedback: feedback || null,
       },
@@ -901,7 +905,7 @@ router.post("/:resourceId/naming/confirm", async (req, res) => {
       ? {
           title: scenarioRow.scenario_title,
           story_content: scenarioRow.story_content,
-          acts: scenarioRow.scenario_json,
+          acts: scenarioRow.scenario_json?.acts || [],
         }
       : null;
 
@@ -1028,6 +1032,36 @@ router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
       await callDatabase("contents", "update", { generated_content: finalContent }, { id: contentId });
     }
 
+    // ⭐⭐ 영상 디테일/퀄리티 개선: 기존에는 아래 Step 9에서 Higgsfield에 넘기는 "장면 묘사"가
+    // Step 7 마케팅 카피(finalContent)의 앞 200자를 그대로 자른 것이었다 — Step 5에서 공들여
+    // 만든 시나리오(Act별 content/visual, 촬영 스타일/분위기)는 여기서 완전히 버려지고 있었다.
+    // 실제 Higgsfield 클립은 15초 단일 샷 하나뿐이므로, Act 1(가장 비중 있는 장면)의 구체적인
+    // visual(카메라/동작/배경 지시)을 우선으로 쓰고, content(대사)와 style/mood를 덧붙여
+    // 실제로 촬영 지시서 역할을 하는 장면 묘사를 구성한다.
+    let sceneDescription = "";
+    let sceneStyle = "";
+    let sceneMood = "";
+    try {
+      const scenarioResult = await callDatabase("scenarios", "read", null, { resource_id: resourceId });
+      const scenarioRow = scenarioResult.success
+        ? scenarioResult.rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+        : null;
+      const acts = Array.isArray(scenarioRow?.scenario_json?.acts) ? scenarioRow.scenario_json.acts : [];
+      const heroAct = acts[0] || null;
+      sceneDescription = [scenarioRow?.scenario_title, heroAct?.visual, heroAct?.content]
+        .filter(Boolean)
+        .join(" — ");
+      const higgsfieldSpec = scenarioRow?.scenario_json?.higgsfield_specifications || {};
+      sceneStyle = higgsfieldSpec.style || "";
+      sceneMood = higgsfieldSpec.mood || "";
+    } catch (e) {
+      console.warn("[Step 9] 시나리오 장면 묘사 조회 실패 (마케팅 카피로 대체):", e.message);
+    }
+    if (!sceneDescription) {
+      // 시나리오를 못 찾은 경우(레거시 자료 등)에만 기존 방식(마케팅 카피 앞부분)으로 폴백
+      sceneDescription = finalContent;
+    }
+
     console.log(`[Step 7 확정] resourceId: ${resourceId}, 수정여부: ${!!editedContent}`);
 
     // ⭐ Hook 4 승인 기록: generation_logs에 마케터 승인 이력 저장
@@ -1107,8 +1141,15 @@ router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
     // 프롬프트 텍스트(이름+외형 묘사)로만 장면에 함께 등장하도록 반영한다.
     const primaryCharacter = selectedCharacters[0];
     const coCharacters = selectedCharacters.slice(1);
+    // ⭐⭐ 기본 캐릭터(config.json에 등록된 8명)는 여기서 항상 config.json의 최신
+    // appearancePrompt를 써야 한다 — characters 테이블의 visual_description은 자료
+    // 생성 시점에 character_library에서 한 번 복사된 옛 짧은 한국어 설명이라, 이후
+    // appearancePrompt를 아무리 수정해도 절대 갱신되지 않는다(캐릭터 프롬프트 수정이
+    // 실제 영상에는 반영되지 않는 버그였음). 커스텀(라이브러리 외) 캐릭터는 config.json에
+    // 없으므로 그대로 visual_description을 쓴다.
+    const getVisualDescription = (c) => getCharacterByName(c.character_name)?.appearancePrompt || c.visual_description || "";
     const coCharacterDescriptions = coCharacters
-      .map((c) => `${c.character_name}(${c.visual_description || "설명 없음"})`)
+      .map((c) => `${c.character_name}(${getVisualDescription(c) || "설명 없음"})`)
       .join(", ");
 
     // ── Step 9: 영상 생성 (Higgsfield) ──
@@ -1134,11 +1175,13 @@ router.post("/:resourceId/copy/:contentId/confirm", async (req, res) => {
     const higgsfieldResult = await generateVideo(
       {
         character: primaryCharacter.character_name,
-        generatedContent: finalContent,
+        generatedContent: sceneDescription,
+        sceneStyle,
+        sceneMood,
         voiceTone: primaryCharacter.voice_tone || "기본",
         visualDescription: coCharacterDescriptions
-          ? `${primaryCharacter.visual_description || ""}, 함께 등장하는 캐릭터: ${coCharacterDescriptions}`
-          : primaryCharacter.visual_description || "",
+          ? `${getVisualDescription(primaryCharacter)}, 함께 등장하는 캐릭터: ${coCharacterDescriptions}`
+          : getVisualDescription(primaryCharacter),
         // ⭐ 재현성: --start-image는 URL이 아니라 job id(generation_seed)를 받는다
         referenceJobId: primaryCharacter.generation_seed || null,
         duration: targetDuration,
