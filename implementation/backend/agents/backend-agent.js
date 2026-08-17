@@ -347,15 +347,7 @@ function resolveAiProvider() {
   return null; // Mock 모드
 }
 
-async function callSolarAgent(agentName, payload) {
-  const provider = resolveAiProvider();
-
-  // Mock 모드: 어떤 프로바이더의 API 키도 설정되어 있지 않은 경우
-  if (!provider) {
-    console.warn(`[Mock Mode] ${agentName} - 테스트 더미 응답 반환 (GEMINI_API_KEY/UPSTAGE_API_KEY 모두 미설정)`);
-    return getMockResponseForAgent(agentName, payload);
-  }
-
+async function callOneProvider(provider, agentName, payload) {
   const apiKey = process.env[provider.apiKeyEnv];
 
   const client = new OpenAI({
@@ -426,6 +418,37 @@ async function callSolarAgent(agentName, payload) {
       console.error(`    404 모델을 찾을 수 없음: ${provider.apiKeyEnv.replace("_API_KEY", "_MODEL")} 값을 확인하세요`);
     } else if (error.message) {
       console.error(`    ${error.message}`);
+    }
+
+    throw error;
+  }
+}
+
+// ⭐⭐ 무료(Gemini) 티어는 트래픽이 몰리면 429(rate limit)/503(overload)이 자주 발생한다 —
+// 실사용 중 실제로 관찰된 문제. 이전에는 같은(이미 막힌) 프로바이더로 3번 재시도만 하다가
+// 결국 502로 실패했다. 429/503/502처럼 "일시적으로 이 프로바이더만 막힌" 에러라면,
+// 유료(Upstage) 키가 설정되어 있는 한 즉시 그쪽으로 전환해서 같은 요청을 이어간다.
+const TRANSIENT_PROVIDER_ERROR_STATUSES = [429, 500, 502, 503];
+
+async function callSolarAgent(agentName, payload) {
+  const provider = resolveAiProvider();
+
+  // Mock 모드: 어떤 프로바이더의 API 키도 설정되어 있지 않은 경우
+  if (!provider) {
+    console.warn(`[Mock Mode] ${agentName} - 테스트 더미 응답 반환 (GEMINI_API_KEY/UPSTAGE_API_KEY 모두 미설정)`);
+    return getMockResponseForAgent(agentName, payload);
+  }
+
+  try {
+    return await callOneProvider(provider, agentName, payload);
+  } catch (error) {
+    const fallbackKey = provider.key === "gemini" ? "upstage" : provider.key === "upstage" ? "gemini" : null;
+    const fallbackConfig = fallbackKey ? AI_PROVIDERS[fallbackKey] : null;
+    const fallbackAvailable = fallbackConfig && !isPlaceholderKey(process.env[fallbackConfig.apiKeyEnv]);
+
+    if (fallbackAvailable && TRANSIENT_PROVIDER_ERROR_STATUSES.includes(error.status)) {
+      console.warn(`  [자동 전환] ${provider.label}이(가) 일시적으로 막혀서(${error.status}) ${fallbackConfig.label}로 전환해서 재시도합니다`);
+      return await callOneProvider({ key: fallbackKey, ...fallbackConfig }, agentName, payload);
     }
 
     throw error;
