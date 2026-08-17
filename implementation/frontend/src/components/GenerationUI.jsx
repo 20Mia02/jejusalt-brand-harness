@@ -385,13 +385,12 @@ export default function GenerationUI({ resourceId, onSuccess, requestType = 'int
   };
 
   // ── Stage 4: 카피 확정 → Step8~9 → 완료 ──
-  const handleConfirmCopy = async ({ editedContent, testMode }) => {
-    beginLoading(testMode ? '컴플라이언스 검증 중... (테스트 모드)' : '컴플라이언스 검증 중...');
+  const handleConfirmCopy = async ({ editedContent }) => {
+    beginLoading('컴플라이언스 검증 중...');
 
     try {
       const res = await apiPost(`/api/generate/${resourceId}/copy/${copyData.contentId}/confirm`, {
         editedContent,
-        testMode,
       });
 
       stopStatusPolling();
@@ -1201,10 +1200,9 @@ function NameOptionGroup({ title, options, selected, onSelect, useCustom, custom
 function CopyReviewPanel({ resourceId, copyData, onConfirm }) {
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(copyData.generatedContent || '');
-  const [testMode, setTestMode] = useState(false);
 
-  const handleUseAsIs = () => onConfirm({ testMode });
-  const handleConfirmEdit = () => onConfirm({ editedContent: content, testMode });
+  const handleUseAsIs = () => onConfirm({});
+  const handleConfirmEdit = () => onConfirm({ editedContent: content });
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -1214,33 +1212,6 @@ function CopyReviewPanel({ resourceId, copyData, onConfirm }) {
           숏폼 영상을 올릴 때 <strong className="text-dark-text">영상 아래 상세 설명(캡션)</strong>으로 바로 붙여넣을 수 있는 카피예요.
           AI 초안을 그대로 쓰거나, 브랜드 톤에 맞게 직접 다듬어보세요.
         </div>
-      </div>
-
-      {/* ⭐ 테스트 모드: Higgsfield 크레딧 소진 중에도 파이프라인 연동/테스트를 계속하기 위한
-          대체 경로 (fal.ai API). 체험 크레딧 소모성 + 상업적 이용 불가 취급이라 반드시 명확히 경고를 보여준다. */}
-      <div className={`rounded-lg p-4 border ${testMode ? 'bg-status-pending/10 border-status-pending/40' : 'bg-dark-bg border-dark-chip'}`}>
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={testMode}
-            onChange={(e) => setTestMode(e.target.checked)}
-            className="mt-1"
-          />
-          <div>
-            <div className="font-semibold text-sm">
-              🧪 테스트 모드로 생성 (fal.ai 사용)
-            </div>
-            <div className="text-xs text-dark-text-muted mt-1">
-              Higgsfield 크레딧이 부족할 때 파이프라인 연동 확인용으로만 사용하세요.
-              {testMode && (
-                <span className="block mt-1 font-semibold text-status-pending">
-                  ⚠️ 테스트 모드 영상에는 워터마크가 포함되며, 상업적 이용이 불가능합니다.
-                  실제 마케팅에는 절대 사용하지 마세요.
-                </span>
-              )}
-            </div>
-          </div>
-        </label>
       </div>
 
       <TrendPanel resourceId={resourceId} onInsert={(text) => {
@@ -1296,14 +1267,8 @@ function CopyReviewPanel({ resourceId, copyData, onConfirm }) {
  * 완료 화면 (기존 videoUrl 표시 로직 유지)
  */
 function DoneScreen({ finalResult, onRestart, onRetryVideo, onGoHome }) {
-  const { videoUrl, validationStatus, validationScore, higgsfieldError, qaResult, testMode } = finalResult;
+  const { videoUrl, validationStatus, validationScore, higgsfieldError, qaResult } = finalResult;
   const videoFailed = !videoUrl;
-
-  const TestModeBanner = () => (
-    <div className="bg-status-pending/10 border-2 border-status-pending/50 rounded-lg p-3 text-sm font-semibold text-status-pending">
-      ⚠️ 테스트 모드로 생성된 영상입니다 (fal.ai) — 상업적 이용 불가, 파이프라인 검증용으로만 사용하세요.
-    </div>
-  );
 
   if (videoFailed) {
     return (
@@ -1332,7 +1297,6 @@ function DoneScreen({ finalResult, onRestart, onRetryVideo, onGoHome }) {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {testMode && <TestModeBanner />}
       <div className="bg-status-approved/10 p-4 rounded border border-status-approved/30">
         <div className="text-lg font-bold text-status-approved mb-2">✅ 영상이 생성되었습니다!</div>
         <div className="text-sm text-dark-text space-y-1">

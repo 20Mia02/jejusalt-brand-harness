@@ -14,8 +14,11 @@ export default function FilterUI({ onResourceCreated }) {
     targets: [],
     focus: [],
   });
+  const [keyword, setKeyword] = useState("");
   const [filteredResources, setFilteredResources] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -187,7 +190,7 @@ export default function FilterUI({ onResourceCreated }) {
   };
 
   const handleSearch = async () => {
-    setLoading(true);
+    setSearchLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
@@ -203,14 +206,18 @@ export default function FilterUI({ onResourceCreated }) {
       if (filters.focus.length > 0) {
         params.append("focus", filters.focus.join(","));
       }
+      if (keyword.trim()) {
+        params.append("keyword", keyword.trim());
+      }
 
       const res = await apiClient.get(`/api/resources/filter?${params.toString()}`);
       setFilteredResources(res.data.resources || []);
+      setHasSearched(true);
     } catch (err) {
       console.error("필터 검색 실패:", err);
       setError("검색에 실패했습니다.");
     } finally {
-      setLoading(false);
+      setSearchLoading(false);
     }
   };
 
@@ -221,7 +228,42 @@ export default function FilterUI({ onResourceCreated }) {
       targets: [],
       focus: [],
     });
-    setFilteredResources([]);
+    setKeyword("");
+    handleSearch();
+  };
+
+  // ── 필터 탭에 처음 들어올 때 전체 자료 목록을 바로 보여준다 (필터/검색어는 그 다음 좁히는 용도) ──
+  useEffect(() => {
+    if (mode === "filter" && !hasSearched) {
+      handleSearch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  // ── 검색 결과에서 기존 자료를 선택 → 재분석 없이 바로 Step 2(메타데이터 검토)로 이어감 ──
+  const handleSelectResource = async (resourceId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get(`/api/resources/${resourceId}`);
+      if (!res.data.success) {
+        throw new Error(res.data.message || "자료를 불러오지 못했습니다.");
+      }
+      const { resource, characters } = res.data;
+      if (onResourceCreated) {
+        onResourceCreated(
+          resource.id,
+          resource.metadata,
+          characters,
+          resource.reference_materials || []
+        );
+      }
+    } catch (err) {
+      console.error("기존 자료 불러오기 실패:", err);
+      setError(err.response?.data?.message || "자료를 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!metadata) {
@@ -456,6 +498,19 @@ export default function FilterUI({ onResourceCreated }) {
             </div>
 
             <div className="space-y-6">
+              {/* 검색어 (제품명/제품정보 자유 검색) */}
+              <div>
+                <label className="block font-semibold mb-3">검색어</label>
+                <input
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
+                  placeholder="제품명이나 제품 정보로 검색 (예: 로션, 스킨케어)"
+                  className="w-full px-4 py-2.5 bg-dark-bg border border-dark-chip rounded-lg text-sm text-dark-text outline-none focus:border-brand-blue"
+                />
+              </div>
+
               {/* 카테고리 */}
               <div>
                 <label className="block font-semibold mb-3">카테고리</label>
@@ -567,28 +622,20 @@ export default function FilterUI({ onResourceCreated }) {
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleSearch}
-                  disabled={loading}
+                  disabled={searchLoading}
                   className="flex-1 px-6 py-3 btn-primary disabled:opacity-50"
                 >
-                  {loading ? "검색 중..." : "🔍 검색"}
+                  {searchLoading ? "검색 중..." : "🔍 검색"}
                 </button>
                 <button
                   onClick={handleReset}
-                  disabled={loading}
+                  disabled={searchLoading}
                   className="px-6 py-3 bg-dark-chip text-dark-text rounded-lg hover:brightness-125 disabled:opacity-50"
                 >
                   초기화
                 </button>
               </div>
             </div>
-
-            {/* 검색 안내 메시지 */}
-            {filteredResources.length === 0 &&
-              !Object.values(filters).some((f) => f.length > 0) && (
-                <div className="bg-brand-blue/10 border border-brand-blue/30 text-brand-blue px-4 py-3 rounded mt-6 text-center">
-                  💡 필터를 선택하고 "검색" 버튼을 클릭하면 자료를 찾을 수 있습니다.
-                </div>
-              )}
           </div>
 
           {/* 결과 섹션 */}
@@ -600,14 +647,25 @@ export default function FilterUI({ onResourceCreated }) {
                   검색 결과 ({filteredResources.length}개)
                 </h2>
               </div>
+              <p className="text-xs text-dark-text-muted -mt-2 mb-4">
+                자료를 클릭하면 다시 분석하지 않고 바로 다음 단계로 이어갈 수 있습니다.
+              </p>
               <div className="grid grid-cols-1 gap-4">
                 {filteredResources.map((resource) => (
-                  <div key={resource.id} className="result-card p-4">
+                  <div
+                    key={resource.id}
+                    onClick={() => !loading && handleSelectResource(resource.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSelectResource(resource.id); }}
+                    className={`result-card p-4 cursor-pointer transition hover:border-brand-blue hover:brightness-110 ${loading ? 'opacity-60 pointer-events-none' : ''}`}
+                  >
                     <h3 className="text-lg font-semibold text-brand-blue">
                       {resource.product_name}
                     </h3>
                     <p className="text-sm text-dark-text-muted mt-1">
-                      {resource.product_info.substring(0, 100)}...
+                      {(resource.product_info || "").substring(0, 100)}
+                      {(resource.product_info || "").length > 100 ? "..." : ""}
                     </p>
                     {resource.metadata && (
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -621,8 +679,11 @@ export default function FilterUI({ onResourceCreated }) {
                         ))}
                       </div>
                     )}
-                    <div className="text-xs text-dark-text-muted mt-2">
-                      생성일: {new Date(resource.created_at).toLocaleDateString()}
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="text-xs text-dark-text-muted">
+                        생성일: {new Date(resource.created_at).toLocaleDateString()}
+                      </div>
+                      <div className="text-xs text-brand-blue font-medium">이어서 진행 →</div>
                     </div>
                   </div>
                 ))}
@@ -630,12 +691,13 @@ export default function FilterUI({ onResourceCreated }) {
             </div>
           )}
 
-          {filteredResources.length === 0 &&
-            Object.values(filters).some((f) => f.length > 0) && (
-              <div className="text-center py-8 text-dark-text-muted">
-                해당하는 자료가 없습니다.
-              </div>
-            )}
+          {hasSearched && !searchLoading && filteredResources.length === 0 && (
+            <div className="text-center py-8 text-dark-text-muted">
+              {Object.values(filters).some((f) => f.length > 0) || keyword.trim()
+                ? "해당하는 자료가 없습니다. 필터나 검색어를 바꿔보세요."
+                : "아직 등록된 자료가 없습니다. \"자료 입력\" 탭에서 새 자료를 먼저 만들어주세요."}
+            </div>
+          )}
         </div>
       )}
     </div>

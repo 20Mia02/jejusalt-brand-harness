@@ -302,97 +302,85 @@ async function callDatabase(table, operation, data, filter) {
 // ============================================================================
 // [함수 2] getResourcesByFilter - 자료 필터링 조회
 // ============================================================================
+// 검색 가능한 상태 — "analyzing"(진행 중)/"failed"(실패)는 메타데이터가 없거나
+// 신뢰할 수 없으므로 제외한다. 실제 파이프라인은 resources.status를 "completed"로
+// 바꾸는 지점이 없고 Step1~2 성공 시 "analyzed"에서 멈추므로, "completed"만 찾던
+// 예전 로직은 실사용 조건에서 단 하나의 결과도 반환할 수 없는 버그였다.
+const SEARCHABLE_RESOURCE_STATUSES = ["analyzed", "completed"];
+
 /**
- * 자료를 카테고리/나이대로 필터링해서 조회
- * 
- * @param {object} filters - {categories: [...], ageGroups: [...], targets: [...], focus: [...], status: '...'}
+ * 자료를 카테고리/나이대/키워드로 필터링해서 조회
+ *
+ * @param {object} filters - {categories: [...], ageGroups: [...], targets: [...], focus: [...], keyword?: string}
  * @returns {object} {success, rows, total}
  */
 async function getResourcesByFilter(filters = {}) {
   try {
-    const { categories, ageGroups, targets, focus, status } = filters;
+    const { categories, ageGroups, targets, focus, keyword } = filters;
+    const kw = (keyword || "").trim().toLowerCase();
 
     console.log(`[DB] 자료 필터링 조회: ${JSON.stringify(filters)}`);
 
-    // ✅ 필터가 하나도 없으면 빈 배열 반환 (필터 선택 후에만 결과 표시)
-    const hasCategories = categories && categories.length > 0;
-    const hasAgeGroups = ageGroups && ageGroups.length > 0;
-    const hasTargets = targets && targets.length > 0;
-    const hasFocus = focus && focus.length > 0;
-
-    if (!hasCategories && !hasAgeGroups && !hasTargets && !hasFocus) {
-      console.log(`  [✓] 필터 미선택: 빈 결과 반환`);
-      return { success: true, rows: [], total: 0 };
-    }
-
     if (isMockMode) {
       const rows = mockTable("resources").filter((r) => {
-        if (r.status !== "completed") return false;
+        if (!SEARCHABLE_RESOURCE_STATUSES.includes(r.status)) return false;
         const md = r.metadata || {};
+        // 필터 그룹 간(카테고리 vs 나이대 vs...)은 AND, 그룹 내 선택값끼리는 OR
         const has = (arr, want) =>
           !want || want.length === 0 || (arr || []).some((v) => want.includes(v));
-        return (
+        const matchesFilters =
           has(md.categories, categories) &&
           has(md.ageGroups, ageGroups) &&
           has(md.targets, targets) &&
-          has(md.focus, focus)
+          has(md.focus, focus);
+        if (!matchesFilters) return false;
+        if (!kw) return true;
+        return (
+          (r.product_name || "").toLowerCase().includes(kw) ||
+          (r.product_info || "").toLowerCase().includes(kw)
         );
       });
+      // 최신순 정렬 (mock 테이블은 삽입 순서 보장 안 하므로 명시적으로 정렬)
+      rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       console.log(`  [Mock] ${rows.length}개 자료 조회됨`);
       return { success: true, rows, total: rows.length };
     }
 
     let query = supabase.from("resources").select("*");
 
-    // status는 항상 'completed'로만 필터링
-    query = query.eq("status", "completed");
-    
-    // metadata JSONB 필터링 (categories)
-    if (categories && categories.length > 0) {
-      // PostgreSQL @> (contains) 연산자 사용
-      // metadata->categories 배열이 특정 값을 포함하는지 확인
-      categories.forEach((cat) => {
-        query = query.filter("metadata->categories", "contains", cat);
-      });
-    }
+    query = query.in("status", SEARCHABLE_RESOURCE_STATUSES);
 
-    // metadata JSONB 필터링 (ageGroups)
-    if (ageGroups && ageGroups.length > 0) {
-      // metadata->ageGroups 배열이 특정 값을 포함하는지 확인
-      ageGroups.forEach((age) => {
-        query = query.filter("metadata->ageGroups", "contains", age);
-      });
-    }
+    // metadata JSONB 필터링 — 그룹 내 OR: 선택된 값 중 하나라도 포함하면 매치.
+    // (PostgREST의 .filter()를 같은 컬럼에 여러 번 체이닝하면 AND로 묶여서, 카테고리를
+    // 2개 이상 선택하면 "둘 다 포함"을 요구하는 반대 의미가 되는 버그가 있었다 —
+    // .or()로 "값1 포함 OR 값2 포함 OR ..."을 명시적으로 구성해서 고친다.)
+    const orContains = (column, values) => {
+      if (!values || values.length === 0) return;
+      const clause = values.map((v) => `${column}.cs.${JSON.stringify([v])}`).join(",");
+      query = query.or(clause);
+    };
+    orContains("metadata->categories", categories);
+    orContains("metadata->ageGroups", ageGroups);
+    orContains("metadata->targets", targets);
+    orContains("metadata->focus", focus);
 
-    // metadata JSONB 필터링 (targets)
-    if (targets && targets.length > 0) {
-      // metadata->targets 배열이 특정 값을 포함하는지 확인
-      targets.forEach((target) => {
-        query = query.filter("metadata->targets", "contains", target);
-      });
-    }
-
-    // metadata JSONB 필터링 (focus / 강조점)
-    if (focus && focus.length > 0) {
-      // metadata->focus 배열이 특정 값을 포함하는지 확인
-      focus.forEach((f) => {
-        query = query.filter("metadata->focus", "contains", f);
-      });
+    if (kw) {
+      query = query.or(`product_name.ilike.%${kw}%,product_info.ilike.%${kw}%`);
     }
 
     // 최신순 정렬
     query = query.order("created_at", { ascending: false });
-    
+
     const { data: result, error } = await query;
-    
+
     if (error) {
       console.error(`  [오류] ${error.message}`);
       return { success: false, error: "FILTER_FAILED", message: error.message };
     }
-    
+
     console.log(`  [✓] ${result.length}개 자료 조회됨`);
     return { success: true, rows: result || [], total: result.length };
-    
+
   } catch (error) {
     console.error(`[DB] 필터링 조회 예외: ${error.message}`);
     return { success: false, error: "DB_ERROR", message: error.message };

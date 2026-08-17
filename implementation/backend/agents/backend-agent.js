@@ -1198,9 +1198,7 @@ const sanitizeForShell = (s) => String(s || "").replace(/["'`$\\;|&<>%^()\n\r]/g
 
 /**
  * 영상 생성 프롬프트(캐릭터 일관성 앵커 + 브랜드 컨텍스트 + 텍스트-오버레이 금지 지시)를
- * 만드는 공통 로직. Higgsfield(기본 모드)와 Kling(테스트 모드)이 이 함수를 공유하므로,
- * 캐릭터 묘사/브랜드 반영 방식을 한 번만 고치면 두 모드에 동일하게 적용된다
- * (기본 모드만 고치고 테스트 모드는 그대로 있는 식의 불일치를 방지).
+ * 만드는 공통 로직.
  */
 function buildVideoPromptText(videoConfig, config) {
   const brand = config.brand || {};
@@ -1380,149 +1378,11 @@ async function callHiggsfield(videoConfig, resourceId, contentId) {
   }
 }
 
-// ============================================================================
-// [함수 2-0] 테스트 모드 — fal.ai(다중 영상모델 프록시 API)로 영상 생성
-// (Higgsfield 크레딧 소진 중에도 파이프라인 연동/테스트를 계속하기 위한 대체 경로)
-// ----------------------------------------------------------------------------
-// ⚠️⚠️ 중요: Kling 자체 개발자 API는 실제로는 유료(선불 크레딧 구매 필요)였고, 소비자
-// 웹앱에만 있는 "하루 무료 크레딧"은 API 쪽으로 넘어오지 않는다는 것을 실제 키로
-// 확인함 (계정 잔액 0에서도 인증은 성공하고 "Account balance not enough"만 반환됨).
-// 대신 fal.ai는 신규 가입 시 실제로 청구되는 개발자 API에 $10 상당의 체험 크레딧을
-// 주는 것으로 확인되어 이걸 사용한다 (여러 영상 모델을 하나의 큐 API로 프록시).
-// 그래도 이 크레딧은 소모성이며, 대상 모델의 무료/저가 여부와 무관하게 프론트엔드는
-// "테스트 모드 / 상업적 이용 불가" 경고를 표시한다(모델별 라이선스가 제각각이라
-// 상업적 사용 가능 여부를 코드에서 신뢰성 있게 판단할 수 없기 때문).
-// ============================================================================
-
-async function callFalVideo(videoConfig, resourceId, contentId) {
-  try {
-    const falKey = process.env.FAL_KEY;
-    if (!falKey) {
-      throw new Error(
-        "FAL_KEY가 설정되지 않았습니다 (테스트 모드는 fal.ai API 키가 필요합니다 — fal.ai/dashboard/keys 에서 발급, 신규 가입 시 체험 크레딧 제공)"
-      );
-    }
-
-    const { getConfig } = require("../utils/config-loader");
-    const config = getConfig();
-
-    const model = process.env.FAL_MODEL || "fal-ai/pixverse/v5.5/text-to-video";
-
-    // fal의 pixverse 엔드포인트는 duration을 "5" 또는 "8"(문자열)만 받는다 — Higgsfield처럼
-    // 임의 초 단위를 그대로 못 쓰므로 요청 길이를 가장 가까운 허용값으로 반올림한다.
-    // (FAL_MODEL을 다른 모델로 바꾸면 이 값의 의미도 그 모델 스펙에 맞게 확인해야 함)
-    const rawDuration = Number(videoConfig.duration);
-    const requestedDuration = Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 5;
-    const duration = requestedDuration > 6 ? "8" : "5";
-
-    // 프롬프트 자체는 buildVideoPromptText로 Higgsfield와 완전히 공유 — 공백만 정리한다.
-    const prompt = buildVideoPromptText(videoConfig, config).replace(/\s+/g, " ").trim();
-
-    console.log(`[테스트 모드] fal.ai 호출 시작 (모델: ${model}, duration: ${duration}초)`);
-    console.log(`  프롬프트: ${prompt}`);
-
-    const authHeader = { Authorization: `Key ${falKey}` };
-    const submitRes = await axios.post(
-      `https://queue.fal.run/${model}`,
-      { prompt, duration, resolution: "540p", aspect_ratio: "9:16" },
-      { headers: { ...authHeader, "Content-Type": "application/json" }, timeout: 30000 }
-    );
-
-    const requestId = submitRes.data?.request_id;
-    const statusUrl = submitRes.data?.status_url || `https://queue.fal.run/${model}/requests/${requestId}/status`;
-    const responseUrl = submitRes.data?.response_url || `https://queue.fal.run/${model}/requests/${requestId}`;
-    if (!requestId) {
-      throw new Error(`fal.ai 작업 생성 응답에 request_id가 없습니다: ${JSON.stringify(submitRes.data)}`);
-    }
-
-    // 5초 간격으로 최대 5분 폴링
-    const maxAttempts = 60;
-    let completed = false;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-
-      const statusRes = await axios.get(statusUrl, { headers: authHeader, timeout: 15000 });
-      const status = statusRes.data?.status;
-      if (status === "COMPLETED") {
-        completed = true;
-        break;
-      }
-      if (status === "FAILED" || status === "ERROR") {
-        throw new Error(`fal.ai 작업 실패: ${JSON.stringify(statusRes.data)}`);
-      }
-      console.log(`  [테스트 모드] fal.ai 진행 중... (${attempt}/${maxAttempts}, status=${status})`);
-    }
-
-    if (!completed) {
-      throw new Error("fal.ai 영상 생성 타임아웃 (5분 초과)");
-    }
-
-    // ⚠️ 출력 스키마는 모델마다 다르다 (video.url / output.video.url 등) — FAL_MODEL을
-    // 바꿨는데 여기서 못 찾으면 raw 응답을 로그로 남겨서 실제 스키마를 확인할 수 있게 한다.
-    const resultRes = await axios.get(responseUrl, { headers: authHeader, timeout: 15000 });
-    const videoUrl = resultRes.data?.video?.url || resultRes.data?.output?.video?.url || null;
-    if (!videoUrl) {
-      throw new Error(`fal.ai 결과에서 영상 URL을 찾지 못했습니다: ${JSON.stringify(resultRes.data)}`);
-    }
-
-    console.log(`[✓] 테스트 모드 영상 생성 완료: ${videoUrl}`);
-
-    const videoResult = await callDatabase("videos", "create", {
-      resource_id: resourceId,
-      content_id: contentId,
-      generation_status: "completed",
-      generation_progress: 100,
-      video_url: videoUrl,
-      generation_start_time: new Date(),
-      generation_end_time: new Date(),
-    });
-
-    return {
-      success: true,
-      data: {
-        video_url: videoUrl,
-        generation_status: "completed",
-        generation_progress: 100,
-        videos_row_id: videoResult.rows?.[0]?.id,
-        testMode: true,
-        provider: "fal",
-        model,
-        commercialUseAllowed: false,
-      },
-    };
-  } catch (error) {
-    // fal.ai 에러 응답은 detail이 문자열(예: "User is locked...")일 때도 있고
-    // 배열([{msg: "..."}])일 때도 있어서(밸리데이션 에러) 둘 다 처리한다.
-    const detail = error.response?.data?.detail;
-    const rawMessage =
-      (typeof detail === "string" ? detail : detail?.[0]?.msg) ||
-      error.response?.data?.message ||
-      error.message;
-    const isBalanceError = /balance|insufficient|credit|locked/i.test(rawMessage || "");
-    console.error(`[✗] 테스트 모드(fal.ai) 영상 생성 실패 (${isBalanceError ? "FAL_CREDITS_EXHAUSTED" : "FAL_API_ERROR"}): ${rawMessage}`);
-    return {
-      success: false,
-      error: isBalanceError ? "FAL_CREDITS_EXHAUSTED" : "FAL_API_ERROR",
-      message: isBalanceError
-        ? "fal.ai 체험 크레딧이 소진되었습니다. fal.ai 대시보드에서 크레딧을 충전한 뒤 다시 시도하세요."
-        : rawMessage,
-      statusCode: error.response?.status,
-    };
-  }
-}
-
 /**
  * 영상 생성 단일 진입점 — routes/generation.js는 이 함수 하나만 호출한다.
- * testMode=false(기본 모드): Higgsfield(유료, 상업적 사용 가능)
- * testMode=true(테스트 모드): fal.ai(체험 크레딧으로 사용, 상업적 사용 불가 취급, 파이프라인 검증 전용)
- * 두 모드 모두 buildVideoPromptText를 공유하므로, 캐릭터/브랜드 프롬프트를 고치는 기능
- * 수정은 이 함수를 거치지 않고 바로 두 모드 모두에 반영된다.
+ * Higgsfield(유료, 상업적 사용 가능)만 사용한다.
  */
-async function generateVideo(videoConfig, resourceId, contentId, options = {}) {
-  const testMode = !!options.testMode;
-  if (testMode) {
-    return callFalVideo(videoConfig, resourceId, contentId);
-  }
+async function generateVideo(videoConfig, resourceId, contentId) {
   return callHiggsfield(videoConfig, resourceId, contentId);
 }
 
@@ -1674,7 +1534,6 @@ async function pollHiggsfield(higgsfieldId, videoRowId) {
 module.exports = {
   callAgent,
   callHiggsfield,
-  callFalVideo,
   generateVideo,
   pollHiggsfield,
   generateCharacterReferenceImage,

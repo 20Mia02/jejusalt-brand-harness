@@ -305,16 +305,20 @@ router.get("/", async (req, res) => {
 // metadata는 JSONB이므로 .contains() 연산자로 필터링한다.
 // ─────────────────────────────────────────────
 router.get("/filter", async (req, res) => {
-  const { categories, ageGroups, targets, focus, videoTypes } = req.query;
+  const { categories, ageGroups, targets, focus, keyword } = req.query;
 
-  const toArray = (v) => (v ? (Array.isArray(v) ? v : [v]) : []);
+  const toArray = (v) => {
+    if (!v) return [];
+    const arr = Array.isArray(v) ? v : String(v).split(",");
+    return arr.map((s) => s.trim()).filter(Boolean);
+  };
 
   const filters = {
     categories: toArray(categories),
     ageGroups: toArray(ageGroups),
     targets: toArray(targets),
     focus: toArray(focus),
-    videoTypes: toArray(videoTypes),
+    keyword: keyword ? String(keyword).trim() : "",
   };
 
   const { getResourcesByFilter } = require("../agents/database-agent");
