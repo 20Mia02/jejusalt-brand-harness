@@ -5,6 +5,7 @@ import GenerationUI from "./components/GenerationUI"
 import MetadataReviewUI from "./components/MetadataReviewUI"
 import CharacterCreator from "./components/CharacterCreator"
 import CharacterGallery from "./components/CharacterGallery"
+import BrandStorySection from "./components/BrandStorySection"
 import AdminMode from "./components/AdminMode"
 import OceanBackground from "./components/OceanBackground"
 import "./App.css"
@@ -206,11 +207,11 @@ function App() {
             <div className="header-divider"></div>
             <nav className="app-header-nav">
               <Link to="/" className={!isAdmin && !isGallery ? 'active' : ''}>메인</Link>
-              <Link to="/characters" className={isGallery ? 'active' : ''}>🎭 캐릭터 갤러리</Link>
+              <Link to="/characters" className={isGallery ? 'active' : ''}>🌍 브랜드 세계관</Link>
               <Link to="/admin" className={isAdmin ? 'active' : ''}>관리자 모드</Link>
             </nav>
             <p className="header-subtitle">
-              {isAdmin ? '관리자 모드' : isGallery ? '캐릭터 갤러리' : STEP_LABELS[currentStep]}
+              {isAdmin ? '관리자 모드' : isGallery ? '브랜드 세계관' : STEP_LABELS[currentStep]}
             </p>
           </div>
         </div>
@@ -222,7 +223,10 @@ function App() {
           path="/"
           element={<MainFlow currentStep={currentStep} setCurrentStep={setCurrentStep} />}
         />
-        <Route path="/characters" element={<CharacterGallery />} />
+        <Route
+          path="/characters"
+          element={<><CharacterGallery /><BrandStorySection /></>}
+        />
         <Route path="/admin" element={<AdminMode />} />
       </Routes>
     </div>

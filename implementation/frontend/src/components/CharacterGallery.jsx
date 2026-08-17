@@ -23,17 +23,70 @@ function ReferenceMedia({ url, className, alt }) {
   return <img src={url} alt={alt} className={className} onError={(e) => { e.target.style.display = 'none'; }} />;
 }
 
+// ⭐ 카드 썸네일 위에 마우스를 올리면 좌우 화살표가 나타나서 사진을 넘겨볼 수 있는 캐러셀.
+// 기본으로는 인형 키링 버전이 보이고, 화살표로 넘기면 원래(AI 영상 선택용) 썸네일도 볼 수 있다.
+function ImageCarousel({ images, alt }) {
+  const [index, setIndex] = useState(0);
+
+  if (images.length === 0) {
+    return <span className="text-xs text-dark-text-muted">아직 생성 안 됨</span>;
+  }
+
+  const goTo = (e, delta) => {
+    e.stopPropagation(); // 카드 확장 토글이 같이 눌리지 않도록
+    setIndex((prev) => (prev + delta + images.length) % images.length);
+  };
+
+  return (
+    <div className="group relative w-full h-full">
+      <ReferenceMedia url={images[index]} alt={alt} className="w-full h-full object-contain" />
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => goTo(e, -1)}
+            aria-label="이전 사진"
+            className="absolute left-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full bg-black/40 text-white opacity-0 group-hover:opacity-100 transition hover:bg-black/60"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={(e) => goTo(e, 1)}
+            aria-label="다음 사진"
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full bg-black/40 text-white opacity-0 group-hover:opacity-100 transition hover:bg-black/60"
+          >
+            ›
+          </button>
+          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+            {images.map((_, i) => (
+              <span
+                key={i}
+                className={`w-1.5 h-1.5 rounded-full ${i === index ? 'bg-white' : 'bg-white/40'}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function transformCharacter(raw) {
   // API 응답 필드를 UI 표시용 필드로 변환
   const traits = Array.isArray(raw.personality_traits) ? raw.personality_traits : [];
   const roleTags = raw.role ? raw.role.split('·').map(s => s.trim()).filter(Boolean) : [];
   const allKeywords = [...traits, ...roleTags];
 
+  // ⭐ 인형 키링 버전을 기본으로 보여주고, 화살표로 넘기면 원래(AI 영상용) 버전이 나오도록
+  // 이미지 배열을 [키링, 기본] 순서로 구성 — 둘 중 하나만 있으면 그것만 노출
+  const images = [raw.keyring_image_url, raw.reference_image_url].filter(Boolean);
+
   return {
     id: raw.id,
     name: raw.character_name,
     description: raw.character_profile || raw.visual_description || raw.visualIdentity || '',
-    referenceImageUrl: raw.reference_image_url,
+    images,
     personalityKeywords: allKeywords,
     currentVersion: raw.source === 'default' ? null : '사용자 생성',
     tone: raw.tone_trait || raw.role || '',
@@ -61,7 +114,10 @@ export default function CharacterGallery() {
       try {
         const data = await apiGet('/api/characters/library');
         const rawChars = data.characters || [];
-        setCharacters(rawChars.map(transformCharacter));
+        // ⭐ 실제 사용자가 자료를 넣어 새로 생성한 커스텀 캐릭터가 아직 없는 현재 단계에서는
+        // 기본 8개 캐릭터만 노출한다 (source가 'default'가 아닌 ai_generated 테스트/leftover 항목은 숨김)
+        const baseChars = rawChars.filter((r) => r.source === 'default');
+        setCharacters(baseChars.map(transformCharacter));
       } catch (err) {
         console.error('캐릭터 갤러리 API 호출 실패:', err);
         setError('캐릭터 목록을 불러오지 못했습니다.');
@@ -98,11 +154,7 @@ export default function CharacterGallery() {
               onClick={() => setExpandedId(expanded ? null : char.id)}
             >
               <div className="w-full aspect-square bg-dark-chip rounded-lg overflow-hidden mb-3 flex items-center justify-center">
-                {char.referenceImageUrl ? (
-                  <ReferenceMedia url={char.referenceImageUrl} alt={char.name} className="w-full h-full object-contain" />
-                ) : (
-                  <span className="text-xs text-dark-text-muted">아직 생성 안 됨</span>
-                )}
+                <ImageCarousel images={char.images} alt={char.name} />
               </div>
               <div className="flex items-center justify-between mb-2">
                 <span className="font-bold text-base">{char.name}</span>

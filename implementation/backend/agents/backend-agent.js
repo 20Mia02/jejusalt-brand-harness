@@ -1258,6 +1258,7 @@ function getCommonAppearanceRulesText() {
   // ⭐⭐ "인간형 인형(리본 베이비 돌)처럼 보인다"는 반복 피드백 반영 — CRITICAL BODY에
   // 인간 아기/리본 인형 부정을 명시적으로 추가.
   return [
+    "TOP PRIORITY — MAXIMUM CUTENESS (outranks everything else including material realism): this must look irresistibly adorable and huggable above all — soft rounded chibi proportions, big sparkling doll eyes, a warm inviting expression, the kawaii charm of a beloved plush toy or premium gacha figurine — cute and charming always outranks photorealism or gritty texture detail",
     "CRITICAL BODY: a simple round non-anatomical chibi toy body — one continuous pear/egg-shaped torso with NO visible waist, shoulders, or joints, short stubby limbs, tiny rounded feet, like a soft beanbag plush toy — NOT a slender human figure, NOT a human baby, NOT a reborn baby doll, NOT a realistic baby/toddler face, an entirely non-human fantasy creature, head at least 55% of total height",
     "EYES: large glossy doll eyes with a black outline and mostly dark iris, a small bright blue (#00AEEF) dot at the very center of each pupil only (NOT the whole eye colored blue), a white sparkle highlight, and long eyelashes",
     "pink blush cheeks",
@@ -1266,8 +1267,9 @@ function getCommonAppearanceRulesText() {
     "DYNAMIC POSE: body and limbs posed in a dynamic, lively stance — capable of naturally holding, lifting, presenting, or interacting with a product — never stiff or static, always with a sense of movement and personality even at rest",
     "hands with a few short, soft rounded fingers separated by shallow grooves (NOT a smooth fingerless mitten blob, NOT realistic human fingers), no fingernails, same finger count every time",
     "GEM: a LARGE glowing hexagonal salt-crystal gem naturally integrated at the center of the chest — sewn into the clothing as a decorative centerpiece or grown directly from the body as fits this character's own design, looking like it truly belongs there (NOT a sticker or object floating on top), sized to about 30% of the width of the upper torso, cut in this character's own signature accent color with bright specular highlights — this exact gem must always be present and clearly visible, same shape on every sibling, only the color differs",
-    "the exact surface material and any clothing/accessories must be specific and concretely detailed (fabric weave, stitching, gem facets, fur strands, etc. as appropriate) to match this character's own elemental theme, NOT a generic uniform material shared identically with the other siblings — only the small face area is a soft neutral skin-tone, no bare human-looking skin elsewhere on the body",
-    "rendered as a glossy premium chibi doll-like 3D character (Kakao Friends / Pixar-quality soft-shaded 3D render), NOT a flat 2D illustration, NOT a sticker, NOT a photo of a real toy",
+    "the material/texture theme (matte, glossy, fuzzy, faceted, etc.) must be specific to this character's own element, rendered with rich, realistic material detail and lighting — fabric weave, glossy sheen, fine glitter grain, faceted gem refraction, etc. should all read clearly and NOT be simplified or smoothed away",
+    "FACE MATERIAL: the face is colored and textured in the exact same material and color family as this character's own body/outfit (matching the specific color already established for the body) — NEVER a separate realistic tan/beige human skin tone, no bare human-looking skin anywhere on the body",
+    "STYLE: a premium collectible chibi figurine / keyring doll, photographed or rendered with detailed, realistic material texture and lighting — like a real physical collectible object, not a flat illustration or sticker",
     "no uncanny AI artifacts (asymmetric eyes, melted features, extra fingers, warped proportions)",
     "must NOT resemble any existing character or franchise (Pokémon, Kakao Friends, LINE Friends, Sanrio [Hello Kitty, My Melody, Cinnamoroll, Kuromi, Gudetama], Rilakkuma, San-X [Sumikko Gurashi, Molang], Moomin, Miffy, Care Bears, Chiikawa, BT21, Kumamon-style local mascots, Pororo and friends, Catch! Teenieping (캐치! 티니핑), Tayo, Pinkfong/Baby Shark, Minions, Winnie the Pooh, Paddington, Peanuts/Snoopy, Doraemon, Studio Ghibli's Totoro, or Disney/Pixar/anime/manga)",
   ].join(", ");
@@ -1559,7 +1561,7 @@ async function generateCharacterReferenceImage({ characterName, voiceTone, visua
     // 이미 배경까지 상세히 지정한 완성된 프롬프트를 직접 넘길 때) 절대 넣으면 안 된다 —
     // 프롬프트 맨 끝에 붙는 문구라 뒤에 오는 지시가 우선시되는 경향이 있어서, 상세하게
     // 지정한 배경을 이 한 줄이 통째로 무시시켜 버린 사례가 실제로 있었다(해수 v1 생성).
-    const backgroundInstruction = skipCommonRules ? null : "single character centered, plain background";
+    const backgroundInstruction = skipCommonRules ? null : "single character centered, flat solid background in #00AEEF";
     const metadata = visualDescription
       ? [`${characterName} character`, visualDescription, commonRules, voiceTone ? `${voiceTone} tone` : null, "cute mascot reference shot", backgroundInstruction, noTextInstruction].filter(Boolean).join(", ")
       : [`${characterName} character`, commonRules, `${voiceTone || "friendly"} tone`, "cute mascot reference shot", noTextInstruction].filter(Boolean).join(", ");

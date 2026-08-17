@@ -21,6 +21,7 @@
 const express = require("express");
 const router = express.Router();
 const path = require("path");
+const fs = require("fs");
 
 const { callAgent, generateCharacterReferenceImage } = require("../agents/backend-agent");
 const { callDatabase } = require("../agents/database-agent");
@@ -73,6 +74,7 @@ router.get("/library", async (req, res) => {
           appearancePrompt: char.appearancePrompt,
           thumbnailStagingPrompt: char.thumbnailStagingPrompt,
           reference_image_url: char.reference_image_url,
+          keyring_image_url: char.keyring_image_url || null,
         },
       ])
     );
@@ -449,13 +451,27 @@ router.post("/library/:id/generate-reference", async (req, res) => {
     // 쓰면 길고 복잡한 문장 때문에 콘텐츠 필터에 오탐(nsfw)으로 걸리는 경우가 있었다.
     // referencePrompt(짧고 안전한 영어 요약)가 주어지면 그것을 실제 생성에 사용하고,
     // 화면에 보여주는 상세 한국어 visual_description은 그대로 유지한다.
+    // ⭐ 버그 수정: 기본 8개 캐릭터는 config.json의 appearancePrompt(+thumbnailStagingPrompt)가
+    // "일관성을 위한 확정 프롬프트"인데, 이 라우트가 읽는 character_library DB row에는
+    // 그 필드가 없다(merge는 GET /library에서만 일어남) — referencePrompt를 매번 명시적으로
+    // 넘기지 않으면 옛날 lib.visual_description(짧은 초안 문구)으로 조용히 생성돼버린다.
+    // 그래서 base character면 config.json에서 직접 찾아 자동으로 조합한다.
+    const baseConfigChar = lib.is_base_character
+      ? (config.characters || []).find((c) => c.id === lib.id || c.name === lib.character_name)
+      : null;
+    const autoReferencePrompt =
+      baseConfigChar?.appearancePrompt
+        ? [baseConfigChar.appearancePrompt, baseConfigChar.thumbnailStagingPrompt].filter(Boolean).join(", ")
+        : null;
+    const finalReferencePrompt = referencePrompt || autoReferencePrompt;
+
     const genResult = await generateCharacterReferenceImage({
       characterName: lib.character_name,
       voiceTone: lib.voice_tone,
-      visualDescription: referencePrompt || lib.visual_description,
-      // referencePrompt로 완성된 프롬프트(appearancePrompt+thumbnailStagingPrompt 등)를
-      // 직접 넘길 때는 공통 요소가 이미 다 포함되어 있으므로 중복 삽입을 막는다.
-      skipCommonRules: !!referencePrompt,
+      visualDescription: finalReferencePrompt || lib.visual_description,
+      // 완성된 프롬프트(appearancePrompt+thumbnailStagingPrompt)를 쓸 때는 공통 요소가
+      // 이미 다 포함되어 있으므로 중복 삽입을 막는다.
+      skipCommonRules: !!finalReferencePrompt,
     });
 
     if (!genResult.success) {
@@ -486,6 +502,88 @@ router.post("/library/:id/generate-reference", async (req, res) => {
     console.error(`[POST /api/characters/library/:id/generate-reference] 예외:`, error);
     return res.status(500).json({ success: false, message: "레퍼런스 생성 중 오류가 발생했습니다." });
   }
+});
+
+// ─────────────────────────────────────────────
+// POST /api/characters/library/:id/set-reference — 레퍼런스 이미지를 직접 고정
+//
+// ⭐ 용도: 여러 번 재생성한 결과 중 사용자가 이미 마음에 든 특정 결과물(과거 생성본)을
+// "이걸로 최종 확정"하고 싶을 때, 다시 생성하지 않고 그 이미지/시드를 그대로 저장한다.
+// body: { referenceImageUrl: string, generationSeed?: string }
+// ─────────────────────────────────────────────
+router.post("/library/:id/set-reference", async (req, res) => {
+  const { id } = req.params;
+  const { referenceImageUrl, generationSeed } = req.body || {};
+
+  if (!referenceImageUrl) {
+    return res.status(400).json({ success: false, message: "referenceImageUrl이 필요합니다." });
+  }
+
+  const libResult = await callDatabase("character_library", "read", null, { id });
+  if (!libResult.success || libResult.rows.length === 0) {
+    return res.status(404).json({ success: false, message: "해당 캐릭터를 찾을 수 없습니다." });
+  }
+  const lib = libResult.rows[0];
+
+  const finalUpdate = await callDatabase(
+    "character_library",
+    "update",
+    {
+      reference_image_url: referenceImageUrl,
+      generation_seed: generationSeed || lib.generation_seed || null,
+      image_generated_at: new Date().toISOString(),
+      generation_count: (lib.generation_count || 0) + 1,
+    },
+    { id }
+  );
+
+  return res.json({ success: true, character: finalUpdate.rows?.[0] });
+});
+
+// ─────────────────────────────────────────────
+// POST /api/characters/library/:id/set-keyring-image — 인형 키링 버전 이미지 고정
+//
+// ⭐ 키링 인형 상품화용 별도 썸네일. character_library(실제 DB) 테이블에는
+// keyring_image_url 컬럼이 없으므로(스키마 변경 없이 안전하게 추가하기 위해)
+// DB에는 쓰지 않고, config.json에만 캐릭터 이름으로 매칭해서 저장한다.
+// body: { keyringImageUrl: string }
+// ─────────────────────────────────────────────
+router.post("/library/:id/set-keyring-image", async (req, res) => {
+  const { id } = req.params;
+  const { keyringImageUrl } = req.body || {};
+
+  if (!keyringImageUrl) {
+    return res.status(400).json({ success: false, message: "keyringImageUrl이 필요합니다." });
+  }
+
+  const libResult = await callDatabase("character_library", "read", null, { id });
+  if (!libResult.success || libResult.rows.length === 0) {
+    return res.status(404).json({ success: false, message: "해당 캐릭터를 찾을 수 없습니다." });
+  }
+  const characterName = libResult.rows[0].character_name;
+
+  const configChar = (config.characters || []).find((c) => c.name === characterName);
+  if (!configChar) {
+    return res.status(404).json({ success: false, message: "config.json에서 기본 캐릭터를 찾을 수 없습니다." });
+  }
+
+  configChar.keyring_image_url = keyringImageUrl;
+
+  try {
+    const configPath = path.join(__dirname, "../../../config/config.json");
+    const raw = fs.readFileSync(configPath, "utf8");
+    const usesCrlf = raw.includes("\r\n");
+    const json = JSON.stringify(config, null, 2) + "\n";
+    fs.writeFileSync(configPath, usesCrlf ? json.replace(/\n/g, "\r\n") : json, "utf8");
+  } catch (err) {
+    console.error("config.json 저장 실패:", err);
+    return res.status(500).json({ success: false, message: "config.json 저장 중 오류가 발생했습니다." });
+  }
+
+  return res.json({
+    success: true,
+    character: { character_name: characterName, keyring_image_url: keyringImageUrl },
+  });
 });
 
 module.exports = router;
