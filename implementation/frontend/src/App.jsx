@@ -171,7 +171,7 @@ function App() {
     // 서버에서 config 로드
     const loadConfig = async () => {
       try {
-        const res = await fetch('/api/config');
+        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/config`);
         if (res.ok) {
           const data = await res.json();
           window.appConfig = data;
